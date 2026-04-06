@@ -151,15 +151,40 @@ export default function App() {
       if (u) {
         try {
           const userRef = doc(db, 'users', u.uid);
-          const userDoc = await getDoc(userRef);
+          let userDoc = await getDoc(userRef);
           
           let role: 'superadmin' | 'trainer' | 'client' = 'client';
-          if (u.email === 'planeacionespolijic@gmail.com') {
+
+          // 1. Hardcoded SuperAdmin Check (Priority)
+          if (u.email?.toLowerCase() === 'planeacionespolijic@gmail.com') {
             role = 'superadmin';
-          } else if (userDoc.exists()) {
-            role = userDoc.data().role || 'client';
+          } 
+          
+          // 2. Account Claiming Logic (for Trainers created by email)
+          if (!userDoc.exists() && u.email) {
+            const emailRef = doc(db, 'users', u.email.toLowerCase());
+            const emailDoc = await getDoc(emailRef);
+            if (emailDoc.exists()) {
+              const data = emailDoc.data();
+              role = data.role || role; // Use existing role if found
+              // Link the pre-created account to the real UID
+              await setDoc(userRef, { 
+                ...data, 
+                uid: u.uid,
+                lastLogin: serverTimestamp(),
+                photoURL: u.photoURL || data.photoURL || null,
+                displayName: u.displayName || data.displayName || 'Usuario'
+              }, { merge: true });
+              userDoc = await getDoc(userRef);
+            }
           }
 
+          // 3. Normal Role Fetching (if not already superadmin)
+          if (userDoc.exists() && role !== 'superadmin') {
+            role = userDoc.data().role || role;
+          }
+
+          // 4. Update/Create User Document
           await setDoc(userRef, {
             uid: u.uid,
             email: u.email || 'invitado@wlsports.com',
@@ -167,17 +192,21 @@ export default function App() {
             photoURL: u.photoURL || null,
             lastLogin: serverTimestamp(),
             role: role,
-            isAnonymous: u.isAnonymous
+            isAnonymous: u.isAnonymous,
+            status: userDoc.exists() ? (userDoc.data().status || 'active') : 'active'
           }, { merge: true });
 
-          const updatedDoc = await getDoc(userRef);
-          if (updatedDoc.exists()) {
-            const data = updatedDoc.data();
-            setUserRole(data.role);
-            setUserProfile(data);
+          // Set state immediately
+          setUserRole(role);
+          
+          const finalDoc = await getDoc(userRef);
+          if (finalDoc.exists()) {
+            setUserProfile(finalDoc.data());
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${u.uid}`);
+          console.error('Auth state error:', error);
+          // Don't throw here to avoid infinite loop in ErrorBoundary if it's a transient error
+          // handleFirestoreError(error, OperationType.WRITE, `users/${u.uid}`);
         }
       }
       setLoading(false);

@@ -160,9 +160,9 @@ export const SuperAdminDashboard = ({ onBack, user, role }: SuperAdminDashboardP
     if (!newTrainer.email || !newTrainer.displayName) return;
 
     try {
-      const tempId = `trainer_${Date.now()}`;
-      await setDoc(doc(db, 'users', tempId), {
-        email: newTrainer.email,
+      const emailId = newTrainer.email.trim().toLowerCase();
+      await setDoc(doc(db, 'users', emailId), {
+        email: newTrainer.email.trim().toLowerCase(),
         displayName: newTrainer.displayName,
         role: 'trainer',
         status: 'active',
@@ -178,9 +178,9 @@ export const SuperAdminDashboard = ({ onBack, user, role }: SuperAdminDashboardP
         AuditAction.CREATE_USER,
         user.uid,
         role,
-        tempId,
+        emailId,
         newTrainer.displayName,
-        'Nuevo entrenador creado por superadmin'
+        'Nuevo entrenador creado por superadmin (ID basado en email)'
       );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'users');

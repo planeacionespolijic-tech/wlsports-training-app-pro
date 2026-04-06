@@ -169,7 +169,7 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && 
         (
-          (request.auth.token.email == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
+          (request.auth.token.email != null && request.auth.token.email.toLower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
         );
     }
@@ -305,10 +305,19 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid)) || isSuperAdmin();
+      allow read: if isOwner(userId) || 
+                    (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid)) || 
+                    (isAuthenticated() && request.auth.token.email != null && resource.data.get('email', '') == request.auth.token.email) ||
+                    isSuperAdmin();
       allow list: if (isTrainer() || isSuperAdmin()) && isNotBlocked();
-      allow create: if (isOwner(userId) || isTrainer() || isSuperAdmin()) && isValidUser(request.resource.data) && (request.resource.data.get('role', 'client') == 'client' || isSuperAdmin());
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.get('role', 'client') == resource.data.get('role', 'client')) || 
+      allow create: if (isOwner(userId) || isTrainer() || isSuperAdmin()) && 
+                    isValidUser(request.resource.data) && 
+                    (
+                      request.resource.data.get('role', 'client') == 'client' || 
+                      isSuperAdmin() ||
+                      (request.auth.token.email != null && exists(/databases/$(database)/documents/users/$(request.auth.token.email)) && get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == request.resource.data.role)
+                    );
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.get('role', 'client') == resource.data.get('role', 'client') || isSuperAdmin())) || 
                     (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid) && isNotBlocked()) || 
                     isSuperAdmin();
     }
