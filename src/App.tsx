@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, loginWithGoogle, loginAnonymously, logout, handleFirestoreError, OperationType } from './firebase';
 import { SuperAdminDashboard } from './screens/SuperAdminDashboard';
@@ -94,11 +94,29 @@ export default function App() {
   const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
   const [userRole, setUserRole] = useState<'superadmin' | 'trainer' | 'client'>('client');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const handleNavigate = (screen: string, data: any = null) => {
     setScreenData(data);
     setCurrentScreen(screen);
   };
+
+  useEffect(() => {
+    setLoading(true);
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log("Usuario logueado con redirect:", result.user);
+        }
+      })
+      .catch((error) => {
+        console.error("Error en login redirect:", error);
+        setAuthError("Error al iniciar sesión con Google. Por favor, intenta de nuevo.");
+      })
+      .finally(() => {
+        // We don't set loading to false here because onAuthStateChanged will handle it
+      });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -152,7 +170,7 @@ export default function App() {
 
   const renderScreen = () => {
     if (!user) {
-      return <LoginScreen onLogin={loginWithGoogle} onLoginAnonymous={loginAnonymously} />;
+      return <LoginScreen onLogin={loginWithGoogle} onLoginAnonymous={loginAnonymously} externalError={authError} />;
     }
 
     if (userProfile && (userProfile.status === 'blocked' || userProfile.status === 'deleted')) {
