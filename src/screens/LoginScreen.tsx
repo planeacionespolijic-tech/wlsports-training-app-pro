@@ -4,9 +4,10 @@ import { motion } from 'motion/react';
 
 interface LoginScreenProps {
   onLogin: () => void;
+  onLoginAnonymous: () => void;
 }
 
-export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
+export const LoginScreen = ({ onLogin, onLoginAnonymous }: LoginScreenProps) => {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background Decorative Elements */}
@@ -61,7 +62,7 @@ export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
         >
           <button 
             onClick={onLogin}
-            className="w-full flex items-center justify-center gap-4 bg-white text-black py-5 rounded-3xl font-black text-lg hover:bg-zinc-200 transition-all transform active:scale-95 shadow-xl shadow-white/5"
+            className="w-full flex items-center justify-center gap-4 bg-white text-black py-5 rounded-3xl font-black text-lg hover:bg-zinc-200 transition-all transform active:scale-95 shadow-xl shadow-white/5 mb-4"
           >
             <img 
               src="https://www.google.com/favicon.ico" 
@@ -69,6 +70,14 @@ export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               className="w-6 h-6"
             />
             Iniciar sesión con Google
+          </button>
+
+          <button 
+            onClick={onLoginAnonymous}
+            className="w-full flex items-center justify-center gap-4 bg-zinc-900 text-white py-5 rounded-3xl font-black text-lg border border-zinc-800 hover:bg-zinc-800 transition-all transform active:scale-95"
+          >
+            <LogIn size={24} className="text-[#D4AF37]" />
+            Acceso como Invitado
           </button>
           
           <p className="text-center text-zinc-600 text-[10px] mt-8 uppercase tracking-widest font-bold">

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, loginWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, loginWithGoogle, loginAnonymously, logout, handleFirestoreError, OperationType } from './firebase';
 import { SuperAdminDashboard } from './screens/SuperAdminDashboard';
 import { TrainerDashboard } from './screens/TrainerDashboard';
 import { ClientDashboard } from './screens/ClientDashboard';
@@ -118,11 +118,12 @@ export default function App() {
 
           await setDoc(userRef, {
             uid: u.uid,
-            email: u.email,
-            displayName: u.displayName,
-            photoURL: u.photoURL,
+            email: u.email || 'invitado@wlsports.com',
+            displayName: u.displayName || 'Invitado',
+            photoURL: u.photoURL || null,
             lastLogin: serverTimestamp(),
-            role: role
+            role: role,
+            isAnonymous: u.isAnonymous
           }, { merge: true });
 
           const updatedDoc = await getDoc(userRef);
@@ -151,7 +152,7 @@ export default function App() {
 
   const renderScreen = () => {
     if (!user) {
-      return <LoginScreen onLogin={loginWithGoogle} />;
+      return <LoginScreen onLogin={loginWithGoogle} onLoginAnonymous={loginAnonymously} />;
     }
 
     if (userProfile && (userProfile.status === 'blocked' || userProfile.status === 'deleted')) {
