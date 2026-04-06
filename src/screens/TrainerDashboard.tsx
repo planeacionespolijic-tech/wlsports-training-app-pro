@@ -33,11 +33,12 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
       const q = query(
         collection(db, 'users'),
         where('trainerId', '==', user.uid),
-        where('status', '==', 'active'),
-        orderBy('displayName')
+        where('status', '==', 'active')
       );
       const snapshot = await getDocs(q);
-      setAthletes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => (a.displayName || '').localeCompare(b.displayName || ''));
+      setAthletes(data);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'users');
     } finally {
@@ -52,12 +53,13 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     const athletesQuery = query(
       collection(db, 'users'),
       where('trainerId', '==', user.uid),
-      where('status', '==', 'active'),
-      orderBy('displayName')
+      where('status', '==', 'active')
     );
 
     const unsubscribeAthletes = onSnapshot(athletesQuery, (snapshot) => {
-      setAthletes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => (a.displayName || '').localeCompare(b.displayName || ''));
+      setAthletes(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
@@ -70,11 +72,16 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
         const q = query(
           collection(db, 'history'),
           where('trainerId', '==', user.uid),
-          orderBy('createdAt', 'desc'),
-          limit(10)
+          limit(20)
         );
         const snap = await getDocs(q);
-        setRecentActivity(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        data.sort((a: any, b: any) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB.getTime() - dateA.getTime();
+        });
+        setRecentActivity(data);
       } catch (e) {
         console.error('Error fetching activity:', e);
       }
@@ -85,12 +92,16 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     const submissionsQuery = query(
       collection(db, 'challengeSubmissions'),
       where('trainerId', '==', user.uid),
-      where('status', '==', 'pending'),
-      orderBy('timestamp', 'desc')
+      where('status', '==', 'pending')
     );
 
     const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
       const subs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      subs.sort((a: any, b: any) => {
+        const dateA = a.timestamp?.toDate?.() || new Date(0);
+        const dateB = b.timestamp?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
       setPendingSubmissions(subs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'challengeSubmissions');

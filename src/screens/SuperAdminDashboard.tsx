@@ -54,22 +54,28 @@ export const SuperAdminDashboard = ({ onBack, user, role }: SuperAdminDashboardP
       const trainersQuery = query(
         collection(db, 'users'),
         where('role', '==', 'trainer'),
-        orderBy('lastLogin', 'desc'),
-        limit(50)
+        limit(100)
       );
       const trainersSnap = await getDocs(trainersQuery);
       const trainersData = await Promise.all(trainersSnap.docs.map(async (trainerDoc) => {
-        const trainer = { id: trainerDoc.id, ...trainerDoc.data() };
+        const trainer = { id: trainerDoc.id, ...trainerDoc.data() } as any;
         const clientsQuery = query(collection(db, 'users'), where('trainerId', '==', trainer.id));
         const clientsSnapshot = await getDocs(clientsQuery);
         return { ...trainer, clientCount: clientsSnapshot.size };
       }));
+      
+      // Sort in memory
+      trainersData.sort((a, b) => {
+        const dateA = a.lastLogin?.toDate?.() || new Date(0);
+        const dateB = b.lastLogin?.toDate?.() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
       setTrainers(trainersData);
 
       // Initial Athletes fetch
       const athletesResult = await fetchPaginated<any>(
         'users',
-        [where('role', '==', 'client'), orderBy('lastLogin', 'desc')],
+        [where('role', '==', 'client')],
         10
       );
       setAthletes(athletesResult.data);
@@ -110,7 +116,7 @@ export const SuperAdminDashboard = ({ onBack, user, role }: SuperAdminDashboardP
     try {
       const result = await fetchPaginated<any>(
         'users',
-        [where('role', '==', 'client'), orderBy('lastLogin', 'desc')],
+        [where('role', '==', 'client')],
         10,
         athletesLastVisible
       );

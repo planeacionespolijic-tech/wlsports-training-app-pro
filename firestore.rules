@@ -145,7 +145,7 @@ service cloud.firestore {
 
     function isNotBlocked() {
       return isAuthenticated() && (
-        (request.auth.token.email == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') == 'active' ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'client') == 'superadmin'
@@ -169,7 +169,7 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && 
         (
-          (request.auth.token.email != null && request.auth.token.email.toLower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
+          (request.auth.token.email != null && request.auth.token.email.lower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
         );
     }
