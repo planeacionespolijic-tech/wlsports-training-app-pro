@@ -181,7 +181,7 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
         </div>
 
         {/* Social Buttons */}
-        <div className="w-full grid grid-cols-2 gap-4">
+        <div className="w-full grid grid-cols-2 gap-4 mb-4">
           <button 
             onClick={() => handleLogin(onLogin as any)}
             disabled={isLoading}
@@ -200,6 +200,20 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
             Invitado
           </button>
         </div>
+
+        <button 
+          onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('guest', 'true');
+            window.history.replaceState({}, '', url);
+            handleLogin(onLoginAnonymous as any);
+          }}
+          disabled={isLoading}
+          className="w-full bg-zinc-800/50 text-[#D4AF37] py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-[#D4AF37]/20 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
+        >
+          <Zap size={18} />
+          Acceso Directo (Sin Registro)
+        </button>
         
         <p className="text-center text-zinc-600 text-[10px] mt-8 uppercase tracking-widest font-bold">
           Al ingresar aceptas nuestros términos y condiciones

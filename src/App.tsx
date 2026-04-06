@@ -119,8 +119,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const checkAutoLogin = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const isVercel = window.location.hostname.includes('vercel.app');
+      const hasLoggedOut = localStorage.getItem('wlsports_logged_out') === 'true';
+      
+      if ((params.get('guest') === 'true' || isVercel) && !user && !loading && !hasLoggedOut) {
+        try {
+          await loginAnonymously();
+        } catch (err) {
+          console.error("Auto-login failed:", err);
+        }
+      }
+    };
+    checkAutoLogin();
+  }, [user, loading]);
+
+  const handleLogout = async () => {
+    localStorage.setItem('wlsports_logged_out', 'true');
+    await logout();
+    setCurrentScreen('home');
+  };
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        localStorage.removeItem('wlsports_logged_out');
+      }
       
       if (u) {
         try {
@@ -185,7 +211,7 @@ export default function App() {
             Si crees que esto es un error, contacta con soporte.
           </p>
           <button 
-            onClick={logout}
+            onClick={handleLogout}
             className="bg-zinc-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-all"
           >
             Cerrar Sesión
@@ -203,7 +229,7 @@ export default function App() {
               else if (role === 'trainer') handleNavigate('trainer-dashboard');
               else handleNavigate('client-dashboard');
             }}
-            onLogout={logout}
+            onLogout={handleLogout}
             user={user}
             currentRole={userRole}
           />
@@ -211,9 +237,9 @@ export default function App() {
       case 'superadmin-dashboard':
         return <SuperAdminDashboard onBack={() => handleNavigate('home')} user={user} role={userRole} />;
       case 'trainer-dashboard':
-        return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={logout} onBack={() => handleNavigate('home')} />;
+        return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
       case 'client-dashboard':
-        return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={logout} onBack={() => handleNavigate('home')} />;
+        return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
       case 'entrenamientos':
         return <WorkoutsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} onNavigate={handleNavigate} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'historial':
@@ -265,7 +291,7 @@ export default function App() {
               else if (role === 'trainer') handleNavigate('trainer-dashboard');
               else handleNavigate('client-dashboard');
             }}
-            onLogout={logout}
+            onLogout={handleLogout}
             user={user}
             currentRole={userRole}
           />
