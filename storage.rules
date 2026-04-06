@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Función para verificar si el usuario es administrador
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "planeacionespolijic@gmail.com" ||
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Reglas para fotos de perfil
+    match /users/{userId}/{fileName} {
+      // Lectura pública (o autenticada si prefieres)
+      allow read: if true; 
+      
+      // Escritura solo por el dueño o admin
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin())
+                   && request.resource.size < 1 * 1024 * 1024 // Máximo 1MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Denegar todo lo demás por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

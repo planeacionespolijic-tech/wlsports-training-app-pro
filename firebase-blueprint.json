@@ -1,0 +1,338 @@
+{
+  "entities": {
+    "workout": {
+      "title": "Workout",
+      "description": "A training routine definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the workout" },
+        "duration": { "type": "string", "description": "Duration of the workout" },
+        "exercises": { 
+          "type": "array", 
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "sets": { "type": "string" },
+              "reps": { "type": "string" },
+              "weight": { "type": "string" }
+            }
+          }
+        },
+        "userId": { "type": "string", "description": "Owner of the workout" },
+        "trainerId": { "type": "string", "description": "Trainer of the user" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "userId", "createdAt"]
+    },
+    "historyEntry": {
+      "title": "History Entry",
+      "description": "A record of a completed workout",
+      "type": "object",
+      "properties": {
+        "workoutName": { "type": "string", "description": "Name of the workout completed" },
+        "workoutDetails": { "type": "object", "description": "Snapshot of the workout details at completion" },
+        "date": { "type": "string", "description": "Date of completion" },
+        "userId": { "type": "string", "description": "User who completed the workout" },
+        "trainerId": { "type": "string", "description": "Trainer of the user" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["workoutName", "date", "userId", "createdAt"]
+    },
+    "report": {
+      "title": "Report",
+      "description": "A performance report or note",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the report" },
+        "description": { "type": "string", "description": "Content of the report" },
+        "userId": { "type": "string", "description": "Owner of the report" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "userId", "createdAt"]
+    },
+    "userProfile": {
+      "title": "User Profile",
+      "description": "User account information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "trainer", "client"] },
+        "createdBy": { "type": "string", "description": "UID of the user who created this profile" },
+        "trainerId": { "type": "string", "description": "UID of the trainer assigned to this client" },
+        "type": { "type": "string", "enum": ["adult", "child"] },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "points": { "type": "integer" },
+        "achievements": { "type": "array", "items": { "type": "string" } },
+        "streak": { "type": "integer" },
+        "trustScore": { "type": "number", "description": "Reliability score of the user" },
+        "goals": { "type": "string" },
+        "lastLogin": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "gamificationLog": {
+      "title": "Gamification Log",
+      "description": "History of points and achievements earned",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["points", "achievement", "level_up"] },
+        "value": { "type": "integer" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "createdAt"]
+    },
+    "challenge": {
+      "title": "Challenge",
+      "description": "Simplified challenges by level",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "level": { "type": "integer" },
+        "videoUrl": { "type": "string" },
+        "xpReward": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "level", "createdAt"]
+    },
+    "tournament": {
+      "title": "Tournament",
+      "description": "A sports tournament",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "players": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "players", "createdAt"]
+    },
+    "tournamentMatch": {
+      "title": "Tournament Match",
+      "description": "Results for a match day in a tournament",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "dateName": { "type": "string" },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "playerId": { "type": "string" },
+              "outcome": { "type": "string", "enum": ["win", "draw", "lose"] }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "dateName", "results", "createdAt"]
+    },
+    "tournamentBonus": {
+      "title": "Tournament Bonus",
+      "description": "Bonus points for a player in a tournament",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "playerId": { "type": "string" },
+        "points": { "type": "integer" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "playerId", "points", "createdAt"]
+    },
+    "challengeSubmission": {
+      "title": "Challenge Submission",
+      "description": "Athlete evidence for a challenge",
+      "type": "object",
+      "properties": {
+        "challengeId": { "type": "string" },
+        "userId": { "type": "string" },
+        "trainerId": { "type": "string", "description": "UID of the trainer who needs to validate this" },
+        "videoUrl": { "type": "string" },
+        "result": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "validationDetails": { "type": "object" },
+        "trainerFeedback": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["challengeId", "userId", "trainerId", "status", "timestamp"]
+    },
+    "diagnosis": {
+      "title": "Diagnosis",
+      "description": "Automatic diagnosis based on evaluations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "limitations": { "type": "string" },
+        "focus": { "type": "string" },
+        "recommendations": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "trainingPlan": {
+      "title": "Training Plan",
+      "description": "Intelligent planning with blocks and progressions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "objective": { "type": "string" },
+        "blocks": { "type": "array", "items": { "type": "string" } },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "createdAt"]
+    },
+    "motorEvaluation": {
+      "title": "Motor Evaluation",
+      "description": "Specific evaluation for kids",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "coordination": { "type": "number" },
+        "balance": { "type": "number" },
+        "agility": { "type": "number" },
+        "strength": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "assessment": {
+      "title": "Assessment",
+      "description": "A physical assessment record",
+      "type": "object",
+      "properties": {
+        "weight": { "type": "number" },
+        "height": { "type": "number" },
+        "bodyFat": { "type": "number" },
+        "muscleMass": { "type": "number" },
+        "vo2Max": { "type": "number" },
+        "notes": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["weight", "height", "userId", "createdAt"]
+    },
+    "anamnesis": {
+      "title": "Anamnesis",
+      "description": "Medical and sports history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "medicalHistory": { "type": "string" },
+        "injuries": { "type": "string" },
+        "medications": { "type": "string" },
+        "habits": { "type": "string" },
+        "goals": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "updatedAt"]
+    },
+    "test": {
+      "title": "Test",
+      "description": "Physical or technical test result",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["physical", "technical"] },
+        "name": { "type": "string" },
+        "value": { "type": "string" },
+        "unit": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "name", "value", "createdAt"]
+    },
+    "videoAnalysis": {
+      "title": "Video Analysis",
+      "description": "Movement analysis from video",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "title": { "type": "string" },
+        "observations": { "type": "string" },
+        "analysis": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "videoUrl", "title", "createdAt"]
+    },
+    "reactionTest": {
+      "title": "Reaction Test",
+      "description": "Results of a visual stimulus reaction test",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "repetitions": { "type": "integer" },
+        "average": { "type": "number" },
+        "best": { "type": "number" },
+        "reactionTimes": { "type": "array", "items": { "type": "number" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date", "repetitions", "average", "best", "createdAt"]
+    },
+    "liveSession": {
+      "title": "Live Session",
+      "description": "Real-time state of an ongoing workout",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "workoutId": { "type": "string" },
+        "workoutName": { "type": "string" },
+        "completedExercises": { "type": "array", "items": { "type": "integer" } },
+        "currentExerciseIndex": { "type": "integer" },
+        "rpe": { "type": "integer" },
+        "lastUpdate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "finished"] }
+      },
+      "required": ["userId", "workoutId", "status"]
+    },
+    "auditLog": {
+      "title": "Audit Log",
+      "description": "Record of critical system actions",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "Type of action performed" },
+        "performedBy": { "type": "string", "description": "UID of the user who performed the action" },
+        "performedByRole": { "type": "string", "description": "Role of the user who performed the action" },
+        "targetUserId": { "type": "string", "description": "UID of the user affected by the action" },
+        "targetUserName": { "type": "string", "description": "Name of the user affected by the action" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "string", "description": "Additional information about the action" }
+      },
+      "required": ["action", "performedBy", "performedByRole", "targetUserId", "targetUserName", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/workouts/{workoutId}": { "schema": "workout", "description": "User workouts" },
+    "/history/{historyId}": { "schema": "historyEntry", "description": "Workout history" },
+    "/reports/{reportId}": { "schema": "report", "description": "Performance reports" },
+    "/users/{userId}": { "schema": "userProfile", "description": "User profiles" },
+    "/assessments/{assessmentId}": { "schema": "assessment", "description": "Physical assessments" },
+    "/anamnesis/{anamnesisId}": { "schema": "anamnesis", "description": "Medical history" },
+    "/tests/{testId}": { "schema": "test", "description": "Physical/Technical tests" },
+    "/videoAnalysis/{analysisId}": { "schema": "videoAnalysis", "description": "Movement analysis" },
+    "/diagnoses/{diagnosisId}": { "schema": "diagnosis", "description": "Automatic diagnoses" },
+    "/trainingPlans/{planId}": { "schema": "trainingPlan", "description": "Training plans" },
+    "/motorEvaluations/{evalId}": { "schema": "motorEvaluation", "description": "Kids motor evaluations" },
+    "/gamificationLogs/{logId}": { "schema": "gamificationLog", "description": "Gamification history" },
+    "/challenges/{challengeId}": { "schema": "challenge", "description": "Simplified challenges" },
+    "/tournaments/{tournamentId}": { "schema": "tournament", "description": "Tournaments" },
+    "/tournamentMatches/{matchId}": { "schema": "tournamentMatch", "description": "Tournament match results" },
+    "/tournamentBonuses/{bonusId}": { "schema": "tournamentBonus", "description": "Tournament bonus points" },
+    "/reactionTests/{testId}": { "schema": "reactionTest", "description": "Reaction test results" },
+    "/liveSessions/{userId}": { "schema": "liveSession", "description": "Live workout sessions" },
+    "/auditLogs/{logId}": { "schema": "auditLog", "description": "System audit logs" }
+  }
+}
