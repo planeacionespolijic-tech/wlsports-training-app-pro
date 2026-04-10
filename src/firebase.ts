@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect, 
+  signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
   User, 
@@ -26,7 +26,7 @@ export const googleProvider = new GoogleAuthProvider();
 const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@wlsports.local`;
 
 // Auth helpers
-export const loginWithGoogle = () => signInWithRedirect(auth, googleProvider);
+export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 
 export const registerWithUsername = async (username: string, password: string) => {
   if (username.length < 3) throw new Error("El nombre de usuario debe tener al menos 3 caracteres.");

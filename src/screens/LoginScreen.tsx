@@ -23,7 +23,22 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
       await loginFn();
     } catch (err: any) {
       const message = err.message || "Ocurrió un error al iniciar sesión.";
-      if (message.includes("Anonymous")) {
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(
+          <>
+            Dominio no autorizado para inicio de sesión con Google.
+            <br />
+            <a 
+              href="https://console.firebase.google.com/project/_/authentication/settings" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="underline font-bold mt-2 block text-[#D4AF37]"
+            >
+              Agrega tu dominio de Vercel en Firebase Authentication &gt; Settings &gt; Authorized domains
+            </a>
+          </>
+        );
+      } else if (message.includes("Anonymous")) {
         setError(
           <>
             {message}
