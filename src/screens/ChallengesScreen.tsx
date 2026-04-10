@@ -46,7 +46,7 @@ export const ChallengesScreen = ({ onBack, userId, role, userProfile }: Challeng
     xpReward: 0
   });
 
-  const isTrainer = role === 'trainer' || role === 'superadmin';
+  const isTrainer = role === 'trainer';
 
   useEffect(() => {
     const q = query(collection(db, 'challenges'), orderBy('level', 'asc'), orderBy('createdAt', 'desc'));

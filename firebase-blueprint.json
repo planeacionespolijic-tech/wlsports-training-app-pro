@@ -60,7 +60,7 @@
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
-        "role": { "type": "string", "enum": ["superadmin", "trainer", "client"] },
+        "role": { "type": "string", "enum": ["trainer", "client"] },
         "createdBy": { "type": "string", "description": "UID of the user who created this profile" },
         "trainerId": { "type": "string", "description": "UID of the trainer assigned to this client" },
         "type": { "type": "string", "enum": ["adult", "child"] },
@@ -298,6 +298,20 @@
       },
       "required": ["userId", "workoutId", "status"]
     },
+    "exerciseBank": {
+      "title": "Exercise Bank",
+      "description": "A bank of exercises for trainers to use in workouts",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "muscleGroup": { "type": "string" },
+        "description": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "trainerId", "createdAt"]
+    },
     "auditLog": {
       "title": "Audit Log",
       "description": "Record of critical system actions",
@@ -333,6 +347,7 @@
     "/tournamentBonuses/{bonusId}": { "schema": "tournamentBonus", "description": "Tournament bonus points" },
     "/reactionTests/{testId}": { "schema": "reactionTest", "description": "Reaction test results" },
     "/liveSessions/{userId}": { "schema": "liveSession", "description": "Live workout sessions" },
+    "/exerciseBank/{exerciseId}": { "schema": "exerciseBank", "description": "Trainer exercise bank" },
     "/auditLogs/{logId}": { "schema": "auditLog", "description": "System audit logs" }
   }
 }

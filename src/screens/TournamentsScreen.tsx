@@ -74,7 +74,7 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
     reason: ''
   });
 
-  const isTrainer = role === 'trainer' || role === 'superadmin';
+  const isTrainer = role === 'trainer';
 
   useEffect(() => {
     const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));

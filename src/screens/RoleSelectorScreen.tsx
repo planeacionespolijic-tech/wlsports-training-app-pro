@@ -3,7 +3,7 @@ import { Shield, Users, User, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface RoleSelectorScreenProps {
-  onSelectRole: (role: 'superadmin' | 'trainer' | 'client') => void;
+  onSelectRole: (role: 'trainer' | 'client') => void;
   onLogout: () => void;
   user: any;
   currentRole: string;
@@ -12,22 +12,13 @@ interface RoleSelectorScreenProps {
 export const RoleSelectorScreen = ({ onSelectRole, onLogout, user, currentRole }: RoleSelectorScreenProps) => {
   const roles = [
     { 
-      id: 'superadmin', 
-      title: 'SuperAdmin', 
-      description: 'Gestión global y métricas', 
-      icon: Shield, 
-      color: 'text-red-500', 
-      bg: 'bg-red-500/10',
-      allowed: currentRole === 'superadmin'
-    },
-    { 
       id: 'trainer', 
       title: 'Entrenador', 
       description: 'Gestión de atletas y entrenamientos', 
       icon: Users, 
       color: 'text-[#D4AF37]', 
       bg: 'bg-[#D4AF37]/10',
-      allowed: currentRole === 'superadmin' || currentRole === 'trainer'
+      allowed: currentRole === 'trainer'
     },
     { 
       id: 'client', 

@@ -3,7 +3,6 @@ import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, loginWithGoogle, loginAnonymously, logout, handleFirestoreError, OperationType } from './firebase';
-import { SuperAdminDashboard } from './screens/SuperAdminDashboard';
 import { TrainerDashboard } from './screens/TrainerDashboard';
 import { ClientDashboard } from './screens/ClientDashboard';
 import { LoginScreen } from './screens/LoginScreen';
@@ -86,13 +85,15 @@ class ErrorBoundary extends (React.Component as any) {
   }
 }
 
+import { ExerciseBankScreen } from './screens/ExerciseBankScreen';
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentScreen, setCurrentScreen] = useState('home');
   const [screenData, setScreenData] = useState<any>(null);
   const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
-  const [userRole, setUserRole] = useState<'superadmin' | 'trainer' | 'client'>('client');
+  const [userRole, setUserRole] = useState<'trainer' | 'client'>('client');
   const [userProfile, setUserProfile] = useState<any>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -153,20 +154,18 @@ export default function App() {
           const userRef = doc(db, 'users', u.uid);
           let userDoc = await getDoc(userRef);
           
-          let role: 'superadmin' | 'trainer' | 'client' = 'client';
+          let role: 'trainer' | 'client' = 'client';
 
-          // 1. Hardcoded SuperAdmin Check (Priority)
-          if (u.email?.toLowerCase() === 'planeacionespolijic@gmail.com') {
-            role = 'superadmin';
-          } 
-          
-          // 2. Account Claiming Logic (for Trainers created by email)
+          // 1. Account Claiming Logic (for Trainers created by email)
           if (!userDoc.exists() && u.email) {
             const emailRef = doc(db, 'users', u.email.toLowerCase());
             const emailDoc = await getDoc(emailRef);
             if (emailDoc.exists()) {
               const data = emailDoc.data();
               role = data.role || role; // Use existing role if found
+              if (role === 'superadmin' as any) {
+                role = 'trainer';
+              }
               // Link the pre-created account to the real UID
               await setDoc(userRef, { 
                 ...data, 
@@ -179,9 +178,12 @@ export default function App() {
             }
           }
 
-          // 3. Normal Role Fetching (if not already superadmin)
-          if (userDoc.exists() && role !== 'superadmin') {
+          // 3. Normal Role Fetching
+          if (userDoc.exists()) {
             role = userDoc.data().role || role;
+            if (role === 'superadmin' as any) {
+              role = 'trainer';
+            }
           }
 
           // 4. Update/Create User Document
@@ -219,7 +221,7 @@ export default function App() {
     setCurrentScreen('athlete-profile');
   };
 
-  const isTrainerOrAdmin = userRole === 'superadmin' || userRole === 'trainer';
+  const isTrainer = userRole === 'trainer';
   const targetUserId = selectedAthlete ? selectedAthlete.id : (user?.uid || '');
   const currentTrainerId = userRole === 'trainer' ? (user?.uid || null) : (userProfile?.trainerId || null);
 
@@ -254,8 +256,7 @@ export default function App() {
         return (
           <RoleSelectorScreen 
             onSelectRole={(role) => {
-              if (role === 'superadmin') handleNavigate('superadmin-dashboard');
-              else if (role === 'trainer') handleNavigate('trainer-dashboard');
+              if (role === 'trainer') handleNavigate('trainer-dashboard');
               else handleNavigate('client-dashboard');
             }}
             onLogout={handleLogout}
@@ -263,12 +264,17 @@ export default function App() {
             currentRole={userRole}
           />
         );
-      case 'superadmin-dashboard':
-        return <SuperAdminDashboard onBack={() => handleNavigate('home')} user={user} role={userRole} />;
       case 'trainer-dashboard':
         return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
       case 'client-dashboard':
         return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
+      case 'exercise-bank':
+        return (
+          <ExerciseBankScreen
+            userId={user.uid}
+            onBack={() => navigateTo('trainer-dashboard')}
+          />
+        );
       case 'entrenamientos':
         return <WorkoutsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} onNavigate={handleNavigate} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'historial':
@@ -283,25 +289,25 @@ export default function App() {
           userId={user.uid}
         />;
       case 'athlete-profile':
-        return <AthleteProfileScreen athlete={selectedAthlete} onBack={() => { setSelectedAthlete(null); handleNavigate('home'); }} onNavigate={handleNavigate} isAdmin={isTrainerOrAdmin} />;
+        return <AthleteProfileScreen athlete={selectedAthlete} onBack={() => { setSelectedAthlete(null); handleNavigate('home'); }} onNavigate={handleNavigate} isAdmin={isTrainer} />;
       case 'valoracion':
-        return <ValoracionScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <ValoracionScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'zonas':
         return <ZonasScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'seguimiento':
         return <SeguimientoScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'anamnesis':
-        return <AnamnesisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <AnamnesisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'tests':
-        return <TestsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <TestsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'videoAnalysis':
-        return <VideoAnalysisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <VideoAnalysisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'diagnostico':
-        return <DiagnosisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <DiagnosisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'planificacion':
-        return <PlanningScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <PlanningScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'kidsModule':
-        return <KidsModuleScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainerOrAdmin} trainerId={currentTrainerId} />;
+        return <KidsModuleScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'ejecucion-sesion':
         return <SessionExecutionScreen onBack={() => handleNavigate('entrenamientos')} userId={targetUserId} workout={screenData} trainerId={currentTrainerId} />;
       case 'retos':
@@ -316,8 +322,7 @@ export default function App() {
         return (
           <RoleSelectorScreen 
             onSelectRole={(role) => {
-              if (role === 'superadmin') handleNavigate('superadmin-dashboard');
-              else if (role === 'trainer') handleNavigate('trainer-dashboard');
+              if (role === 'trainer') handleNavigate('trainer-dashboard');
               else handleNavigate('client-dashboard');
             }}
             onLogout={handleLogout}
@@ -356,7 +361,7 @@ export default function App() {
         )}
 
         {/* Coach Floating Action Button to switch athletes */}
-        {isTrainerOrAdmin && selectedAthlete && (
+        {isTrainer && selectedAthlete && (
           <button 
             onClick={() => {
               setSelectedAthlete(null);

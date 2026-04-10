@@ -45,6 +45,12 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
   const [circExTime, setCircExTime] = useState(30);
   const [circExReps, setCircExReps] = useState('');
 
+  // Exercise Bank state
+  const [exerciseBank, setExerciseBank] = useState<any[]>([]);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankTargetBlockId, setBankTargetBlockId] = useState<string | null>(null);
+  const [bankTargetType, setBankTargetType] = useState<'normal' | 'circuit' | null>(null);
+
   const fetchWorkouts = useCallback(async (isRefresh = false) => {
     if (!userId) return;
     if (isRefresh) setRefreshing(true);
@@ -73,6 +79,25 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
   useEffect(() => {
     fetchWorkouts();
   }, [fetchWorkouts]);
+
+  useEffect(() => {
+    const currentTrainerId = trainerId || userId;
+    if (!currentTrainerId) return;
+
+    const q = query(
+      collection(db, 'exerciseBank'),
+      where('trainerId', '==', currentTrainerId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExerciseBank(data);
+    }, (error) => {
+      console.error('Error fetching exercise bank:', error);
+    });
+
+    return () => unsubscribe();
+  }, [trainerId, userId]);
 
   // Calculations
   const calculateExerciseTotalTime = (series: number, timePerSeries: number) => series * timePerSeries;
@@ -561,22 +586,36 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
                                       {editingExerciseId ? 'Editando Ejercicio' : 'Nuevo Ejercicio'}
                                     </h4>
-                                    {editingExerciseId && (
-                                      <button 
-                                        onClick={() => {
-                                          setEditingExerciseId(null);
-                                          setExName('');
-                                          setExSeries(3);
-                                          setExReps('');
-                                          setExTime(0);
-                                          setExLoad('');
-                                          setExRpe(0);
-                                        }}
-                                        className="text-[10px] font-bold text-zinc-500 hover:text-white"
-                                      >
-                                        Cancelar Edición
-                                      </button>
-                                    )}
+                                    <div className="flex items-center gap-3">
+                                      {!editingExerciseId && exerciseBank.length > 0 && (
+                                        <button 
+                                          onClick={() => {
+                                            setBankTargetBlockId(block.id);
+                                            setBankTargetType('normal');
+                                            setShowBankModal(true);
+                                          }}
+                                          className="text-[10px] font-bold text-[#D4AF37] hover:text-white bg-[#D4AF37]/10 px-2 py-1 rounded"
+                                        >
+                                          Importar del Banco
+                                        </button>
+                                      )}
+                                      {editingExerciseId && (
+                                        <button 
+                                          onClick={() => {
+                                            setEditingExerciseId(null);
+                                            setExName('');
+                                            setExSeries(3);
+                                            setExReps('');
+                                            setExTime(0);
+                                            setExLoad('');
+                                            setExRpe(0);
+                                          }}
+                                          className="text-[10px] font-bold text-zinc-500 hover:text-white"
+                                        >
+                                          Cancelar Edición
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <input
                                     type="text"
@@ -700,19 +739,33 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
                                       {editingItemId ? 'Editando Item de Circuito' : 'Nuevo Ejercicio en Circuito'}
                                     </h4>
-                                    {editingItemId && (
-                                      <button 
-                                        onClick={() => {
-                                          setEditingItemId(null);
-                                          setCircExName('');
-                                          setCircExTime(30);
-                                          setCircExReps('');
-                                        }}
-                                        className="text-[10px] font-bold text-zinc-500 hover:text-white"
-                                      >
-                                        Cancelar Edición
-                                      </button>
-                                    )}
+                                    <div className="flex items-center gap-3">
+                                      {!editingItemId && exerciseBank.length > 0 && (
+                                        <button 
+                                          onClick={() => {
+                                            setBankTargetBlockId(block.id);
+                                            setBankTargetType('circuit');
+                                            setShowBankModal(true);
+                                          }}
+                                          className="text-[10px] font-bold text-[#D4AF37] hover:text-white bg-[#D4AF37]/10 px-2 py-1 rounded"
+                                        >
+                                          Importar del Banco
+                                        </button>
+                                      )}
+                                      {editingItemId && (
+                                        <button 
+                                          onClick={() => {
+                                            setEditingItemId(null);
+                                            setCircExName('');
+                                            setCircExTime(30);
+                                            setCircExReps('');
+                                          }}
+                                          className="text-[10px] font-bold text-zinc-500 hover:text-white"
+                                        >
+                                          Cancelar Edición
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <input
                                     type="text"
@@ -865,6 +918,52 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
           </div>
         )}
       </main>
+
+      {/* Exercise Bank Modal */}
+      <AnimatePresence>
+        {showBankModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 shadow-2xl flex flex-col max-h-[80vh]"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-black">Banco de Ejercicios</h2>
+                <button onClick={() => setShowBankModal(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                {exerciseBank.length === 0 ? (
+                  <p className="text-zinc-500 text-sm italic text-center py-10">No hay ejercicios en tu banco.</p>
+                ) : (
+                  exerciseBank.map(ex => (
+                    <div 
+                      key={ex.id} 
+                      className="bg-black border border-zinc-800 p-4 rounded-xl flex justify-between items-center hover:border-[#D4AF37]/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (bankTargetType === 'normal') {
+                          setExName(ex.name);
+                        } else {
+                          setCircExName(ex.name);
+                        }
+                        setShowBankModal(false);
+                      }}
+                    >
+                      <div>
+                        <p className="font-bold text-sm">{ex.name}</p>
+                        {ex.muscleGroup && <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{ex.muscleGroup}</p>}
+                      </div>
+                      <Plus size={18} className="text-[#D4AF37]" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

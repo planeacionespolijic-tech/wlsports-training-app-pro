@@ -10,19 +10,19 @@ interface HomeScreenProps {
   user: User;
   onLogout: () => void;
   athlete?: any;
-  role: 'superadmin' | 'trainer' | 'client';
+  role: 'trainer' | 'client';
 }
 
 interface MenuItem {
   id: string;
   title: string;
   icon: LucideIcon;
-  roles?: ('superadmin' | 'trainer' | 'client')[];
+  roles?: ('trainer' | 'client')[];
 }
 
 export const HomeScreen = ({ onNavigate, user, onLogout, athlete, role }: HomeScreenProps) => {
   const [userData, setUserData] = useState<any>(null);
-  const isAdmin = role === 'superadmin' || role === 'trainer';
+  const isAdmin = role === 'trainer';
   const targetAthlete = athlete || { id: user.uid, displayName: user.displayName, photoURL: user.photoURL };
   const isChild = userData?.type === 'child';
 
@@ -37,9 +37,8 @@ export const HomeScreen = ({ onNavigate, user, onLogout, athlete, role }: HomeSc
   }, [targetAthlete.id]);
 
   const menuItems: MenuItem[] = [
-    { id: 'superadmin-dashboard', title: 'Panel SuperAdmin', icon: ShieldAlert, roles: ['superadmin'] },
-    { id: 'trainer-dashboard', title: 'Panel Entrenador', icon: Users, roles: ['trainer', 'superadmin'] },
-    { id: 'client-dashboard', title: 'Panel Alumno / Padre', icon: Activity, roles: ['client', 'trainer', 'superadmin'] },
+    { id: 'trainer-dashboard', title: 'Panel Entrenador', icon: Users, roles: ['trainer'] },
+    { id: 'client-dashboard', title: 'Panel Alumno / Padre', icon: Activity, roles: ['client', 'trainer'] },
   ];
 
   const filteredItems = menuItems.filter(item => {

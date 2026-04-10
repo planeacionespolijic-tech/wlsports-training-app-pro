@@ -145,10 +145,8 @@ service cloud.firestore {
 
     function isNotBlocked() {
       return isAuthenticated() && (
-        (request.auth.token.email != null && request.auth.token.email.lower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') == 'active' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'client') == 'superadmin'
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') == 'active'
         )) ||
         !exists(/databases/$(database)/documents/users/$(request.auth.uid))
       );
@@ -164,14 +162,6 @@ service cloud.firestore {
 
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && 
-        (
-          (request.auth.token.email != null && request.auth.token.email.lower() == "planeacionespolijic@gmail.com" && request.auth.token.email_verified == true) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
-        );
     }
 
     function isTrainer() {
@@ -202,86 +192,86 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return (data.get('uid', '') == request.auth.uid || isTrainer() || isSuperAdmin()) &&
-             data.get('role', 'client') in ['superadmin', 'trainer', 'client'];
+      return (data.get('uid', '') == request.auth.uid || isTrainer()) &&
+             data.get('role', 'client') in ['trainer', 'client'];
     }
 
     function isValidWorkout(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidHistory(data) {
       return data.workoutName is string && data.workoutName.size() > 0 && data.workoutName.size() < 100 &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidReport(data) {
       return data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
              data.description is string && data.description.size() > 0 &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidAssessment(data) {
       return data.weight is number && data.height is number &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidAnamnesis(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidTest(data) {
       return data.userId is string && data.type in ['physical', 'technical'] &&
              data.name is string && data.value is string &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidVideoAnalysis(data) {
       return data.userId is string && data.videoUrl is string &&
-             data.title is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             data.title is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidDiagnosis(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidTrainingPlan(data) {
-      return data.userId is string && data.title is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && data.title is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidMotorEvaluation(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidGamificationLog(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidChallenge(data) {
       return data.get('title', '') is string && data.get('title', '').size() > 0 &&
              data.get('level', 0) is int &&
-             (isTrainer() || isSuperAdmin());
+             isTrainer();
     }
 
     function isValidTournament(data) {
       return data.get('title', '') is string && data.get('title', '').size() > 0 &&
              data.get('players', []) is list &&
-             (isTrainer() || isSuperAdmin());
+             isTrainer();
     }
 
     function isValidTournamentMatch(data) {
       return data.get('tournamentId', '') is string &&
              data.get('dateName', '') is string &&
              data.get('results', []) is list &&
-             (isTrainer() || isSuperAdmin());
+             isTrainer();
     }
 
     function isValidTournamentBonus(data) {
       return data.get('tournamentId', '') is string &&
              data.get('playerId', '') is string &&
              data.get('points', 0) is int &&
-             (isTrainer() || isSuperAdmin());
+             isTrainer();
     }
 
     function isValidChallengeSubmission(data) {
@@ -289,15 +279,15 @@ service cloud.firestore {
              data.userId == request.auth.uid &&
              data.trainerId is string &&
              data.status in ['pending', 'approved', 'rejected'] &&
-             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+             (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidReactionTest(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     function isValidLiveSession(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
     }
 
     // ===============================================================
@@ -306,150 +296,160 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || 
-                    (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid)) || 
-                    (isAuthenticated() && request.auth.token.email != null && resource.data.get('email', '') == request.auth.token.email) ||
-                    isSuperAdmin();
-      allow list: if (isTrainer() || isSuperAdmin()) && isNotBlocked();
-      allow create: if (isOwner(userId) || isTrainer() || isSuperAdmin()) && 
+                    (isAuthenticated() && resource != null && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid)) || 
+                    (isAuthenticated() && request.auth.token.email != null && (userId == request.auth.token.email.lower() || (resource != null && resource.data.get('email', '') == request.auth.token.email)));
+      allow list: if isAuthenticated() && isNotBlocked();
+      allow create: if (isOwner(userId) || isTrainer()) && 
                     isValidUser(request.resource.data) && 
                     (
                       request.resource.data.get('role', 'client') == 'client' || 
-                      isSuperAdmin() ||
-                      (request.auth.token.email != null && exists(/databases/$(database)/documents/users/$(request.auth.token.email)) && get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == request.resource.data.role)
+                      (request.auth.token.email != null && exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.role == request.resource.data.role)
                     );
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.get('role', 'client') == resource.data.get('role', 'client') || isSuperAdmin())) || 
-                    (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid) && isNotBlocked()) || 
-                    isSuperAdmin();
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.get('role', 'client') == resource.data.get('role', 'client') || (resource.data.get('role', 'client') == 'superadmin' && request.resource.data.get('role', 'client') == 'trainer'))) || 
+                    (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid) && isNotBlocked());
     }
 
     match /workouts/{workoutId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidWorkout(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidWorkout(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidWorkout(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
     }
 
     match /history/{historyId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidHistory(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidHistory(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidHistory(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
     }
 
     match /reports/{reportId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidReport(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidReport(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidReport(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
     }
 
     match /assessments/{assessmentId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidAssessment(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidAssessment(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidAssessment(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
     }
 
     match /anamnesis/{anamnesisId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidAnamnesis(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidAnamnesis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidAnamnesis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if false;
     }
 
     match /tests/{testId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidTest(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if false;
     }
 
     match /videoAnalysis/{analysisId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidVideoAnalysis(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidVideoAnalysis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidVideoAnalysis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if false;
     }
 
     match /diagnoses/{diagnosisId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
+      allow create: if isTrainer() && isNotBlocked() && isValidDiagnosis(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidDiagnosis(request.resource.data);
+      allow delete: if false;
     }
 
     match /trainingPlans/{planId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTrainingPlan(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTrainingPlan(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
+      allow create: if isTrainer() && isNotBlocked() && isValidTrainingPlan(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidTrainingPlan(request.resource.data);
+      allow delete: if false;
     }
 
     match /motorEvaluations/{evalId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidMotorEvaluation(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidMotorEvaluation(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
+      allow create: if isTrainer() && isNotBlocked() && isValidMotorEvaluation(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidMotorEvaluation(request.resource.data);
+      allow delete: if false;
     }
 
     match /gamificationLogs/{logId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidGamificationLog(request.resource.data);
-      allow update: if isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /challenges/{challengeId} {
       allow read: if isAuthenticated();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidChallenge(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidChallenge(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow create: if isTrainer() && isNotBlocked() && isValidChallenge(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidChallenge(request.resource.data);
+      allow delete: if false;
     }
 
     match /tournaments/{tournamentId} {
       allow read: if isAuthenticated();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournament(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournament(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow create: if isTrainer() && isNotBlocked() && isValidTournament(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidTournament(request.resource.data);
+      allow delete: if false;
     }
 
     match /tournamentMatches/{matchId} {
       allow read: if isAuthenticated();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentMatch(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentMatch(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow create: if isTrainer() && isNotBlocked() && isValidTournamentMatch(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidTournamentMatch(request.resource.data);
+      allow delete: if false;
     }
 
     match /tournamentBonuses/{bonusId} {
       allow read: if isAuthenticated();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentBonus(request.resource.data);
-      allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentBonus(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow create: if isTrainer() && isNotBlocked() && isValidTournamentBonus(request.resource.data);
+      allow update: if isTrainer() && isNotBlocked() && isValidTournamentBonus(request.resource.data);
+      allow delete: if false;
     }
 
     match /challengeSubmissions/{submissionId} {
-      allow read: if isDocOwner() || (isAuthenticated() && resource.data.trainerId == request.auth.uid) || isSuperAdmin();
+      allow read: if isDocOwner() || (isAuthenticated() && resource.data.trainerId == request.auth.uid);
       allow create: if isNotBlocked() && isValidChallengeSubmission(request.resource.data);
-      allow update: if (isAuthenticated() && (resource.data.trainerId == request.auth.uid || isTrainerOf(resource.data.userId)) || isSuperAdmin()) && isNotBlocked();
-      allow delete: if isSuperAdmin();
+      allow update: if (isAuthenticated() && (resource.data.trainerId == request.auth.uid || isTrainerOf(resource.data.userId))) && isNotBlocked();
+      allow delete: if false;
     }
 
     match /reactionTests/{testId} {
-      allow read: if isDocOwner() || isDocTrainer() || isSuperAdmin();
+      allow read: if isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidReactionTest(request.resource.data);
-      allow update: if (isDocOwner() && isNotBlocked() && isValidReactionTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if (isDocOwner() && isNotBlocked() && isValidReactionTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
+      allow delete: if false;
     }
 
     match /liveSessions/{userId} {
-      allow read: if isOwner(userId) || isTrainerOf(userId) || isSuperAdmin();
+      allow read: if isOwner(userId) || isTrainerOf(userId);
       allow create: if isOwner(userId) && isNotBlocked() && isValidLiveSession(request.resource.data);
-      allow update: if (isOwner(userId) && isNotBlocked() && isValidLiveSession(request.resource.data)) || (isTrainerOf(userId) && isNotBlocked()) || isSuperAdmin();
-      allow delete: if isOwner(userId) || isTrainerOf(userId) || isSuperAdmin();
+      allow update: if (isOwner(userId) && isNotBlocked() && isValidLiveSession(request.resource.data)) || (isTrainerOf(userId) && isNotBlocked());
+      allow delete: if isOwner(userId) || isTrainerOf(userId);
+    }
+
+    match /exerciseBank/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow create: if isTrainer() && isNotBlocked() && 
+                    hasRequiredFields(['name', 'trainerId', 'createdAt']) &&
+                    request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100 &&
+                    request.resource.data.trainerId == request.auth.uid &&
+                    request.resource.data.createdAt is timestamp;
+      allow update: if isTrainer() && isNotBlocked() && resource.data.trainerId == request.auth.uid &&
+                    request.resource.data.trainerId == request.auth.uid &&
+                    request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100;
+      allow delete: if isTrainer() && isNotBlocked() && resource.data.trainerId == request.auth.uid;
     }
 
     match /auditLogs/{logId} {
-      allow read, list: if isSuperAdmin();
+      allow read, list: if false;
       allow create: if isAuthenticated() && 
                     request.resource.data.performedBy == request.auth.uid &&
                     request.resource.data.timestamp == request.time;

@@ -3,7 +3,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL?: string;
-  role: 'superadmin' | 'trainer' | 'client';
+  role: 'trainer' | 'client';
   createdBy?: string;
   trainerId?: string;
   type: 'adult' | 'child';

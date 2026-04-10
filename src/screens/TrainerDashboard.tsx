@@ -263,15 +263,24 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
           <div className="space-y-6 pb-24">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em]">Mis Atletas</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" size={14} />
-                <input 
-                  type="text"
-                  placeholder="Buscar..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-zinc-900 border border-zinc-800 rounded-full py-1.5 pl-9 pr-4 text-xs outline-none focus:border-[#D4AF37] transition-all w-32 focus:w-48"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" size={14} />
+                  <input 
+                    type="text"
+                    placeholder="Buscar..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-zinc-900 border border-zinc-800 rounded-full py-1.5 pl-9 pr-4 text-xs outline-none focus:border-[#D4AF37] transition-all w-32 focus:w-48"
+                  />
+                </div>
+                <button 
+                  onClick={() => onNavigate('deportistas')}
+                  className="bg-[#D4AF37] text-black p-1.5 rounded-full hover:scale-110 transition-transform"
+                  title="Gestionar Atletas"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
             </div>
 
@@ -344,6 +353,7 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
                 { id: 'reaccion', title: 'Reacción Visual', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/10' },
                 { id: 'videoAnalysis', title: 'Análisis Video', icon: Video, color: 'text-red-500', bg: 'bg-red-500/10' },
                 { id: 'entrenamientos', title: 'Rutinas Globales', icon: Dumbbell, color: 'text-green-500', bg: 'bg-green-500/10' },
+                { id: 'exercise-bank', title: 'Banco Ejercicios', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               ].map((tool) => (
                 <button 
                   key={tool.id}

@@ -9,7 +9,7 @@ import { logAuditEvent, AuditAction } from '../services/auditService';
 interface DeportistasScreenProps {
   onBack: () => void;
   onSelectAthlete: (athlete: any) => void;
-  role: 'superadmin' | 'trainer' | 'client';
+  role: 'trainer' | 'client';
   userId: string;
 }
 
@@ -55,7 +55,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         orderBy('lastLogin', 'desc')
       );
     } else {
-      // Superadmin sees all
       q = query(
         collection(db, 'users'),
         where('role', '==', 'client'),
