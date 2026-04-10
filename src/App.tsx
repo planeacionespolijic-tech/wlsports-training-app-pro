@@ -122,10 +122,9 @@ export default function App() {
   useEffect(() => {
     const checkAutoLogin = async () => {
       const params = new URLSearchParams(window.location.search);
-      const isVercel = window.location.hostname.includes('vercel.app');
       const hasLoggedOut = localStorage.getItem('wlsports_logged_out') === 'true';
       
-      if ((params.get('guest') === 'true' || isVercel) && !user && !loading && !hasLoggedOut) {
+      if (params.get('guest') === 'true' && !user && !loading && !hasLoggedOut) {
         try {
           await loginAnonymously();
         } catch (err) {
