@@ -272,7 +272,7 @@ export default function App() {
         return (
           <ExerciseBankScreen
             userId={user.uid}
-            onBack={() => navigateTo('trainer-dashboard')}
+            onBack={() => handleNavigate('trainer-dashboard')}
           />
         );
       case 'entrenamientos':
