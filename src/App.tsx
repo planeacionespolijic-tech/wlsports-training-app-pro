@@ -92,14 +92,54 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentScreen, setCurrentScreen] = useState('home');
   const [screenData, setScreenData] = useState<any>(null);
+  const [screenHistory, setScreenHistory] = useState<{screen: string, data: any}[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<any>(null);
   const [userRole, setUserRole] = useState<'trainer' | 'client'>('client');
   const [userProfile, setUserProfile] = useState<any>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const handleNavigate = (screen: string, data: any = null) => {
+    console.log(`[Navigation] Navigating to ${screen} from ${currentScreen}. Current history length: ${screenHistory.length}`);
+    if (screen === 'home' || screen === 'deportistas' || screen === 'trainer-dashboard' || screen === 'client-dashboard') {
+      setSelectedAthlete(null);
+    }
+    if (screen === 'athlete-profile' && data) {
+      setSelectedAthlete(data);
+    }
+    if (screen === 'home') {
+      setScreenHistory([]);
+    } else {
+      const newHistory = [...screenHistory, { screen: currentScreen, data: screenData }];
+      console.log(`[Navigation] Pushed to history. New history length: ${newHistory.length}`, newHistory);
+      setScreenHistory(newHistory);
+    }
     setScreenData(data);
     setCurrentScreen(screen);
+  };
+
+  const handleBack = () => {
+    console.log(`[Navigation] Back button clicked. Current history length: ${screenHistory.length}`, screenHistory);
+    if (screenHistory.length === 0) {
+      console.log(`[Navigation] History is empty, going to home.`);
+      setCurrentScreen('home');
+      setScreenData(null);
+      setSelectedAthlete(null);
+      return;
+    }
+
+    const newHistory = [...screenHistory];
+    const previousState = newHistory.pop();
+
+    console.log(`[Navigation] Popped from history. Going to ${previousState?.screen}. New history length: ${newHistory.length}`);
+    setScreenHistory(newHistory);
+
+    if (previousState) {
+      if (previousState.screen === 'home' || previousState.screen === 'deportistas' || previousState.screen === 'trainer-dashboard' || previousState.screen === 'client-dashboard') {
+        setSelectedAthlete(null);
+      }
+      setCurrentScreen(previousState.screen);
+      setScreenData(previousState.data);
+    }
   };
 
   useEffect(() => {
@@ -138,7 +178,7 @@ export default function App() {
   const handleLogout = async () => {
     localStorage.setItem('wlsports_logged_out', 'true');
     await logout();
-    setCurrentScreen('home');
+    handleNavigate('home');
   };
 
   useEffect(() => {
@@ -217,7 +257,7 @@ export default function App() {
 
   const handleSelectAthlete = (athlete: any) => {
     setSelectedAthlete(athlete);
-    setCurrentScreen('athlete-profile');
+    handleNavigate('athlete-profile');
   };
 
   const isTrainer = userRole === 'trainer';
@@ -264,59 +304,59 @@ export default function App() {
           />
         );
       case 'trainer-dashboard':
-        return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
+        return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={handleBack} />;
       case 'client-dashboard':
-        return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={() => handleNavigate('home')} />;
+        return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={handleBack} />;
       case 'exercise-bank':
         return (
           <ExerciseBankScreen
             userId={user.uid}
-            onBack={() => handleNavigate('trainer-dashboard')}
+            onBack={handleBack}
           />
         );
       case 'entrenamientos':
-        return <WorkoutsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} onNavigate={handleNavigate} userId={targetUserId} trainerId={currentTrainerId} />;
+        return <WorkoutsScreen onBack={handleBack} onNavigate={handleNavigate} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'historial':
-        return <HistoryScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
+        return <HistoryScreen onBack={handleBack} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'informes':
-        return <ReportsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
+        return <ReportsScreen onBack={handleBack} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'deportistas':
         return <DeportistasScreen 
-          onBack={() => handleNavigate('home')} 
+          onBack={handleBack} 
           onSelectAthlete={handleSelectAthlete}
           role={userRole}
           userId={user.uid}
         />;
       case 'athlete-profile':
-        return <AthleteProfileScreen athlete={selectedAthlete} onBack={() => { setSelectedAthlete(null); handleNavigate('home'); }} onNavigate={handleNavigate} isAdmin={isTrainer} />;
+        return <AthleteProfileScreen athlete={selectedAthlete} onBack={handleBack} onNavigate={handleNavigate} isAdmin={isTrainer} />;
       case 'valoracion':
-        return <ValoracionScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <ValoracionScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'zonas':
-        return <ZonasScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
+        return <ZonasScreen onBack={handleBack} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'seguimiento':
-        return <SeguimientoScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} trainerId={currentTrainerId} />;
+        return <SeguimientoScreen onBack={handleBack} userId={targetUserId} trainerId={currentTrainerId} />;
       case 'anamnesis':
-        return <AnamnesisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <AnamnesisScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'tests':
-        return <TestsScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <TestsScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'videoAnalysis':
-        return <VideoAnalysisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <VideoAnalysisScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'diagnostico':
-        return <DiagnosisScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <DiagnosisScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'planificacion':
-        return <PlanningScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <PlanningScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'kidsModule':
-        return <KidsModuleScreen onBack={() => handleNavigate(selectedAthlete ? 'athlete-profile' : 'home')} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
+        return <KidsModuleScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'ejecucion-sesion':
-        return <SessionExecutionScreen onBack={() => handleNavigate('entrenamientos')} userId={targetUserId} workout={screenData} trainerId={currentTrainerId} />;
+        return <SessionExecutionScreen onBack={handleBack} userId={targetUserId} workout={screenData} trainerId={currentTrainerId} />;
       case 'retos':
-        return <ChallengesScreen onBack={() => handleNavigate('home')} userId={targetUserId} role={userRole} userProfile={userProfile} />;
+        return <ChallengesScreen onBack={handleBack} userId={targetUserId} role={userRole} userProfile={userProfile} />;
       case 'torneos':
-        return <TournamentsScreen onBack={() => handleNavigate('home')} userId={targetUserId} role={userRole} />;
+        return <TournamentsScreen onBack={handleBack} userId={targetUserId} role={userRole} />;
       case 'tabata':
-        return <TabataScreen onBack={() => handleNavigate('home')} userId={targetUserId} />;
+        return <TabataScreen onBack={handleBack} userId={targetUserId} />;
       case 'reaccion':
-        return <ReactionScreen onBack={() => handleNavigate('home')} userId={targetUserId} />;
+        return <ReactionScreen onBack={handleBack} userId={targetUserId} />;
       default:
         return (
           <RoleSelectorScreen 
@@ -349,8 +389,7 @@ export default function App() {
         {currentScreen !== 'home' && (
           <button 
             onClick={() => {
-              setCurrentScreen('home');
-              setScreenData(null);
+              handleNavigate('home');
             }}
             className="fixed bottom-6 left-6 bg-zinc-900/80 backdrop-blur-md border border-zinc-800 text-[#D4AF37] p-4 rounded-full shadow-2xl z-50 hover:scale-110 transition-all active:scale-95 flex items-center justify-center"
             title="Inicio"
@@ -363,8 +402,7 @@ export default function App() {
         {isTrainer && selectedAthlete && (
           <button 
             onClick={() => {
-              setSelectedAthlete(null);
-              setCurrentScreen('deportistas');
+              handleNavigate('deportistas');
             }}
             className="fixed bottom-6 right-6 bg-zinc-900 border border-zinc-800 text-[#D4AF37] p-4 rounded-full shadow-2xl z-50 hover:scale-110 transition-all active:scale-95 flex items-center gap-2"
           >

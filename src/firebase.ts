@@ -28,6 +28,31 @@ const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@
 // Auth helpers
 export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 
+export const createSecondaryUser = async (username: string, password: string, displayName: string) => {
+  if (username.length < 3) throw new Error("El nombre de usuario debe tener al menos 3 caracteres.");
+  if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+  
+  // Initialize a secondary app to avoid signing out the current user
+  const secondaryApp = initializeApp(firebaseConfig, `SecondaryApp_${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  const email = usernameToEmail(username);
+  
+  try {
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await updateProfile(userCredential.user, { displayName });
+    await signOut(secondaryAuth);
+    return userCredential.user;
+  } catch (error: any) {
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error("El nombre de usuario ya está en uso.");
+    }
+    if (error.code === 'auth/operation-not-allowed') {
+      throw new Error("El inicio de sesión con correo/contraseña no está habilitado en Firebase.");
+    }
+    throw error;
+  }
+};
+
 export const registerWithUsername = async (username: string, password: string) => {
   if (username.length < 3) throw new Error("El nombre de usuario debe tener al menos 3 caracteres.");
   if (password.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");

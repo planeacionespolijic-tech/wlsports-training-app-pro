@@ -28,16 +28,20 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
           <>
             Dominio no autorizado para inicio de sesión con Google.
             <br />
+            Debes agregar este dominio (la URL actual) en Firebase Authentication &gt; Settings &gt; Authorized domains.
+            <br />
             <a 
               href="https://console.firebase.google.com/project/_/authentication/settings" 
               target="_blank" 
               rel="noopener noreferrer"
               className="underline font-bold mt-2 block text-[#D4AF37]"
             >
-              Agrega tu dominio de Vercel en Firebase Authentication &gt; Settings &gt; Authorized domains
+              Ir a la consola de Firebase
             </a>
           </>
         );
+      } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        setError("El inicio de sesión fue cancelado. Por favor, intenta de nuevo y no cierres la ventana emergente.");
       } else if (message.includes("Anonymous")) {
         setError(
           <>

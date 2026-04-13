@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Check, Copy, RefreshCw } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
 import { Exercise, TrainingBlock, Workout } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -399,7 +399,16 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button 
+            onClick={() => {
+              if (isAdding) {
+                resetForm();
+              } else {
+                onBack();
+              }
+            }} 
+            className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+          >
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-bold">{editingWorkoutId ? 'Editar Entrenamiento' : 'Entrenamientos'}</h1>

@@ -147,7 +147,16 @@ export const ReportsScreen = ({ onBack, userId, trainerId }: ReportsScreenProps)
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button 
+            onClick={() => {
+              if (isAdding) {
+                setIsAdding(false);
+              } else {
+                onBack();
+              }
+            }} 
+            className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+          >
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-bold">Informes</h1>

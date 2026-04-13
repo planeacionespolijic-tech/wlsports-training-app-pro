@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Calendar, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle } from 'lucide-react';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { ArrowLeft, User, Mail, Calendar, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle, Lock } from 'lucide-react';
+import { db, handleFirestoreError, OperationType, createSecondaryUser } from '../firebase';
 import { collection, query, onSnapshot, orderBy, where, setDoc, doc, serverTimestamp, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,7 +17,8 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
   const [deportistas, setDeportistas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newAthlete, setNewAthlete] = useState({ email: '', displayName: '', type: 'adult' as 'adult' | 'child' });
+  const [isCreating, setIsCreating] = useState(false);
+  const [newAthlete, setNewAthlete] = useState({ username: '', password: '', displayName: '', type: 'adult' as 'adult' | 'child' });
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -84,12 +85,18 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
 
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAthlete.email || !newAthlete.displayName) return;
+    if (!newAthlete.username || !newAthlete.displayName || !newAthlete.password) return;
 
+    setIsCreating(true);
     try {
-      const tempId = `client_${Date.now()}`;
-      await setDoc(doc(db, 'users', tempId), {
-        email: newAthlete.email,
+      // Create the user in Firebase Auth using the secondary app
+      const user = await createSecondaryUser(newAthlete.username, newAthlete.password, newAthlete.displayName);
+      
+      // Create the user document in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        username: newAthlete.username,
+        email: `${newAthlete.username.trim().toLowerCase()}@wlsports.local`,
         displayName: newAthlete.displayName,
         type: newAthlete.type,
         role: 'client',
@@ -105,20 +112,23 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         streak: 0
       });
 
-      setNewAthlete({ email: '', displayName: '', type: 'adult' });
+      setNewAthlete({ username: '', password: '', displayName: '', type: 'adult' });
       setShowAddModal(false);
+      setFeedback({ message: 'Deportista creado exitosamente', type: 'success' });
 
       // Audit Log
       await logAuditEvent(
         AuditAction.CREATE_USER,
         userId,
         role,
-        tempId,
+        user.uid,
         newAthlete.displayName,
         `Deportista (${newAthlete.type}) creado por entrenador`
       );
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
+    } catch (error: any) {
+      setFeedback({ message: error.message || 'Error al crear el deportista', type: 'error' });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -296,8 +306,8 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-zinc-500 text-xs mt-1">
-                      <Mail size={12} />
-                      <span>{item.email}</span>
+                      <User size={12} />
+                      <span>{item.username || item.email}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -357,13 +367,26 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Email</label>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Nombre de Usuario</label>
                 <input 
-                  type="email"
-                  value={newAthlete.email}
-                  onChange={(e) => setNewAthlete({ ...newAthlete, email: e.target.value })}
+                  type="text"
+                  value={newAthlete.username}
+                  onChange={(e) => setNewAthlete({ ...newAthlete, username: e.target.value })}
                   className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white focus:border-[#D4AF37] outline-none transition-colors"
-                  placeholder="deportista@ejemplo.com"
+                  placeholder="Ej: carlosruiz123"
+                  minLength={3}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Contraseña</label>
+                <input 
+                  type="password"
+                  value={newAthlete.password}
+                  onChange={(e) => setNewAthlete({ ...newAthlete, password: e.target.value })}
+                  className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white focus:border-[#D4AF37] outline-none transition-colors"
+                  placeholder="Mínimo 6 caracteres"
+                  minLength={6}
                   required
                 />
               </div>
@@ -396,9 +419,17 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-[#D4AF37] text-black py-4 rounded-xl font-bold hover:bg-[#B8962E] transition-colors"
+                  disabled={isCreating}
+                  className="flex-1 bg-[#D4AF37] text-black py-4 rounded-xl font-bold hover:bg-[#B8962E] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Crear Perfil
+                  {isCreating ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Crear Perfil'
+                  )}
                 </button>
               </div>
             </form>
