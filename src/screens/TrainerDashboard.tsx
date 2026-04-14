@@ -11,12 +11,13 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface TrainerDashboardProps {
   user: any;
+  userProfile?: any;
   onNavigate: (screen: string, data?: any) => void;
   onLogout: () => void;
   onBack?: () => void;
 }
 
-export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: TrainerDashboardProps) => {
+export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBack }: TrainerDashboardProps) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'athletes' | 'challenges' | 'tools'>('dashboard');
   const [athletes, setAthletes] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
@@ -30,11 +31,18 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     if (!user?.uid) return;
     setLoading(true);
     try {
-      const q = query(
+      let q = query(
         collection(db, 'users'),
         where('trainerId', '==', user.uid),
         where('status', '==', 'active')
       );
+      if (userProfile?.role === 'superadmin') {
+        q = query(
+          collection(db, 'users'),
+          where('role', '==', 'client'),
+          where('status', '==', 'active')
+        );
+      }
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a: any, b: any) => (a.displayName || '').localeCompare(b.displayName || ''));
@@ -44,17 +52,24 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     } finally {
       setLoading(false);
     }
-  }, [user?.uid]);
+  }, [user?.uid, userProfile?.role]);
 
   useEffect(() => {
     if (!user?.uid) return;
 
     // Listen to athletes (onSnapshot)
-    const athletesQuery = query(
+    let athletesQuery = query(
       collection(db, 'users'),
       where('trainerId', '==', user.uid),
       where('status', '==', 'active')
     );
+    if (userProfile?.role === 'superadmin') {
+      athletesQuery = query(
+        collection(db, 'users'),
+        where('role', '==', 'client'),
+        where('status', '==', 'active')
+      );
+    }
 
     const unsubscribeAthletes = onSnapshot(athletesQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -69,11 +84,18 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     // Activity recent (getDocs - one time)
     const fetchActivity = async () => {
       try {
-        const q = query(
+        let q = query(
           collection(db, 'history'),
           where('trainerId', '==', user.uid),
           limit(20)
         );
+        if (userProfile?.role === 'superadmin') {
+          q = query(
+            collection(db, 'history'),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+          );
+        }
         const snap = await getDocs(q);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         data.sort((a: any, b: any) => {
@@ -89,11 +111,17 @@ export const TrainerDashboard = ({ user, onNavigate, onLogout, onBack }: Trainer
     fetchActivity();
 
     // Listen to pending submissions (onSnapshot - filtered by trainerId)
-    const submissionsQuery = query(
+    let submissionsQuery = query(
       collection(db, 'challengeSubmissions'),
       where('trainerId', '==', user.uid),
       where('status', '==', 'pending')
     );
+    if (userProfile?.role === 'superadmin') {
+      submissionsQuery = query(
+        collection(db, 'challengeSubmissions'),
+        where('status', '==', 'pending')
+      );
+    }
 
     const unsubscribeSubmissions = onSnapshot(submissionsQuery, (snapshot) => {
       const subs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));

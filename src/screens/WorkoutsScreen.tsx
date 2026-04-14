@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Check, Copy, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Check, Copy, RefreshCw, Share2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
@@ -867,6 +867,17 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
                     </div>
                     <div className="flex items-center gap-2">
                       <button 
+                        onClick={() => {
+                          const url = `${window.location.origin}/?share=workout&id=${item.id}`;
+                          navigator.clipboard.writeText(url);
+                          alert('Enlace copiado al portapapeles');
+                        }}
+                        title="Compartir"
+                        className="p-2 text-zinc-700 hover:text-[#D4AF37] transition-colors"
+                      >
+                        <Share2 size={18} />
+                      </button>
+                      <button 
                         onClick={() => handleDuplicate(item)}
                         title="Duplicar"
                         className="p-2 text-zinc-700 hover:text-[#D4AF37] transition-colors"
@@ -954,8 +965,15 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
                       onClick={() => {
                         if (bankTargetType === 'normal') {
                           setExName(ex.name);
+                          setExSeries(ex.series || 3);
+                          setExReps(ex.reps || '');
+                          setExTime(ex.timePerSeries || ex.time || 0);
+                          setExLoad(ex.load || '');
+                          setExRpe(ex.rpe || 0);
                         } else {
                           setCircExName(ex.name);
+                          setCircExTime(ex.timePerSeries || ex.time || 30);
+                          setCircExReps(ex.reps || '');
                         }
                         setShowBankModal(false);
                       }}

@@ -172,6 +172,16 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
     }
   };
 
+  const handleDeleteMatchDay = async (matchId: string) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta fecha? Esta acción no se puede deshacer.')) {
+      try {
+        await deleteDoc(doc(db, 'tournamentMatches', matchId));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'tournamentMatches');
+      }
+    }
+  };
+
   const calculateStandings = () => {
     if (!selectedTournament) return [];
     const standings: Record<string, { name: string; points: number; wins: number; draws: number; losses: number }> = {};
@@ -283,7 +293,18 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
                     <div key={md.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
                       <div className="flex justify-between items-center mb-3">
                         <h4 className="font-bold text-sm">{md.dateName}</h4>
-                        <span className="text-[10px] text-zinc-500">{new Date(md.createdAt?.toDate()).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500">{new Date(md.createdAt?.toDate()).toLocaleDateString()}</span>
+                          {isTrainer && (
+                            <button 
+                              onClick={() => handleDeleteMatchDay(md.id)}
+                              className="text-zinc-500 hover:text-red-500 transition-colors p-1"
+                              title="Eliminar fecha"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {md.results.map((r, i) => (

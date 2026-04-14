@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle2, Save, Loader2, MessageSquare, Activity, Clock, Layers, Play, Pause, SkipForward, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Save, Loader2, MessageSquare, Activity, Clock, Layers, Play, Pause, SkipForward, RotateCcw, Plus, X } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, increment, getDocs } from 'firebase/firestore';
 import { awardSessionPoints } from '../services/gamificationService';
 import { startLiveSession, updateLiveSession, endLiveSession } from '../services/liveSessionService';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,23 +15,92 @@ interface SessionExecutionScreenProps {
   userId: string;
   workout: any;
   trainerId: string | null;
+  isAdmin?: boolean;
 }
 
-export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: SessionExecutionScreenProps) => {
+export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId, isAdmin }: SessionExecutionScreenProps) => {
   const [saving, setSaving] = useState(false);
+  const [localWorkout, setLocalWorkout] = useState(workout);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [rpe, setRpe] = useState<number>(5);
   const [observations, setObservations] = useState('');
   const [adaptations, setAdaptations] = useState<{ [key: string]: string }>({});
   const [activeTool, setActiveTool] = useState<'tabata' | 'reaction' | null>(null);
 
+  // States for adding exercises
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState<string | null>(null);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [exerciseBank, setExerciseBank] = useState<any[]>([]);
+  const [exName, setExName] = useState('');
+  const [exSeries, setExSeries] = useState(3);
+  const [exReps, setExReps] = useState('');
+  const [exTime, setExTime] = useState(0);
+  const [exLoad, setExLoad] = useState('');
+  const [exRpe, setExRpe] = useState(0);
+
+  useEffect(() => {
+    const fetchExerciseBank = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'exerciseBank'));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setExerciseBank(data);
+      } catch (error) {
+        console.error("Error fetching exercise bank:", error);
+      }
+    };
+    if (isAdmin) {
+      fetchExerciseBank();
+    }
+  }, [isAdmin]);
+
+  const handleAddExercise = (blockId: string) => {
+    if (!exName) return;
+    
+    const newExercise = {
+      id: Date.now().toString(),
+      name: exName,
+      series: exSeries,
+      reps: exReps,
+      timePerSeries: exTime,
+      load: exLoad,
+      rpe: exRpe,
+      totalTime: exSeries * exTime
+    };
+
+    setLocalWorkout((prev: any) => {
+      const newBlocks = prev.blocks.map((b: any) => {
+        if (b.id === blockId) {
+          return {
+            ...b,
+            exercises: [...(b.exercises || []), newExercise],
+            totalTime: (b.totalTime || 0) + newExercise.totalTime
+          };
+        }
+        return b;
+      });
+      
+      return {
+        ...prev,
+        blocks: newBlocks
+      };
+    });
+
+    setShowAddExerciseModal(null);
+    setExName('');
+    setExSeries(3);
+    setExReps('');
+    setExTime(0);
+    setExLoad('');
+    setExRpe(0);
+  };
+
   // Initialize live session
   useEffect(() => {
-    startLiveSession(userId, workout);
+    startLiveSession(userId, localWorkout);
     return () => {
       // End live session logic if needed
     };
-  }, [userId, workout]);
+  }, [userId, localWorkout]);
 
   const toggleExercise = (id: string) => {
     const newCompleted = completedExercises.includes(id)
@@ -48,10 +117,10 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
       await addDoc(collection(db, 'history'), {
         userId,
         trainerId,
-        workoutId: workout.id || 'custom',
-        workoutName: workout.name,
+        workoutId: localWorkout.id || 'custom',
+        workoutName: localWorkout.name,
         workoutDetails: {
-          ...workout,
+          ...localWorkout,
           completedExercises,
           rpe,
           observations,
@@ -62,12 +131,12 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
       });
 
       // Award gamification points
-      const result = await awardSessionPoints(userId, workout.name);
+      const result = await awardSessionPoints(userId, localWorkout.name);
       
       // Update user summary for optimized reads
       try {
         await updateUserSummary(userId, {
-          lastWorkout: workout.name,
+          lastWorkout: localWorkout.name,
           lastWorkoutDate: new Date().toISOString(),
           sessionsCompleted: 1,
           points: result?.newPoints || 0,
@@ -316,10 +385,10 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
             <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-xl font-bold">{workout.name}</h1>
+            <h1 className="text-xl font-bold">{localWorkout.name}</h1>
             <div className="flex items-center gap-2 text-[10px] text-zinc-500 uppercase font-black tracking-widest">
               <Clock size={10} />
-              <span>{workout.duration || 'N/A'}</span>
+              <span>{localWorkout.duration || 'N/A'}</span>
               <span className="mx-1">•</span>
               <span>Ejecución</span>
             </div>
@@ -355,8 +424,8 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
 
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-2xl mx-auto space-y-8 pb-20">
-          {workout.blocks && workout.blocks.length > 0 ? (
-            workout.blocks.map((block: any) => (
+          {localWorkout.blocks && localWorkout.blocks.length > 0 ? (
+            localWorkout.blocks.map((block: any) => (
               <div key={block.id} className="space-y-4">
                 <div className="flex items-center gap-2 border-l-2 border-[#D4AF37] pl-3">
                   <Layers size={16} className="text-[#D4AF37]" />
@@ -364,6 +433,15 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
                   <span className="ml-auto text-[10px] font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded-full">
                     {Math.floor(block.totalTime / 60)}:{(block.totalTime % 60).toString().padStart(2, '0')}
                   </span>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => setShowAddExerciseModal(block.id)}
+                      className="ml-2 bg-[#D4AF37]/10 text-[#D4AF37] p-1.5 rounded-lg hover:bg-[#D4AF37]/20 transition-colors"
+                      title="Añadir ejercicio"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-4">
                   {block.type === 'circuit' ? (
@@ -377,7 +455,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
           ) : (
             <div className="space-y-4">
               <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500">Ejercicios de la Sesión</h2>
-              {workout.exercises?.map((ex: any, idx: number) => renderExercise(ex, 'legacy'))}
+              {localWorkout.exercises?.map((ex: any, idx: number) => renderExercise(ex, 'legacy'))}
             </div>
           )}
 
@@ -420,6 +498,135 @@ export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId }: S
         )}
         {activeTool === 'reaction' && (
           <ReactionModule onClose={() => setActiveTool(null)} userId={userId} />
+        )}
+
+        {/* Add Exercise Modal */}
+        {showAddExerciseModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black">Añadir Ejercicio</h2>
+                <button onClick={() => setShowAddExerciseModal(null)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-zinc-500 uppercase font-bold">Nombre del Ejercicio</label>
+                  {exerciseBank.length > 0 && (
+                    <button 
+                      onClick={() => setShowBankModal(true)}
+                      className="text-[10px] font-bold text-[#D4AF37] hover:text-white bg-[#D4AF37]/10 px-2 py-1 rounded"
+                    >
+                      Importar del Banco
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Nombre del ejercicio"
+                  className="w-full bg-black border border-zinc-800 p-4 rounded-xl focus:border-[#D4AF37] outline-none text-sm"
+                  value={exName}
+                  onChange={(e) => setExName(e.target.value)}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Series</label>
+                    <input
+                      type="number"
+                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
+                      value={exSeries}
+                      onChange={(e) => setExSeries(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Reps / Info</label>
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
+                      value={exReps}
+                      onChange={(e) => setExReps(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Tiempo x Serie (seg)</label>
+                    <input
+                      type="number"
+                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
+                      value={exTime}
+                      onChange={(e) => setExTime(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Carga (kg/lbs)</label>
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
+                      value={exLoad}
+                      onChange={(e) => setExLoad(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => handleAddExercise(showAddExerciseModal)}
+                  className="w-full mt-4 bg-[#D4AF37] text-black font-black py-4 rounded-2xl"
+                >
+                  Añadir Ejercicio
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Exercise Bank Modal */}
+        {showBankModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 shadow-2xl flex flex-col max-h-[80vh]"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-black">Banco de Ejercicios</h2>
+                <button onClick={() => setShowBankModal(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                {exerciseBank.length === 0 ? (
+                  <p className="text-zinc-500 text-sm italic text-center py-10">No hay ejercicios en tu banco.</p>
+                ) : (
+                  exerciseBank.map(ex => (
+                    <div 
+                      key={ex.id} 
+                      className="bg-black border border-zinc-800 p-4 rounded-xl flex justify-between items-center hover:border-[#D4AF37]/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setExName(ex.name);
+                        setExSeries(ex.series || 3);
+                        setExReps(ex.reps || '');
+                        setExTime(ex.timePerSeries || ex.time || 0);
+                        setExLoad(ex.load || '');
+                        setExRpe(ex.rpe || 0);
+                        setShowBankModal(false);
+                      }}
+                    >
+                      <div>
+                        <p className="font-bold text-sm">{ex.name}</p>
+                        {ex.muscleGroup && <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{ex.muscleGroup}</p>}
+                      </div>
+                      <Plus size={18} className="text-[#D4AF37]" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

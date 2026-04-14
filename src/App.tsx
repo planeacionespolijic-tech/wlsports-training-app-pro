@@ -193,7 +193,7 @@ export default function App() {
           const userRef = doc(db, 'users', u.uid);
           let userDoc = await getDoc(userRef);
           
-          let role: 'trainer' | 'client' = 'client';
+          let role: 'trainer' | 'client' | 'superadmin' = 'client';
 
           // 1. Account Claiming Logic (for Trainers created by email)
           if (!userDoc.exists() && u.email) {
@@ -201,9 +201,11 @@ export default function App() {
             const emailDoc = await getDoc(emailRef);
             if (emailDoc.exists()) {
               const data = emailDoc.data();
-              role = data.role || role; // Use existing role if found
-              if (role === 'superadmin' as any) {
+              let dbRole = data.role || role; // Use existing role if found
+              if (dbRole === 'superadmin' as any) {
                 role = 'trainer';
+              } else {
+                role = dbRole;
               }
               // Link the pre-created account to the real UID
               await setDoc(userRef, { 
@@ -211,18 +213,27 @@ export default function App() {
                 uid: u.uid,
                 lastLogin: serverTimestamp(),
                 photoURL: u.photoURL || data.photoURL || null,
-                displayName: u.displayName || data.displayName || 'Usuario'
+                displayName: u.displayName || data.displayName || 'Usuario',
+                role: dbRole
               }, { merge: true });
               userDoc = await getDoc(userRef);
             }
           }
 
           // 3. Normal Role Fetching
+          let dbRole = role;
           if (userDoc.exists()) {
-            role = userDoc.data().role || role;
-            if (role === 'superadmin' as any) {
-              role = 'trainer';
-            }
+            dbRole = userDoc.data().role || role;
+          }
+          
+          if (u.email === 'planeacionespolijic@gmail.com') {
+            dbRole = 'superadmin';
+          }
+
+          if (dbRole === 'superadmin' as any) {
+            role = 'trainer'; // App treats superadmin as trainer for UI
+          } else {
+            role = dbRole;
           }
 
           // 4. Update/Create User Document
@@ -232,7 +243,7 @@ export default function App() {
             displayName: u.displayName || 'Invitado',
             photoURL: u.photoURL || null,
             lastLogin: serverTimestamp(),
-            role: role,
+            role: dbRole, // Keep superadmin in DB
             isAnonymous: u.isAnonymous,
             status: userDoc.exists() ? (userDoc.data().status || 'active') : 'active'
           }, { merge: true });
@@ -254,6 +265,36 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user && userProfile && !loading) {
+      const params = new URLSearchParams(window.location.search);
+      const shareType = params.get('share');
+      const shareId = params.get('id');
+
+      if (shareType === 'workout' && shareId) {
+        const fetchSharedWorkout = async () => {
+          try {
+            const docRef = doc(db, 'workouts', shareId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const workoutData = { id: docSnap.id, ...docSnap.data() };
+              window.history.replaceState({}, document.title, window.location.pathname);
+              handleNavigate('ejecucion-sesion', workoutData);
+            } else {
+              alert('El entrenamiento compartido no existe.');
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch (error) {
+            console.error('Error fetching shared workout:', error);
+            alert('Error al cargar el entrenamiento compartido.');
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        };
+        fetchSharedWorkout();
+      }
+    }
+  }, [user, userProfile, loading]);
 
   const handleSelectAthlete = (athlete: any) => {
     setSelectedAthlete(athlete);
@@ -304,7 +345,7 @@ export default function App() {
           />
         );
       case 'trainer-dashboard':
-        return <TrainerDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={handleBack} />;
+        return <TrainerDashboard user={user} userProfile={userProfile} onNavigate={handleNavigate} onLogout={handleLogout} onBack={handleBack} />;
       case 'client-dashboard':
         return <ClientDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} onBack={handleBack} />;
       case 'exercise-bank':
@@ -324,7 +365,7 @@ export default function App() {
         return <DeportistasScreen 
           onBack={handleBack} 
           onSelectAthlete={handleSelectAthlete}
-          role={userRole}
+          role={userProfile?.role || userRole}
           userId={user.uid}
         />;
       case 'athlete-profile':
@@ -348,7 +389,7 @@ export default function App() {
       case 'kidsModule':
         return <KidsModuleScreen onBack={handleBack} userId={targetUserId} isAdmin={isTrainer} trainerId={currentTrainerId} />;
       case 'ejecucion-sesion':
-        return <SessionExecutionScreen onBack={handleBack} userId={targetUserId} workout={screenData} trainerId={currentTrainerId} />;
+        return <SessionExecutionScreen onBack={handleBack} userId={targetUserId} workout={screenData} trainerId={currentTrainerId} isAdmin={isTrainer} />;
       case 'retos':
         return <ChallengesScreen onBack={handleBack} userId={targetUserId} role={userRole} userProfile={userProfile} />;
       case 'torneos':

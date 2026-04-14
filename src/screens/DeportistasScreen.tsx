@@ -55,6 +55,12 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         where('trainerId', '==', userId),
         orderBy('lastLogin', 'desc')
       );
+    } else if (role === 'superadmin') {
+      q = query(
+        collection(db, 'users'),
+        where('role', '==', 'client'),
+        orderBy('lastLogin', 'desc')
+      );
     } else {
       q = query(
         collection(db, 'users'),
