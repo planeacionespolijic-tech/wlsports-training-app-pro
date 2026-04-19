@@ -9,7 +9,7 @@ import { logAuditEvent, AuditAction } from '../services/auditService';
 interface DeportistasScreenProps {
   onBack: () => void;
   onSelectAthlete: (athlete: any) => void;
-  role: 'trainer' | 'client';
+  role: 'trainer' | 'client' | 'superadmin';
   userId: string;
 }
 
@@ -18,7 +18,8 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newAthlete, setNewAthlete] = useState({ username: '', password: '', displayName: '', type: 'adult' as 'adult' | 'child' });
+  const [newAthlete, setNewAthlete] = useState({ email: '', password: '', displayName: '', type: 'adult' as 'adult' | 'child' });
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -89,50 +90,42 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
     return name?.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || '??';
   };
 
+  const handleCopyCredentials = () => {
+    if (!createdCredentials) return;
+    const text = `Credenciales WL SPORTS\nEmail: ${createdCredentials.email}\nContraseña: ${createdCredentials.password}`;
+    navigator.clipboard.writeText(text);
+    setFeedback({ message: 'Credenciales copiadas al portapapeles', type: 'success' });
+  };
+
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAthlete.username || !newAthlete.displayName || !newAthlete.password) return;
+    if (!newAthlete.email || !newAthlete.displayName || !newAthlete.password) return;
 
     setIsCreating(true);
     try {
-      // Create the user in Firebase Auth using the secondary app
-      const user = await createSecondaryUser(newAthlete.username, newAthlete.password, newAthlete.displayName);
+      // Create account using the secondary app helper in firebase.ts
+      const { createAthleteAccount } = await import('../firebase');
+      const user = await createAthleteAccount(newAthlete.email, newAthlete.password, newAthlete.displayName);
       
-      // Create the user document in Firestore
+      // Create doc in users collection
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        username: newAthlete.username,
-        email: `${newAthlete.username.trim().toLowerCase()}@wlsports.local`,
+        email: newAthlete.email,
         displayName: newAthlete.displayName,
         type: newAthlete.type,
         role: 'client',
         status: 'active',
         trainerId: userId,
-        createdBy: userId,
         createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp(),
-        level: 1,
-        xp: 0,
-        points: 0,
-        achievements: [],
-        streak: 0
       });
 
-      setNewAthlete({ username: '', password: '', displayName: '', type: 'adult' });
+      setCreatedCredentials({ email: newAthlete.email, password: newAthlete.password });
+      setNewAthlete({ email: '', password: '', displayName: '', type: 'adult' });
       setShowAddModal(false);
-      setFeedback({ message: 'Deportista creado exitosamente', type: 'success' });
+      setFeedback({ message: 'Atleta creado correctamente', type: 'success' });
 
-      // Audit Log
-      await logAuditEvent(
-        AuditAction.CREATE_USER,
-        userId,
-        role,
-        user.uid,
-        newAthlete.displayName,
-        `Deportista (${newAthlete.type}) creado por entrenador`
-      );
     } catch (error: any) {
-      setFeedback({ message: error.message || 'Error al crear el deportista', type: 'error' });
+      setFeedback({ message: error.message || 'Error al crear el atleta', type: 'error' });
     } finally {
       setIsCreating(false);
     }
@@ -241,18 +234,61 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
           <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-bold">Mis Deportistas</h1>
+          <h1 className="text-xl font-bold">Mis Atletas</h1>
         </div>
-        {role === 'trainer' && (
+        {(role === 'trainer' || role === 'superadmin') && (
           <button 
             onClick={() => setShowAddModal(true)}
             className="bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2"
           >
             <User size={16} />
-            Nuevo
+            Nuevo Atleta
           </button>
         )}
       </header>
+
+      {/* Success Credentials Modal */}
+      {createdCredentials && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[70] flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-zinc-900 w-full max-w-sm rounded-[2.5rem] border border-zinc-800 p-8 text-center shadow-2xl"
+          >
+            <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="text-green-500" size={32} />
+            </div>
+            <h2 className="text-2xl font-black mb-2">Atleta Creado</h2>
+            <p className="text-zinc-500 text-sm mb-8">Credenciales de acceso para el deportista:</p>
+            
+            <div className="bg-black border border-zinc-800 rounded-2xl p-6 mb-8 text-left space-y-4">
+              <div>
+                <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Email / Usuario</p>
+                <p className="text-[#D4AF37] font-mono text-sm break-all">{createdCredentials.email}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Contraseña</p>
+                <p className="text-white font-mono text-sm">{createdCredentials.password}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                onClick={handleCopyCredentials}
+                className="w-full bg-[#D4AF37] text-black py-4 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                Copiar Credenciales
+              </button>
+              <button 
+                onClick={() => setCreatedCredentials(null)}
+                className="w-full bg-zinc-800 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest"
+              >
+                Cerrar
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Feedback Toast */}
       <AnimatePresence>
@@ -312,13 +348,13 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-zinc-500 text-xs mt-1">
-                      <User size={12} />
-                      <span>{item.username || item.email}</span>
+                      <Mail size={12} />
+                      <span className="truncate max-w-[150px]">{item.email}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.role === 'admin' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400'}`}>
-                      {item.role}
+                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${item.role === 'trainer' || item.role === 'superadmin' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                      {item.role === 'client' ? 'Atleta' : item.role}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -358,8 +394,12 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
       {/* Add Athlete Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 p-8 shadow-2xl">
-            <h2 className="text-2xl font-black mb-6">Nuevo Deportista</h2>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 p-8 shadow-2xl"
+          >
+            <h2 className="text-2xl font-black mb-6">Nuevo Atleta</h2>
             <form onSubmit={handleAddAthlete} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Nombre Completo</label>
@@ -373,14 +413,13 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Nombre de Usuario</label>
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Correo Electrónico</label>
                 <input 
-                  type="text"
-                  value={newAthlete.username}
-                  onChange={(e) => setNewAthlete({ ...newAthlete, username: e.target.value })}
+                  type="email"
+                  value={newAthlete.email}
+                  onChange={(e) => setNewAthlete({ ...newAthlete, email: e.target.value })}
                   className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white focus:border-[#D4AF37] outline-none transition-colors"
-                  placeholder="Ej: carlosruiz123"
-                  minLength={3}
+                  placeholder="email@atleta.com"
                   required
                 />
               </div>
@@ -439,7 +478,7 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>

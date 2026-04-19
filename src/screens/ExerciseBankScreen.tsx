@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface ExerciseBankScreenProps {
   onBack: () => void;
   userId: string;
+  userProfile?: any;
 }
 
 interface Exercise {
@@ -18,7 +19,7 @@ interface Exercise {
   trainerId: string;
 }
 
-export const ExerciseBankScreen = ({ onBack, userId }: ExerciseBankScreenProps) => {
+export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBankScreenProps) => {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,11 +34,18 @@ export const ExerciseBankScreen = ({ onBack, userId }: ExerciseBankScreenProps) 
   });
 
   useEffect(() => {
-    const q = query(
+    let q = query(
       collection(db, 'exerciseBank'),
       where('trainerId', '==', userId),
       orderBy('createdAt', 'desc')
     );
+
+    if (userProfile?.role === 'superadmin') {
+      q = query(
+        collection(db, 'exerciseBank'),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Exercise));

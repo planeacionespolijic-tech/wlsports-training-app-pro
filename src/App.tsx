@@ -296,14 +296,24 @@ export default function App() {
     }
   }, [user, userProfile, loading]);
 
+  useEffect(() => {
+    if (user && userProfile && !loading && currentScreen === 'home') {
+      if (userProfile.role === 'trainer' || userProfile.role === 'superadmin') {
+        handleNavigate('trainer-dashboard');
+      } else if (userProfile.role === 'client') {
+        handleNavigate('client-dashboard');
+      }
+    }
+  }, [user, userProfile, loading, currentScreen]);
+
   const handleSelectAthlete = (athlete: any) => {
     setSelectedAthlete(athlete);
     handleNavigate('athlete-profile');
   };
 
-  const isTrainer = userRole === 'trainer';
+  const isTrainer = userRole === 'trainer' || userRole === 'superadmin';
   const targetUserId = selectedAthlete ? selectedAthlete.id : (user?.uid || '');
-  const currentTrainerId = userRole === 'trainer' ? (user?.uid || null) : (userProfile?.trainerId || null);
+  const currentTrainerId = (userRole === 'trainer' || userRole === 'superadmin') ? (user?.uid || null) : (userProfile?.trainerId || null);
 
   const renderScreen = () => {
     if (!user) {
@@ -353,6 +363,7 @@ export default function App() {
           <ExerciseBankScreen
             userId={user.uid}
             onBack={handleBack}
+            userProfile={userProfile}
           />
         );
       case 'entrenamientos':

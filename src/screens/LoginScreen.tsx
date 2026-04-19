@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { LogIn, ShieldCheck, Zap, Trophy, Activity, AlertCircle, User, Lock, UserPlus } from 'lucide-react';
+import { LogIn, Activity, AlertCircle, Mail, Lock, Key, CheckCircle2, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { loginWithUsername, registerWithUsername } from '../firebase';
+import { loginWithEmail, resetPassword } from '../firebase';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -11,15 +11,17 @@ interface LoginScreenProps {
 
 export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginScreenProps) => {
   const [error, setError] = useState<React.ReactNode | null>(null);
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [username, setUsername] = useState('');
+  const [success, setSuccess] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
 
   const handleLogin = async (loginFn: () => Promise<any>) => {
     try {
       setIsLoading(true);
       setError(null);
+      setSuccess(null);
       await loginFn();
     } catch (err: any) {
       const message = err.message || "Ocurrió un error al iniciar sesión.";
@@ -28,50 +30,11 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
           <>
             Dominio no autorizado para inicio de sesión con Google.
             <br />
-            Debes agregar este dominio (la URL actual) en Firebase Authentication &gt; Settings &gt; Authorized domains.
-            <br />
-            <a 
-              href="https://console.firebase.google.com/project/_/authentication/settings" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline font-bold mt-2 block text-[#D4AF37]"
-            >
-              Ir a la consola de Firebase
-            </a>
+            Debes agregar este dominio en la consola de Firebase.
           </>
         );
       } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        setError("El inicio de sesión fue cancelado. Por favor, intenta de nuevo y no cierres la ventana emergente.");
-      } else if (message.includes("Anonymous")) {
-        setError(
-          <>
-            {message}
-            <br />
-            <a 
-              href="https://console.firebase.google.com/project/gen-lang-client-0599383108/authentication/providers" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline font-bold mt-2 block"
-            >
-              Ir a la consola de Firebase para activarlo
-            </a>
-          </>
-        );
-      } else if (message.includes("correo/contraseña")) {
-        setError(
-          <>
-            {message}
-            <br />
-            <a 
-              href="https://console.firebase.google.com/project/gen-lang-client-0599383108/authentication/providers" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline font-bold mt-2 block"
-            >
-              Activar Email/Password en Firebase
-            </a>
-          </>
-        );
+        setError("El inicio de sesión fue cancelado.");
       } else {
         setError(message);
       }
@@ -80,18 +43,28 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
     }
   };
 
-  const handleUsernameAuth = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (!email || (!isForgotPassword && !password)) {
       setError("Por favor completa todos los campos.");
       return;
     }
     
-    handleLogin(() => 
-      isRegistering 
-        ? registerWithUsername(username, password) 
-        : loginWithUsername(username, password)
-    );
+    if (isForgotPassword) {
+      try {
+        setIsLoading(true);
+        setError(null);
+        await resetPassword(email);
+        setSuccess("Te enviamos un correo para restablecer tu contraseña");
+        setIsForgotPassword(false);
+      } catch (err: any) {
+        setError(err.message || "Error al enviar el correo de recuperación.");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      handleLogin(() => loginWithEmail(email, password));
+    }
   };
 
   return (
@@ -126,20 +99,9 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
           transition={{ delay: 0.2, duration: 0.8 }}
           className="w-full bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2rem] mb-6 backdrop-blur-xl"
         >
-          <div className="flex gap-4 mb-6 p-1 bg-black/50 rounded-2xl border border-zinc-800">
-            <button 
-              onClick={() => { setIsRegistering(false); setError(null); }}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${!isRegistering ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              Entrar
-            </button>
-            <button 
-              onClick={() => { setIsRegistering(true); setError(null); }}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${isRegistering ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              Registro
-            </button>
-          </div>
+          <h2 className="text-xl font-bold mb-6 text-center text-zinc-100 uppercase tracking-widest">
+            {isForgotPassword ? 'Recuperar Contraseña' : 'Iniciar Sesión'}
+          </h2>
 
           {(error || externalError) && (
             <motion.div 
@@ -152,29 +114,44 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
             </motion.div>
           )}
 
-          <form onSubmit={handleUsernameAuth} className="space-y-4">
+          {success && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-start gap-3 text-green-400 text-sm"
+            >
+              <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
+              <div>{success}</div>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
               <input 
-                type="text"
-                placeholder="Nombre de usuario"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                placeholder="Correo electrónico"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37] transition-colors"
                 disabled={isLoading}
+                required
               />
             </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-              <input 
-                type="password"
-                placeholder="Contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37] transition-colors"
-                disabled={isLoading}
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                <input 
+                  type="password"
+                  placeholder="Contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37] transition-colors"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+            )}
             <button 
               type="submit"
               disabled={isLoading}
@@ -184,18 +161,27 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
                 <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
               ) : (
                 <>
-                  {isRegistering ? <UserPlus size={18} /> : <LogIn size={18} />}
-                  {isRegistering ? 'Crear Cuenta' : 'Iniciar Sesión'}
+                  {isForgotPassword ? <Key size={18} /> : <LogIn size={18} />}
+                  {isForgotPassword ? 'Enviar Enlace' : 'Entrar'}
                 </>
               )}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <button 
+              onClick={() => { setIsForgotPassword(!isForgotPassword); setError(null); setSuccess(null); }}
+              className="text-[10px] text-zinc-500 hover:text-[#D4AF37] font-bold uppercase tracking-widest transition-colors"
+            >
+              {isForgotPassword ? 'Volver al inicio de sesión' : '¿Olvidaste tu contraseña?'}
+            </button>
+          </div>
         </motion.div>
 
         {/* Divider */}
         <div className="w-full flex items-center gap-4 mb-6">
           <div className="h-[1px] flex-1 bg-zinc-800" />
-          <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">O continuar con</span>
+          <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">O</span>
           <div className="h-[1px] flex-1 bg-zinc-800" />
         </div>
 
@@ -231,11 +217,11 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
           className="w-full bg-zinc-800/50 text-[#D4AF37] py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-[#D4AF37]/20 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
         >
           <Zap size={18} />
-          Acceso Directo (Sin Registro)
+          Acceso Directo
         </button>
         
         <p className="text-center text-zinc-600 text-[10px] mt-8 uppercase tracking-widest font-bold">
-          Al ingresar aceptas nuestros términos y condiciones
+          Plataforma Profesional de Entrenamiento
         </p>
       </div>
 

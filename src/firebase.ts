@@ -10,7 +10,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
-  getRedirectResult
+  getRedirectResult,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc, getDoc, setDoc, getDocFromServer } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -73,13 +74,33 @@ export const registerWithUsername = async (username: string, password: string) =
   }
 };
 
-export const loginWithUsername = async (username: string, password: string) => {
-  const email = usernameToEmail(username);
+export const resetPassword = (email: string) => sendPasswordResetEmail(auth, email);
+
+export const loginWithEmail = async (email: string, password: string) => {
   try {
     return await signInWithEmailAndPassword(auth, email, password);
   } catch (error: any) {
     if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
-      throw new Error("Usuario o contraseña incorrectos.");
+      throw new Error("Email o contraseña incorrectos.");
+    }
+    throw error;
+  }
+};
+
+export const createAthleteAccount = async (email: string, password: string, displayName: string) => {
+  // Initialize a secondary app to avoid signing out the current user
+  const secondaryApp = initializeApp(firebaseConfig, `SecondaryApp_${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  
+  try {
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await updateProfile(userCredential.user, { displayName });
+    const user = userCredential.user;
+    await signOut(secondaryAuth);
+    return user;
+  } catch (error: any) {
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error("El correo electrónico ya está en uso.");
     }
     throw error;
   }
