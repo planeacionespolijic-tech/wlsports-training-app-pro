@@ -1,16 +1,19 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, RotateCcw, Settings, CheckCircle2, Timer, Layers, Repeat, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface TabataScreenProps {
-  onBack: () => void;
-  userId: string;
+  onBack?: () => void;
+  userId?: string;
 }
 
 type Phase = 'PREPARE' | 'WORK' | 'REST' | 'BLOCK_REST' | 'FINISHED';
 
 export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
+  const navigate = useNavigate();
+  
   // Configuration
   const [workTime, setWorkTime] = useState(20);
   const [restTime, setRestTime] = useState(10);
@@ -134,12 +137,17 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
 
   const { color, label, gradient } = getPhaseData();
 
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate(-1);
+  };
+
   if (isConfiguring) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col font-sans">
         <header className="p-6 border-b border-zinc-900 flex items-center justify-between sticky top-0 bg-black/90 backdrop-blur-md z-10">
           <div className="flex items-center gap-4">
-            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
+            <button onClick={handleBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
               <ArrowLeft size={24} />
             </button>
             <h1 className="text-xl font-black uppercase tracking-tighter">Tabata Pro</h1>

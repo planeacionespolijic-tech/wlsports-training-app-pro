@@ -240,32 +240,7 @@ export const SessionExecutionScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans">
-      {/* OVERLAYS FOR TOOLS */}
-      <AnimatePresence>
-        {showTabata && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 1.1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="fixed inset-0 z-50 bg-black"
-          >
-            <TabataScreen onBack={() => setShowTabata(false)} userId={userId as string} />
-          </motion.div>
-        )}
-
-        {showReaction && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 1.1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="fixed inset-0 z-50 bg-black"
-          >
-            <ReactionScreen onBack={() => setShowReaction(false)} userId={userId as string} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans relative">
       {/* MODAL PARA AÑADIR EJERCICIO */}
       {showAdd && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
@@ -540,6 +515,35 @@ export const SessionExecutionScreen = () => {
           )}
         </button>
       </div>
+
+      {/* OVERLAYS FOR TOOLS (Ensuring they are at the end for correct layering) */}
+      <AnimatePresence>
+        {showTabata && (
+          <motion.div 
+            key="tabata-overlay"
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[100] bg-black pointer-events-auto"
+          >
+            <TabataScreen onBack={() => setShowTabata(false)} userId={userId as string} />
+          </motion.div>
+        )}
+
+        {showReaction && (
+          <motion.div 
+            key="reaction-overlay"
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[100] bg-black pointer-events-auto"
+          >
+            <ReactionScreen onBack={() => setShowReaction(false)} userId={userId as string} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
