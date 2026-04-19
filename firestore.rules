@@ -253,6 +253,11 @@ service cloud.firestore {
              (data.userId == request.auth.uid || isTrainer());
     }
 
+    function isValidSession(data) {
+      return data.athleteId is string && data.exercisesCompleted is int &&
+             (data.athleteId == request.auth.uid || isTrainer());
+    }
+
     function isValidVideoAnalysis(data) {
       return data.userId is string && data.videoUrl is string &&
              data.title is string && (data.userId == request.auth.uid || isTrainer());
@@ -446,6 +451,13 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || isDocOwner() || (isAuthenticated() && resource.data.get('trainerId', '') == request.auth.uid);
       allow create: if isNotBlocked() && isValidChallengeSubmission(request.resource.data);
       allow update: if isSuperAdmin() || (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || isTrainerOf(resource.data.get('userId', '')))) && isNotBlocked();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isSuperAdmin() || request.auth.uid == resource.data.athleteId || request.auth.uid == resource.data.trainerId;
+      allow create: if (request.auth.uid == request.resource.data.athleteId || isTrainer()) && isNotBlocked() && isValidSession(request.resource.data);
+      allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }
 

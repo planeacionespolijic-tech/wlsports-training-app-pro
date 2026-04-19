@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle2, Save, Loader2, MessageSquare, Activity, Clock, Layers, Play, Pause, SkipForward, RotateCcw, Plus, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, X, Search, Dumbbell, ChevronRight } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, serverTimestamp, increment, getDocs } from 'firebase/firestore';
-import { awardSessionPoints } from '../services/gamificationService';
-import { startLiveSession, updateLiveSession, endLiveSession } from '../services/liveSessionService';
+import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { TabataModule } from '../components/training/TabataModule';
-import { ReactionModule } from '../components/training/ReactionModule';
-import { Timer, Zap } from 'lucide-react';
-import { updateUserSummary } from '../services/dataService';
+import { TabataScreen } from './TabataScreen';
+import { ReactionScreen } from './ReactionScreen';
 
 interface SessionExecutionScreenProps {
   onBack: () => void;
@@ -18,617 +15,439 @@ interface SessionExecutionScreenProps {
   isAdmin?: boolean;
 }
 
-export const SessionExecutionScreen = ({ onBack, userId, workout, trainerId, isAdmin }: SessionExecutionScreenProps) => {
-  const [saving, setSaving] = useState(false);
-  const [localWorkout, setLocalWorkout] = useState(workout);
-  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
-  const [rpe, setRpe] = useState<number>(5);
-  const [observations, setObservations] = useState('');
-  const [adaptations, setAdaptations] = useState<{ [key: string]: string }>({});
-  const [activeTool, setActiveTool] = useState<'tabata' | 'reaction' | null>(null);
+const MODIFIERS = [
+  "Gol vale doble",
+  "Solo pierna no dominante",
+  "Tiempo límite 1 minuto",
+  "Máximo 3 toques",
+  "Finalización obligatoria"
+];
 
-  // States for adding exercises
-  const [showAddExerciseModal, setShowAddExerciseModal] = useState<string | null>(null);
-  const [showBankModal, setShowBankModal] = useState(false);
-  const [exerciseBank, setExerciseBank] = useState<any[]>([]);
-  const [exName, setExName] = useState('');
-  const [exSeries, setExSeries] = useState(3);
-  const [exReps, setExReps] = useState('');
-  const [exTime, setExTime] = useState(0);
-  const [exLoad, setExLoad] = useState('');
-  const [exRpe, setExRpe] = useState(0);
+export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout, trainerId, isAdmin }: SessionExecutionScreenProps) => {
+  const { workoutId } = useParams();
+  const [workout, setWorkout] = useState(initialWorkout);
+  const [loading, setLoading] = useState(!initialWorkout && !!workoutId);
+  const [saving, setSaving] = useState(false);
+  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
+  const [modifier, setModifier] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
+
+  // States for tools
+  const [showTabata, setShowTabata] = useState(false);
+  const [showReaction, setShowReaction] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newExName, setNewExName] = useState('');
+  const [extraExercises, setExtraExercises] = useState<any[]>([]);
+
+  // Exercise Bank Integration
+  const [bankExercises, setBankExercises] = useState<any[]>([]);
+  const [loadingBank, setLoadingBank] = useState(false);
+  const [bankSearch, setBankSearch] = useState('');
+  const [showBankPicker, setShowBankPicker] = useState(false);
 
   useEffect(() => {
-    const fetchExerciseBank = async () => {
+    if (!workout && workoutId) {
+      const fetchWorkout = async () => {
+        try {
+          const wDoc = await getDoc(doc(db, 'workouts', workoutId));
+          if (wDoc.exists()) {
+            setWorkout({ id: wDoc.id, ...wDoc.data() });
+          }
+        } catch (err) {
+          console.error("Error fetching workout:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchWorkout();
+    }
+  }, [workoutId, workout]);
+
+  // Fetch Bank Exercises when Modal opens
+  useEffect(() => {
+    if (showAdd && trainerId) {
+      const fetchBank = async () => {
+        setLoadingBank(true);
+        try {
+          const q = query(collection(db, 'exerciseBank'), where('trainerId', '==', trainerId));
+          const snap = await getDocs(q);
+          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setBankExercises(data);
+        } catch (err) {
+          console.error("Error fetching bank", err);
+        } finally {
+          setLoadingBank(false);
+        }
+      };
+      fetchBank();
+    }
+  }, [showAdd, trainerId]);
+
+  // Extract exercises safely from varying structures
+  const allExercises = React.useMemo(() => {
+    const base = (() => {
+      if (!workout) return [];
+      if (workout.exercises && Array.isArray(workout.exercises)) {
+        return workout.exercises;
+      }
+      if (workout.blocks && Array.isArray(workout.blocks)) {
+        return workout.blocks.flatMap((b: any) => b.exercises || []);
+      }
+      return [];
+    })();
+    return [...base, ...extraExercises];
+  }, [workout, extraExercises]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'exerciseBank'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setExerciseBank(data);
-      } catch (error) {
-        console.error("Error fetching exercise bank:", error);
+        if (userId) {
+          const uDoc = await getDoc(doc(db, 'users', userId));
+          if (uDoc.exists()) {
+            setUserData(uDoc.data());
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching user data", err);
       }
     };
-    if (isAdmin) {
-      fetchExerciseBank();
-    }
-  }, [isAdmin]);
+    fetchUser();
+  }, [userId]);
 
-  const handleAddExercise = (blockId: string) => {
-    if (!exName) return;
-    
-    const newExercise = {
-      id: Date.now().toString(),
-      name: exName,
-      series: exSeries,
-      reps: exReps,
-      timePerSeries: exTime,
-      load: exLoad,
-      rpe: exRpe,
-      totalTime: exSeries * exTime
-    };
-
-    setLocalWorkout((prev: any) => {
-      const newBlocks = prev.blocks.map((b: any) => {
-        if (b.id === blockId) {
-          return {
-            ...b,
-            exercises: [...(b.exercises || []), newExercise],
-            totalTime: (b.totalTime || 0) + newExercise.totalTime
-          };
-        }
-        return b;
-      });
-      
-      return {
-        ...prev,
-        blocks: newBlocks
-      };
-    });
-
-    setShowAddExerciseModal(null);
-    setExName('');
-    setExSeries(3);
-    setExReps('');
-    setExTime(0);
-    setExLoad('');
-    setExRpe(0);
+  const handleToggle = (exId: string) => {
+    setCompletedExercises(prev => 
+      prev.includes(exId) 
+        ? prev.filter(id => id !== exId)
+        : [...prev, exId]
+    );
   };
 
-  // Initialize live session
-  useEffect(() => {
-    startLiveSession(userId, localWorkout);
-    return () => {
-      // End live session logic if needed
-    };
-  }, [userId, localWorkout]);
+  const handleRollModifier = () => {
+    const random = Math.floor(Math.random() * MODIFIERS.length);
+    setModifier(MODIFIERS[random]);
+  };
 
-  const toggleExercise = (id: string) => {
-    const newCompleted = completedExercises.includes(id)
-      ? completedExercises.filter(i => i !== id)
-      : [...completedExercises, id];
-    
-    setCompletedExercises(newCompleted);
-    updateLiveSession(userId, { completedExercises: newCompleted });
+  const handleAddManualExercise = (exerciseToUse?: any) => {
+    const nameToUse = exerciseToUse ? exerciseToUse.name : newExName.trim();
+    if (!nameToUse) return;
+
+    const newEx = {
+      id: exerciseToUse ? `bank-${exerciseToUse.id}-${Date.now()}` : `manual-${Date.now()}`,
+      name: nameToUse,
+      isManual: true,
+      fromBank: !!exerciseToUse
+    };
+
+    setExtraExercises(prev => [...prev, newEx]);
+    setNewExName('');
+    setShowAdd(false);
+    setShowBankPicker(false);
   };
 
   const handleFinish = async () => {
+    if (!workout) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'history'), {
-        userId,
-        trainerId,
-        workoutId: localWorkout.id || 'custom',
-        workoutName: localWorkout.name,
-        workoutDetails: {
-          ...localWorkout,
-          completedExercises,
-          rpe,
-          observations,
-          adaptations
-        },
-        date: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp(),
+      const xpGained = completedExercises.length * 10;
+      
+      await addDoc(collection(db, 'sessions'), {
+        athleteId: userId,
+        trainerId: trainerId || null,
+        date: serverTimestamp(),
+        exercisesCompleted: completedExercises.length,
+        xpGained: xpGained,
+        modifier: modifier,
+        workoutName: workout.name || 'Entrenamiento'
       });
 
-      // Award gamification points
-      const result = await awardSessionPoints(userId, localWorkout.name);
-      
-      // Update user summary for optimized reads
-      try {
-        await updateUserSummary(userId, {
-          lastWorkout: localWorkout.name,
-          lastWorkoutDate: new Date().toISOString(),
-          sessionsCompleted: 1,
-          points: result?.newPoints || 0,
-          level: result?.newLevel || 1,
-          xp: result?.newXp || 0
-        });
-      } catch (e) {
-        console.error('Error updating user summary:', e);
+      // Update actual user profile XP
+      if (userId) {
+        const userRef = doc(db, 'users', userId);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const currentXp = (snap.data().xp || 0) + xpGained;
+          const newLevel = Math.floor(currentXp / 1000) + 1;
+          await updateDoc(userRef, {
+            xp: increment(xpGained),
+            points: increment(xpGained),
+            level: newLevel
+          });
+        }
       }
-      
-      // End live session
-      await endLiveSession(userId);
-      
-      let message = `¡Sesión guardada! Ganaste ${result?.pointsEarned} puntos.`;
-      if (result?.leveledUp) {
-        message += `\n\n¡FELICIDADES! Subiste al nivel ${result.newLevel}`;
-      }
-      
-      alert(message);
+
+      alert(`Sesión guardada correctamente. ¡Has ganado ${xpGained} XP!`);
       onBack();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'history');
+      handleFirestoreError(error, OperationType.CREATE, 'sessions');
     } finally {
       setSaving(false);
     }
   };
 
-  const renderExercise = (ex: any, blockId: string = 'default') => {
-    const exId = ex.id || `${blockId}-${ex.name}`;
-    const isCompleted = completedExercises.includes(exId);
+  const filteredBank = bankExercises.filter(ex => 
+    ex.name.toLowerCase().includes(bankSearch.toLowerCase())
+  );
 
+  if (loading) {
     return (
-      <motion.div 
-        key={exId}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`p-5 rounded-3xl border transition-all ${isCompleted ? 'bg-zinc-900/30 border-[#D4AF37]/50' : 'bg-zinc-900 border-zinc-800'}`}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className={`font-bold text-lg ${isCompleted ? 'text-zinc-500 line-through' : 'text-white'}`}>
-              {ex.name}
-            </h3>
-            <p className="text-sm text-zinc-500 font-medium">
-              {ex.series} series {ex.reps && `x ${ex.reps} reps`} {ex.load && `@ ${ex.load}`} {ex.weight && `@ ${ex.weight}`}
-              {ex.totalTime > 0 && ` | ${Math.floor(ex.totalTime / 60)}:${(ex.totalTime % 60).toString().padStart(2, '0')}`}
-            </p>
-          </div>
-          <button 
-            onClick={() => toggleExercise(exId)}
-            className={`p-3 rounded-2xl transition-all ${isCompleted ? 'bg-[#D4AF37] text-black' : 'bg-black border border-zinc-800 text-zinc-700'}`}
-          >
-            <CheckCircle2 size={24} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 bg-black/30 p-2 rounded-xl border border-zinc-800/50">
-          <Activity size={14} className="text-zinc-600" />
-          <input 
-            type="text"
-            placeholder="Adaptación (ej: bajé peso, dolió hombro...)"
-            className="bg-transparent text-xs outline-none w-full text-zinc-400"
-            value={adaptations[exId] || ''}
-            onChange={(e) => setAdaptations({ ...adaptations, [exId]: e.target.value })}
-          />
-        </div>
-      </motion.div>
-    );
-  };
-
-  const CircuitPlayer = ({ block }: { block: any }) => {
-    const [currentRound, setCurrentRound] = useState(1);
-    const [currentItemIdx, setCurrentItemIdx] = useState(0);
-    const [isResting, setIsResting] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(0);
-    const [isActive, setIsActive] = useState(false);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-    const circuit = block.circuit;
-    const currentItem = circuit.items[currentItemIdx];
-
-    useEffect(() => {
-      if (isActive && timeLeft > 0) {
-        timerRef.current = setInterval(() => {
-          setTimeLeft(prev => prev - 1);
-        }, 1000);
-      } else if (timeLeft === 0 && isActive) {
-        handleNext();
-      }
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-    }, [isActive, timeLeft]);
-
-    const handleStart = () => {
-      setIsActive(true);
-      if (timeLeft === 0) {
-        setTimeLeft(currentItem.time || 30);
-      }
-    };
-
-    const handlePause = () => {
-      setIsActive(false);
-    };
-
-    const handleNext = () => {
-      if (isResting) {
-        // Finished rest, move to next exercise or next round
-        setIsResting(false);
-        const nextIdx = currentItemIdx + 1;
-        if (nextIdx < circuit.items.length) {
-          setCurrentItemIdx(nextIdx);
-          setTimeLeft(circuit.items[nextIdx].time || 30);
-        } else {
-          // End of round
-          if (currentRound < circuit.rounds) {
-            setCurrentRound(prev => prev + 1);
-            setCurrentItemIdx(0);
-            setTimeLeft(circuit.items[0].time || 30);
-          } else {
-            // Circuit finished
-            setIsActive(false);
-            toggleExercise(block.id);
-          }
-        }
-      } else {
-        // Finished work, move to rest
-        const isEndOfRound = currentItemIdx === circuit.items.length - 1;
-        const isEndOfCircuit = isEndOfRound && currentRound === circuit.rounds;
-
-        if (isEndOfCircuit) {
-          setIsActive(false);
-          toggleExercise(block.id);
-        } else {
-          setIsResting(true);
-          setTimeLeft(isEndOfRound ? circuit.restBetweenRounds : circuit.restBetweenExercises);
-        }
-      }
-    };
-
-    const handleReset = () => {
-      setIsActive(false);
-      setCurrentRound(1);
-      setCurrentItemIdx(0);
-      setIsResting(false);
-      setTimeLeft(circuit.items[0].time || 30);
-    };
-
-    const isCompleted = completedExercises.includes(block.id);
-
-    return (
-      <div className={`p-6 rounded-3xl border transition-all ${isCompleted ? 'bg-zinc-900/30 border-[#D4AF37]/50' : 'bg-zinc-900 border-zinc-800'}`}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#D4AF37]/20 p-2 rounded-xl text-[#D4AF37]">
-              <RotateCcw size={20} />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">Circuito: {block.name}</h3>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
-                Ronda {currentRound} de {circuit.rounds} • {circuit.items.length} Ejercicios
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => toggleExercise(block.id)}
-            className={`p-3 rounded-2xl transition-all ${isCompleted ? 'bg-[#D4AF37] text-black' : 'bg-black border border-zinc-800 text-zinc-700'}`}
-          >
-            <CheckCircle2 size={24} />
-          </button>
-        </div>
-
-        {!isCompleted && (
-          <div className="space-y-6">
-            <div className="bg-black/50 rounded-2xl p-6 border border-zinc-800 text-center relative overflow-hidden">
-              {isResting && (
-                <div className="absolute inset-0 bg-emerald-500/10 animate-pulse" />
-              )}
-              <div className="relative z-10">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">
-                  {isResting ? 'Descanso' : 'Trabajo'}
-                </p>
-                <h4 className="text-2xl font-black text-white mb-4">
-                  {isResting ? (currentItemIdx === circuit.items.length - 1 ? 'Próxima Ronda' : 'Siguiente Ejercicio') : currentItem.name}
-                </h4>
-                <div className="text-6xl font-black text-[#D4AF37] tabular-nums mb-6">
-                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                </div>
-
-                <div className="flex justify-center gap-4">
-                  <button 
-                    onClick={handleReset}
-                    className="p-4 bg-zinc-800 text-white rounded-2xl hover:bg-zinc-700 transition-all"
-                  >
-                    <RotateCcw size={24} />
-                  </button>
-                  {isActive ? (
-                    <button 
-                      onClick={handlePause}
-                      className="p-4 bg-zinc-800 text-white rounded-2xl hover:bg-zinc-700 transition-all"
-                    >
-                      <Pause size={24} />
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={handleStart}
-                      className="p-4 bg-[#D4AF37] text-black rounded-2xl hover:opacity-90 transition-all"
-                    >
-                      <Play size={24} />
-                    </button>
-                  )}
-                  <button 
-                    onClick={handleNext}
-                    className="p-4 bg-zinc-800 text-white rounded-2xl hover:bg-zinc-700 transition-all"
-                  >
-                    <SkipForward size={24} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-2">Secuencia del Circuito</p>
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {circuit.items.map((item: any, idx: number) => (
-                  <div 
-                    key={item.id}
-                    className={`flex-shrink-0 px-4 py-2 rounded-xl border transition-all ${idx === currentItemIdx ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-zinc-800 text-zinc-500'}`}
-                  >
-                    <p className="text-[10px] font-black">{idx + 1}. {item.name}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="text-[#D4AF37] animate-spin mb-4" size={48} />
+        <p className="text-zinc-500 font-bold animate-pulse uppercase tracking-[0.2em] text-xs">Preparando sesión...</p>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
-      <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
+    <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+      {/* OVERLAYS FOR TOOLS */}
+      <AnimatePresence>
+        {showTabata && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            className="fixed inset-0 z-50 bg-black"
+          >
+            <TabataScreen onBack={() => setShowTabata(false)} userId={userId} />
+          </motion.div>
+        )}
+
+        {showReaction && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            className="fixed inset-0 z-50 bg-black"
+          >
+            <ReactionScreen onBack={() => setShowReaction(false)} userId={userId} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL PARA AÑADIR EJERCICIO */}
+      {showAdd && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-sm bg-zinc-900 rounded-[2rem] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]"
+          >
+            <div className="p-8 border-b border-zinc-800">
+              <button 
+                onClick={() => setShowAdd(false)}
+                className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+              <h3 className="text-xl font-black italic uppercase mb-2">Añadir Ejercicio</h3>
+              <div className="flex bg-black rounded-xl p-1 gap-1">
+                <button 
+                  onClick={() => setShowBankPicker(false)}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${!showBankPicker ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
+                >
+                  Manual
+                </button>
+                <button 
+                  onClick={() => setShowBankPicker(true)}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${showBankPicker ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
+                >
+                  Biblioteca
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 pt-6">
+              {!showBankPicker ? (
+                <div className="space-y-6">
+                  <p className="text-xs text-zinc-500">¿Quieres añadir algo rápido que no está en el plan?</p>
+                  <input 
+                    autoFocus
+                    value={newExName}
+                    onChange={(e) => setNewExName(e.target.value)}
+                    placeholder="Ej: Sprint final, Plancha..."
+                    className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white focus:border-[#D4AF37] outline-none"
+                  />
+                  <button 
+                    onClick={() => handleAddManualExercise()}
+                    className="w-full bg-[#D4AF37] text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs"
+                  >
+                    Añadir a la sesión
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="sticky top-0 bg-zinc-900 pb-2 z-10">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" size={14} />
+                      <input 
+                        placeholder="Buscar en biblioteca..."
+                        value={bankSearch}
+                        onChange={(e) => setBankSearch(e.target.value)}
+                        className="w-full bg-black border border-zinc-800 py-3 pl-10 pr-4 rounded-xl text-xs outline-none focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  </div>
+
+                  {loadingBank ? (
+                    <div className="flex justify-center p-8">
+                      <Loader2 size={24} className="text-[#D4AF37] animate-spin" />
+                    </div>
+                  ) : filteredBank.length === 0 ? (
+                    <p className="text-center text-xs text-zinc-600 py-8">No se encontraron resultados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredBank.map(ex => (
+                        <button
+                          key={ex.id}
+                          onClick={() => handleAddManualExercise(ex)}
+                          className="w-full flex items-center justify-between p-4 bg-black/50 border border-zinc-800 rounded-xl hover:border-[#D4AF37]/40 transition-all text-left group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 group-hover:text-[#D4AF37]">
+                              <Dumbbell size={14} />
+                            </div>
+                            <span className="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">{ex.name}</span>
+                          </div>
+                          <ChevronRight size={14} className="text-zinc-700 group-hover:text-[#D4AF37]" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 1. HEADER */}
+      <header className="p-4 border-b border-zinc-800 bg-zinc-900/50 sticky top-0 z-10 flex items-center justify-between backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={onBack} className="p-3 bg-black hover:bg-zinc-800 rounded-full transition-colors border border-zinc-800">
             <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-xl font-bold">{localWorkout.name}</h1>
-            <div className="flex items-center gap-2 text-[10px] text-zinc-500 uppercase font-black tracking-widest">
-              <Clock size={10} />
-              <span>{localWorkout.duration || 'N/A'}</span>
-              <span className="mx-1">•</span>
-              <span>Ejecución</span>
-            </div>
+            <h1 className="text-xl font-black">{userData?.displayName || 'Deportista'}</h1>
+            {userData?.level ? (
+              <p className="text-xs text-[#D4AF37] font-bold uppercase tracking-widest flex items-center gap-1">
+                <Trophy size={12} /> Nivel {userData.level} | {userData.xp || 0} XP
+              </p>
+            ) : (
+              <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Modo Sesión</p>
+            )}
           </div>
         </div>
-        <button 
-          onClick={handleFinish}
-          disabled={saving || completedExercises.length === 0}
-          className="bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-          Finalizar
-        </button>
       </header>
 
-      {/* Quick Tools Bar */}
-      <div className="bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-2 flex justify-center gap-4 sticky top-[73px] z-[5]">
-        <button 
-          onClick={() => setActiveTool('tabata')}
-          className="flex items-center gap-2 px-6 py-2 bg-emerald-500/10 text-emerald-500 rounded-full border border-emerald-500/20 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
-        >
-          <Timer size={14} />
-          Tabata
-        </button>
-        <button 
-          onClick={() => setActiveTool('reaction')}
-          className="flex items-center gap-2 px-6 py-2 bg-blue-500/10 text-blue-500 rounded-full border border-blue-500/20 font-black text-[10px] uppercase tracking-widest hover:bg-blue-500/20 transition-all"
-        >
-          <Zap size={14} />
-          Reacción
-        </button>
-      </div>
+      <main className="flex-1 p-4 pb-32 space-y-8 overflow-y-auto w-full max-w-2xl mx-auto">
+        
+        {/* 2. MODIFICADOR (GAMIFICACIÓN) */}
+        <section className="space-y-4">
+          <button 
+            onClick={handleRollModifier}
+            className="w-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 p-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all"
+          >
+            <Dice5 size={28} />
+            <span className="font-black text-lg uppercase tracking-wider">Modo Desafío</span>
+          </button>
 
-      <main className="flex-1 p-6 overflow-y-auto">
-        <div className="max-w-2xl mx-auto space-y-8 pb-20">
-          {localWorkout.blocks && localWorkout.blocks.length > 0 ? (
-            localWorkout.blocks.map((block: any) => (
-              <div key={block.id} className="space-y-4">
-                <div className="flex items-center gap-2 border-l-2 border-[#D4AF37] pl-3">
-                  <Layers size={16} className="text-[#D4AF37]" />
-                  <h2 className="text-sm font-black uppercase tracking-widest text-[#D4AF37]">{block.name}</h2>
-                  <span className="ml-auto text-[10px] font-bold text-zinc-500 bg-zinc-900 px-2 py-1 rounded-full">
-                    {Math.floor(block.totalTime / 60)}:{(block.totalTime % 60).toString().padStart(2, '0')}
-                  </span>
-                  {isAdmin && (
-                    <button 
-                      onClick={() => setShowAddExerciseModal(block.id)}
-                      className="ml-2 bg-[#D4AF37]/10 text-[#D4AF37] p-1.5 rounded-lg hover:bg-[#D4AF37]/20 transition-colors"
-                      title="Añadir ejercicio"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-4">
-                  {block.type === 'circuit' ? (
-                    <CircuitPlayer block={block} />
-                  ) : (
-                    block.exercises.map((ex: any) => renderExercise(ex, block.id))
-                  )}
-                </div>
-              </div>
-            ))
+          <AnimatePresence>
+            {modifier && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="bg-indigo-600 text-white p-5 rounded-2xl text-center shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-400"
+              >
+                <p className="text-[10px] uppercase font-black tracking-widest text-indigo-200 mb-1">Modificador Activo</p>
+                <p className="text-xl font-black">{modifier}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* 3. LISTA DE EJERCICIOS */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-black text-zinc-500 uppercase tracking-widest mx-1 mb-2">Ejercicios a Completar</h2>
+          {allExercises.length === 0 ? (
+            <div className="bg-zinc-900 border border-dashed border-zinc-800 p-8 rounded-3xl text-center">
+              <p className="text-zinc-500 text-sm">No hay ejercicios asignados en este entrenamiento.</p>
+            </div>
           ) : (
-            <div className="space-y-4">
-              <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500">Ejercicios de la Sesión</h2>
-              {localWorkout.exercises?.map((ex: any, idx: number) => renderExercise(ex, 'legacy'))}
-            </div>
+            allExercises.map((ex: any, idx: number) => {
+              const exId = ex.id || `ex-${idx}`;
+              const isCompleted = completedExercises.includes(exId);
+              
+              return (
+                <button
+                  key={exId}
+                  onClick={() => handleToggle(exId)}
+                  className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all active:scale-[0.98] ${
+                    isCompleted 
+                      ? 'bg-emerald-500/10 border-emerald-500/30' 
+                      : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="flex-1 text-left pr-4">
+                    <h3 className={`font-bold text-lg ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>
+                      {ex.name || 'Ejercicio sin nombre'}
+                    </h3>
+                    {ex.fromBank && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Desde Biblioteca</span>}
+                  </div>
+                  <div className={`p-3 rounded-full ${
+                    isCompleted ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'bg-black border border-zinc-700 text-zinc-600'
+                  }`}>
+                    <CheckCircle2 size={28} />
+                  </div>
+                </button>
+              );
+            })
           )}
+        </section>
 
-          <div className="space-y-6 pt-6 border-t border-zinc-800">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500">Esfuerzo Percibido (RPE)</h2>
-                <span className="text-2xl font-black text-[#D4AF37]">{rpe}</span>
-              </div>
-              <input 
-                type="range" min="1" max="10" value={rpe} onChange={e => setRpe(parseInt(e.target.value))}
-                className="w-full h-2 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
-              />
-              <div className="flex justify-between text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
-                <span>Muy Fácil</span>
-                <span>Máximo Esfuerzo</span>
-              </div>
-            </div>
+        {/* 4. ACCIONES RÁPIDAS */}
+        <section className="grid grid-cols-3 gap-3">
+          <button 
+            onClick={() => setShowAdd(true)}
+            className="flex flex-col items-center justify-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl active:scale-95 transition-transform hover:border-zinc-700"
+          >
+            <Plus size={24} className="text-[#D4AF37] mb-2" />
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Añadir</span>
+          </button>
+          <button 
+            onClick={() => setShowTabata(true)}
+            className="flex flex-col items-center justify-center p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-orange-500/20"
+          >
+            <Timer size={24} className="text-orange-500 mb-2" />
+            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Tabata</span>
+          </button>
+          <button 
+            onClick={() => setShowReaction(true)}
+            className="flex flex-col items-center justify-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-purple-500/20"
+          >
+            <Zap size={24} className="text-purple-500 mb-2" />
+            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Reacción</span>
+          </button>
+        </section>
 
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-                <MessageSquare size={14} />
-                Observaciones Post-Sesión
-              </label>
-              <textarea 
-                value={observations}
-                onChange={e => setObservations(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 focus:border-[#D4AF37] outline-none min-h-[100px] resize-none transition-all"
-                placeholder="¿Cómo te sentiste hoy? ¿Alguna molestia?"
-              />
-            </div>
-          </div>
-        </div>
       </main>
 
-      {/* Overlays for Tools */}
-      <AnimatePresence>
-        {activeTool === 'tabata' && (
-          <TabataModule onClose={() => setActiveTool(null)} />
-        )}
-        {activeTool === 'reaction' && (
-          <ReactionModule onClose={() => setActiveTool(null)} userId={userId} />
-        )}
-
-        {/* Add Exercise Modal */}
-        {showAddExerciseModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.95 }} 
-              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-black">Añadir Ejercicio</h2>
-                <button onClick={() => setShowAddExerciseModal(null)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-zinc-500 uppercase font-bold">Nombre del Ejercicio</label>
-                  {exerciseBank.length > 0 && (
-                    <button 
-                      onClick={() => setShowBankModal(true)}
-                      className="text-[10px] font-bold text-[#D4AF37] hover:text-white bg-[#D4AF37]/10 px-2 py-1 rounded"
-                    >
-                      Importar del Banco
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  placeholder="Nombre del ejercicio"
-                  className="w-full bg-black border border-zinc-800 p-4 rounded-xl focus:border-[#D4AF37] outline-none text-sm"
-                  value={exName}
-                  onChange={(e) => setExName(e.target.value)}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Series</label>
-                    <input
-                      type="number"
-                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
-                      value={exSeries}
-                      onChange={(e) => setExSeries(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Reps / Info</label>
-                    <input
-                      type="text"
-                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
-                      value={exReps}
-                      onChange={(e) => setExReps(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Tiempo x Serie (seg)</label>
-                    <input
-                      type="number"
-                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
-                      value={exTime}
-                      onChange={(e) => setExTime(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500 uppercase font-bold">Carga (kg/lbs)</label>
-                    <input
-                      type="text"
-                      className="w-full bg-black border border-zinc-800 p-3 rounded-xl focus:border-[#D4AF37] outline-none text-center"
-                      value={exLoad}
-                      onChange={(e) => setExLoad(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => handleAddExercise(showAddExerciseModal)}
-                  className="w-full mt-4 bg-[#D4AF37] text-black font-black py-4 rounded-2xl"
-                >
-                  Añadir Ejercicio
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Exercise Bank Modal */}
-        {showBankModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
-              exit={{ opacity: 0, scale: 0.95 }} 
-              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 shadow-2xl flex flex-col max-h-[80vh]"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-black">Banco de Ejercicios</h2>
-                <button onClick={() => setShowBankModal(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                {exerciseBank.length === 0 ? (
-                  <p className="text-zinc-500 text-sm italic text-center py-10">No hay ejercicios en tu banco.</p>
-                ) : (
-                  exerciseBank.map(ex => (
-                    <div 
-                      key={ex.id} 
-                      className="bg-black border border-zinc-800 p-4 rounded-xl flex justify-between items-center hover:border-[#D4AF37]/50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        setExName(ex.name);
-                        setExSeries(ex.series || 3);
-                        setExReps(ex.reps || '');
-                        setExTime(ex.timePerSeries || ex.time || 0);
-                        setExLoad(ex.load || '');
-                        setExRpe(ex.rpe || 0);
-                        setShowBankModal(false);
-                      }}
-                    >
-                      <div>
-                        <p className="font-bold text-sm">{ex.name}</p>
-                        {ex.muscleGroup && <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{ex.muscleGroup}</p>}
-                      </div>
-                      <Plus size={18} className="text-[#D4AF37]" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* 5. FINALIZAR SESIÓN (Fixed bottom) */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
+        <button
+          onClick={handleFinish}
+          disabled={saving || allExercises.length === 0}
+          className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 bg-[#D4AF37] text-black py-5 rounded-2xl font-black text-lg uppercase tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.3)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+        >
+          {saving ? (
+            <Loader2 className="animate-spin" size={28} />
+          ) : (
+            <>
+              <Save size={24} />
+              Finalizar Sesión
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };

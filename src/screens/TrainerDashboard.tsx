@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Users, Activity, Dumbbell, History, FileText, TrendingUp, 
   Trophy, Zap, Timer, Video, Plus, Search, Loader2, 
@@ -18,6 +19,7 @@ interface TrainerDashboardProps {
 }
 
 export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBack }: TrainerDashboardProps) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'athletes' | 'challenges' | 'tools'>('dashboard');
   const [athletes, setAthletes] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
@@ -319,10 +321,10 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
             ) : (
               <div className="grid gap-3">
                 {filteredAthletes.map((athlete) => (
-                  <button 
+                  <div 
                     key={athlete.id}
                     onClick={() => onNavigate('athlete-profile', athlete)}
-                    className="w-full flex items-center justify-between p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl hover:bg-zinc-900 transition-all group"
+                    className="w-full flex items-center justify-between p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl hover:bg-zinc-900 transition-all group cursor-pointer active:scale-[0.98]"
                   >
                     <div className="flex items-center gap-4">
                       <img 
@@ -336,8 +338,31 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
                         <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Nivel {athlete.level || 1}</p>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-zinc-700 group-hover:text-[#D4AF37] transition-colors" />
-                  </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Direct to workouts for speed
+                          navigate(`/atleta/${athlete.id}/entrenamientos`, { state: athlete });
+                        }}
+                        className="p-2 text-zinc-600 hover:text-[#D4AF37] transition-all bg-black rounded-lg border border-zinc-800"
+                        title="Entrenamientos"
+                      >
+                        <Dumbbell size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/atleta/${athlete.id}/historial`, { state: athlete });
+                        }}
+                        className="p-2 text-zinc-600 hover:text-[#D4AF37] transition-all bg-black rounded-lg border border-zinc-800"
+                        title="Historial"
+                      >
+                        <History size={16} />
+                      </button>
+                      <ChevronRight size={16} className="text-zinc-800 group-hover:text-[#D4AF37] transition-colors ml-2" />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

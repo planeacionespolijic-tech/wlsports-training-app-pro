@@ -52,7 +52,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
       // Fetch active challenges
       const challengesQuery = query(
         collection(db, 'challenges'),
-        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc'),
         limit(10)
       );
       const challengesSnap = await getDocs(challengesQuery);

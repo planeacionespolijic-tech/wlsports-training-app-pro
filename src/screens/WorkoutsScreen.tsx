@@ -382,17 +382,47 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
     }
   };
 
-  const handleStartSession = async (workout: any) => {
-    const adjustedWorkout = await suggestProgression(userId, workout);
-    if (adjustedWorkout.autoAdjusted) {
-      if (confirm('El sistema sugiere una progresión automática basada en tu rendimiento previo. ¿Deseas aplicar los cambios?')) {
-        onNavigate('ejecucion-sesion', adjustedWorkout);
-      } else {
-        onNavigate('ejecucion-sesion', workout);
-      }
-    } else {
-      onNavigate('ejecucion-sesion', workout);
+  const [showAthletePicker, setShowAthletePicker] = useState(false);
+  const [selectedWorkoutForSession, setSelectedWorkoutForSession] = useState<any>(null);
+  const [athletes, setAthletes] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load Athletes for picker if in global mode
+    if (trainerId === userId) {
+      const q = query(
+        collection(db, 'users'),
+        where('role', '==', 'client'),
+        orderBy('displayName', 'asc')
+      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setAthletes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return () => unsubscribe();
     }
+  }, [userId, trainerId]);
+
+  const handleStartSession = async (workout: any) => {
+    if (trainerId === userId) {
+      // Global mode: Need to pick an athlete first
+      setSelectedWorkoutForSession(workout);
+      setShowAthletePicker(true);
+      return;
+    }
+    
+    // Athlete mode: Direct start
+    const adjustedWorkout = await suggestProgression(userId, workout);
+    onNavigate('ejecucion-sesion', adjustedWorkout || workout);
+  };
+
+  const handlePickAthleteAndStart = async (athleteId: string) => {
+    if (!selectedWorkoutForSession) return;
+    setShowAthletePicker(false);
+    
+    // Navigate to execution screen FOR THE PICKED ATHLETE
+    onNavigate('ejecucion-directa', { 
+      athleteId, 
+      workout: selectedWorkoutForSession 
+    });
   };
 
   return (
@@ -987,6 +1017,51 @@ export const WorkoutsScreen = ({ onBack, onNavigate, userId, trainerId }: Workou
                   ))
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Athlete Picker Modal */}
+      <AnimatePresence>
+        {showAthletePicker && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[110] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: 20 }}
+              className="bg-zinc-900 w-full max-w-sm rounded-[2.5rem] border border-zinc-800 p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-black">¿Para quién?</h2>
+                <button onClick={() => setShowAthletePicker(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
+              </div>
+              <p className="text-xs text-zinc-500 uppercase font-bold tracking-widest mb-4">Selecciona un atleta para iniciar la sesión</p>
+              
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 mb-6">
+                {athletes.length === 0 ? (
+                  <p className="text-zinc-600 text-sm italic py-4">No tienes atletas registrados.</p>
+                ) : (
+                  athletes.map(athlete => (
+                    <button
+                      key={athlete.id}
+                      onClick={() => handlePickAthleteAndStart(athlete.id)}
+                      className="w-full p-4 bg-black border border-zinc-800 rounded-2xl flex items-center gap-4 hover:border-[#D4AF37] transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs text-[#D4AF37]">
+                        {athlete.displayName?.[0] || 'A'}
+                      </div>
+                      <span className="font-bold text-sm">{athlete.displayName}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+              
+              <button 
+                onClick={() => setShowAthletePicker(false)}
+                className="w-full bg-zinc-800 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest"
+              >
+                Cancelar
+              </button>
             </motion.div>
           </div>
         )}

@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, Settings, Zap, ArrowUp, ArrowDown, ArrowLeft as ArrowLeftIcon, ArrowRight, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, Palette, Move } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  ArrowLeft, Play, Pause, RotateCcw, Zap, ArrowUp, ArrowDown, 
+  ArrowLeft as ArrowLeftIcon, ArrowRight, ArrowUpLeft, ArrowUpRight, 
+  ArrowDownLeft, ArrowDownRight, Palette, Move, Hash, Timer, Target, Volume2, VolumeX 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ReactionScreenProps {
@@ -7,8 +11,8 @@ interface ReactionScreenProps {
   userId: string;
 }
 
-type StimulusType = 'COLOR' | 'DIRECTION';
-type StimulusValue = string; // Color hex or Direction key
+type StimulusType = 'COLOR' | 'DIRECTION' | 'NUMBER';
+type StimulusValue = string | number;
 
 interface Stimulus {
   type: StimulusType;
@@ -18,13 +22,14 @@ interface Stimulus {
 
 export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
   // Configuration
-  const [visibleTime, setVisibleTime] = useState(1.0); // seconds
-  const [intervalTime, setIntervalTime] = useState(2.0); // seconds
+  const [visibleTime, setVisibleTime] = useState(0.8);
+  const [intervalTime, setIntervalTime] = useState(1.5);
   const [reps, setReps] = useState(10);
-  const [isRandom, setIsRandom] = useState(true);
-  const [selectedColors, setSelectedColors] = useState<string[]>(['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#F97316']);
+  const [mode, setMode] = useState<'COLORS' | 'DIRECTIONS' | 'NUMBERS' | 'MIXED'>('COLORS');
+  const [selectedColors, setSelectedColors] = useState<string[]>(['#3B82F6', '#EF4444', '#10B981', '#F59E0B']);
   const [selectedDirections, setSelectedDirections] = useState<string[]>(['UP', 'DOWN', 'LEFT', 'RIGHT']);
-  const [mode, setMode] = useState<'COLORS' | 'DIRECTIONS' | 'BOTH'>('COLORS');
+  const [selectedNumbers, setSelectedNumbers] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Execution State
   const [isActive, setIsActive] = useState(false);
@@ -38,7 +43,8 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const playBeep = (frequency = 440, duration = 0.1) => {
+  const playBeep = (frequency = 660, duration = 0.1) => {
+    if (!soundEnabled) return;
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
@@ -47,6 +53,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
       gainNode.connect(audioCtx.destination);
       oscillator.frequency.value = frequency;
       oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + duration);
     } catch (e) {
@@ -55,40 +62,38 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
   };
 
   const colors = [
-    { name: 'Azul', hex: '#3B82F6' },
-    { name: 'Rojo', hex: '#EF4444' },
-    { name: 'Verde', hex: '#10B981' },
-    { name: 'Amarillo', hex: '#F59E0B' },
-    { name: 'Naranja', hex: '#F97316' },
+    { hex: '#3B82F6' }, { hex: '#EF4444' }, { hex: '#10B981' }, 
+    { hex: '#F59E0B' }, { hex: '#F97316' }, { hex: '#8B5CF6' }
   ];
 
   const directions = [
-    { key: 'UP', icon: ArrowUp, label: 'Arriba' },
-    { key: 'DOWN', icon: ArrowDown, label: 'Abajo' },
-    { key: 'LEFT', icon: ArrowLeftIcon, label: 'Izquierda' },
-    { key: 'RIGHT', icon: ArrowRight, label: 'Derecha' },
-    { key: 'UP_LEFT', icon: ArrowUpLeft, label: 'Diag. Arriba Izq.' },
-    { key: 'UP_RIGHT', icon: ArrowUpRight, label: 'Diag. Arriba Der.' },
-    { key: 'DOWN_LEFT', icon: ArrowDownLeft, label: 'Diag. Abajo Izq.' },
-    { key: 'DOWN_RIGHT', icon: ArrowDownRight, label: 'Diag. Abajo Der.' },
+    { key: 'UP', icon: ArrowUp }, { key: 'DOWN', icon: ArrowDown },
+    { key: 'LEFT', icon: ArrowLeftIcon }, { key: 'RIGHT', icon: ArrowRight },
+    { key: 'UP_LEFT', icon: ArrowUpLeft }, { key: 'UP_RIGHT', icon: ArrowUpRight },
+    { key: 'DOWN_LEFT', icon: ArrowDownLeft }, { key: 'DOWN_RIGHT', icon: ArrowDownRight },
   ];
+
+  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
   const generateNextStimulus = useCallback(() => {
     const availableTypes: StimulusType[] = [];
-    if (mode === 'COLORS' || mode === 'BOTH') availableTypes.push('COLOR');
-    if (mode === 'DIRECTIONS' || mode === 'BOTH') availableTypes.push('DIRECTION');
+    if (mode === 'COLORS' || mode === 'MIXED') availableTypes.push('COLOR');
+    if (mode === 'DIRECTIONS' || mode === 'MIXED') availableTypes.push('DIRECTION');
+    if (mode === 'NUMBERS' || mode === 'MIXED') availableTypes.push('NUMBER');
 
     const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-    let value = '';
+    let value: StimulusValue = '';
 
     if (type === 'COLOR') {
       value = selectedColors[Math.floor(Math.random() * selectedColors.length)];
-    } else {
+    } else if (type === 'DIRECTION') {
       value = selectedDirections[Math.floor(Math.random() * selectedDirections.length)];
+    } else {
+      value = selectedNumbers[Math.floor(Math.random() * selectedNumbers.length)];
     }
 
     return { type, value, id: Date.now() };
-  }, [mode, selectedColors, selectedDirections]);
+  }, [mode, selectedColors, selectedDirections, selectedNumbers]);
 
   const startTraining = () => {
     setIsConfiguring(false);
@@ -96,7 +101,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
     setCurrentRep(0);
     setReactionTimes([]);
     setIsFinished(false);
-    scheduleNextStimulus(intervalTime * 1000);
+    scheduleNextStimulus(1500); // 1.5s initial wait
   };
 
   const scheduleNextStimulus = (delay: number) => {
@@ -104,11 +109,10 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
       const nextStim = generateNextStimulus();
       setCurrentStimulus(nextStim);
       setIsStimulusVisible(true);
-      playBeep(660, 0.1); // Beep when stimulus appears
+      playBeep(880, 0.05); 
       setStartTime(Date.now());
       setCurrentRep((prev) => prev + 1);
 
-      // Hide stimulus after visibleTime
       setTimeout(() => {
         setIsStimulusVisible(false);
         setStartTime(null);
@@ -119,7 +123,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
           setTimeout(() => {
             setIsFinished(true);
             setIsActive(false);
-          }, intervalTime * 1000);
+          }, 1000);
         }
       }, visibleTime * 1000);
     }, delay);
@@ -131,6 +135,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
       setReactionTimes((prev) => [...prev, reactionTime]);
       setIsStimulusVisible(false);
       setStartTime(null);
+      playBeep(440, 0.05);
     }
   };
 
@@ -153,65 +158,79 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
     if (currentStimulus.type === 'COLOR') {
       return (
         <motion.div 
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-full h-full rounded-full shadow-2xl"
-          style={{ backgroundColor: currentStimulus.value }}
+          className="w-full aspect-square rounded-full shadow-[0_0_80px_rgba(255,255,255,0.1)]"
+          style={{ backgroundColor: currentStimulus.value as string }}
         />
       );
-    } else {
+    } else if (currentStimulus.type === 'DIRECTION') {
       const dir = directions.find(d => d.key === currentStimulus.value);
       const Icon = dir?.icon || ArrowUp;
       return (
-        <motion.div 
-          initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          className="w-full h-full flex items-center justify-center text-white"
-        >
-          <Icon size={300} strokeWidth={3} />
-        </motion.div>
+        <div className="w-full aspect-square flex items-center justify-center text-white">
+          <Icon size={280} strokeWidth={3} />
+        </div>
+      );
+    } else {
+      return (
+        <div className="w-full aspect-square flex items-center justify-center text-white">
+          <span className="text-[20rem] font-black italic tracking-tighter drop-shadow-2xl">
+            {currentStimulus.value}
+          </span>
+        </div>
       );
     }
   };
 
   if (isConfiguring) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col">
-        <header className="p-4 border-b border-zinc-800 flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
-            <ArrowLeft size={24} />
+      <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+        <header className="p-6 border-b border-zinc-900 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur-md z-20">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-xl font-black uppercase tracking-tighter">Neuro Reacción</h1>
+          </div>
+          <button 
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-3 rounded-2xl transition-all ${soundEnabled ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-zinc-900 text-zinc-600'}`}
+          >
+            {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
-          <h1 className="text-xl font-bold">Reacción Visual</h1>
         </header>
 
         <main className="flex-1 p-6 space-y-8 overflow-y-auto">
           <section className="space-y-4">
-            <h2 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">Modo de Estímulo</h2>
-            <div className="grid grid-cols-3 gap-2">
-              {['COLORS', 'DIRECTIONS', 'BOTH'].map((m) => (
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Selecciona el modo</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'COLORS', label: 'Colores', icon: Palette },
+                { id: 'DIRECTIONS', label: 'Flechas', icon: Move },
+                { id: 'NUMBERS', label: 'Números', icon: Hash },
+                { id: 'MIXED', label: 'Mixto', icon: Zap },
+              ].map((m) => (
                 <button
-                  key={m}
-                  onClick={() => setMode(m as any)}
-                  className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${mode === m ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}
+                  key={m.id}
+                  onClick={() => setMode(m.id as any)}
+                  className={`flex flex-col items-center justify-center py-6 rounded-[2rem] border transition-all gap-2 ${mode === m.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-zinc-900/50 text-zinc-500 border-zinc-800'}`}
                 >
-                  {m === 'COLORS' ? 'Colores' : m === 'DIRECTIONS' ? 'Flechas' : 'Mixto'}
+                  <m.icon size={24} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">{m.label}</span>
                 </button>
               ))}
             </div>
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ConfigItem label="Tiempo Visible" value={visibleTime} onChange={setVisibleTime} step={0.1} unit="s" />
-            <ConfigItem label="Intervalo" value={intervalTime} onChange={setIntervalTime} step={0.1} unit="s" />
-            <ConfigItem label="Repeticiones" value={reps} onChange={setReps} step={1} min={1} />
+          <div className="grid grid-cols-1 gap-4">
+            <ConfigItem label="Tiempo Visible" value={visibleTime} onChange={setVisibleTime} step={0.1} unit="s" icon={<Timer size={18} className="text-emerald-500" />} />
+            <ConfigItem label="Intervalo" value={intervalTime} onChange={setIntervalTime} step={0.1} unit="s" icon={<Target size={18} className="text-red-500" />} />
+            <ConfigItem label="Repeticiones" value={reps} onChange={setReps} step={5} min={5} icon={<Zap size={18} className="text-amber-500" />} />
           </div>
 
-          {(mode === 'COLORS' || mode === 'BOTH') && (
-            <section className="space-y-4">
-              <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-                <Palette size={14} /> Colores Activos
-              </h2>
-              <div className="flex flex-wrap gap-3">
+          {(mode === 'COLORS' || mode === 'MIXED') && (
+            <section className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-zinc-800/50 space-y-4">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Colores Activos</h2>
+              <div className="flex flex-wrap gap-4 justify-center">
                 {colors.map((c) => (
                   <button
                     key={c.hex}
@@ -222,7 +241,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
                         setSelectedColors(prev => [...prev, c.hex]);
                       }
                     }}
-                    className={`w-12 h-12 rounded-full border-4 transition-all ${selectedColors.includes(c.hex) ? 'scale-110 border-white' : 'border-transparent opacity-40'}`}
+                    className={`w-12 h-12 rounded-2xl border-2 transition-all ${selectedColors.includes(c.hex) ? 'scale-110 border-white ring-4 ring-white/10' : 'border-transparent opacity-20'}`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -230,11 +249,9 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
             </section>
           )}
 
-          {(mode === 'DIRECTIONS' || mode === 'BOTH') && (
-            <section className="space-y-4">
-              <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-                <Move size={14} /> Direcciones Activas
-              </h2>
+          {(mode === 'DIRECTIONS' || mode === 'MIXED') && (
+            <section className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-zinc-800/50 space-y-4">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Direcciones Activas</h2>
               <div className="grid grid-cols-4 gap-3">
                 {directions.map((d) => (
                   <button
@@ -246,25 +263,48 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
                         setSelectedDirections(prev => [...prev, d.key]);
                       }
                     }}
-                    className={`aspect-square rounded-xl border flex items-center justify-center transition-all ${selectedDirections.includes(d.key) ? 'bg-zinc-800 border-[#D4AF37] text-[#D4AF37]' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}
+                    className={`aspect-square rounded-2xl border flex items-center justify-center transition-all ${selectedDirections.includes(d.key) ? 'bg-zinc-800 border-[#D4AF37] text-[#D4AF37] shadow-lg shadow-[#D4AF37]/5' : 'bg-black border-zinc-800 text-zinc-600'}`}
                   >
-                    <d.icon size={24} />
+                    <d.icon size={20} />
                   </button>
                 ))}
               </div>
             </section>
           )}
 
-          <div className="pt-8">
-            <button 
-              onClick={startTraining}
-              className="w-full bg-[#D4AF37] text-black font-black py-5 rounded-3xl flex items-center justify-center gap-3 text-xl shadow-2xl shadow-[#D4AF37]/20 active:scale-95 transition-transform"
-            >
-              <Play fill="black" size={24} />
-              INICIAR SESIÓN
-            </button>
-          </div>
+          {(mode === 'NUMBERS' || mode === 'MIXED') && (
+            <section className="bg-zinc-900/40 p-6 rounded-[2.5rem] border border-zinc-800/50 space-y-4">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Números Activos</h2>
+              <div className="grid grid-cols-5 gap-3">
+                {numbers.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => {
+                      if (selectedNumbers.includes(n)) {
+                        if (selectedNumbers.length > 1) setSelectedNumbers(prev => prev.filter(val => val !== n));
+                      } else {
+                        setSelectedNumbers(prev => [...prev, n]);
+                      }
+                    }}
+                    className={`aspect-square rounded-2xl border flex items-center justify-center font-black transition-all ${selectedNumbers.includes(n) ? 'bg-zinc-800 border-[#D4AF37] text-[#D4AF37]' : 'bg-black border-zinc-800 text-zinc-600'}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </main>
+
+        <footer className="p-8">
+          <button 
+            onClick={startTraining}
+            className="w-full bg-[#D4AF37] text-black font-black py-6 rounded-[2rem] flex items-center justify-center gap-3 text-lg shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em]"
+          >
+            <Play fill="black" size={20} />
+            Empezar Sesión
+          </button>
+        </footer>
       </div>
     );
   }
@@ -272,78 +312,92 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
   if (isFinished) {
     const avgReaction = reactionTimes.length > 0 
       ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(0)
-      : 'N/A';
+      : '---';
 
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center">
-        <Zap size={64} className="text-[#D4AF37] mb-6" />
-        <h2 className="text-4xl font-black mb-2 tracking-tighter">SESIÓN FINALIZADA</h2>
-        <p className="text-zinc-500 uppercase tracking-widest text-xs mb-12">Resumen de Rendimiento</p>
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center font-sans overflow-hidden">
+        {/* Result Background Effect */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,#D4AF3715_0%,transparent_60%)]" />
         
-        <div className="grid grid-cols-2 gap-4 w-full max-w-md mb-12">
-          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Reacciones</p>
-            <p className="text-3xl font-black text-white">{reactionTimes.length}/{reps}</p>
+        <div className="relative z-10 space-y-12 w-full max-w-sm">
+          <div className="space-y-4">
+            <div className="w-20 h-20 bg-[#D4AF37]/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+              <Target size={40} />
+            </div>
+            <h2 className="text-4xl font-black italic tracking-tighter uppercase">Sesión Terminada</h2>
+            <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.4em]">Análisis de Rendimiento</p>
           </div>
-          <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Promedio</p>
-            <p className="text-3xl font-black text-[#D4AF37]">{avgReaction}ms</p>
+          
+          <div className="grid grid-cols-1 gap-4">
+            <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-zinc-800/50 backdrop-blur-sm flex justify-between items-center px-12">
+              <div className="text-left">
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Reacciones</p>
+                <p className="text-4xl font-black text-white">{reactionTimes.length}/{reps}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Promedio</p>
+                <p className="text-4xl font-black text-[#D4AF37]">{avgReaction}<span className="text-sm">ms</span></p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <button 
-          onClick={reset}
-          className="w-full max-w-md bg-white text-black font-black py-5 rounded-3xl text-xl active:scale-95 transition-transform"
-        >
-          NUEVA SESIÓN
-        </button>
+          <button 
+            onClick={reset}
+            className="w-full bg-white text-black font-black py-6 rounded-[2rem] text-lg active:scale-95 transition-all shadow-2xl uppercase tracking-[0.2em]"
+          >
+            Volver a Jugar
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div 
-      className="min-h-screen bg-black flex flex-col cursor-pointer select-none"
+      className="min-h-screen bg-black flex flex-col cursor-pointer select-none overflow-hidden relative"
       onClick={handleReaction}
     >
-      <header className="p-6 flex items-center justify-between z-10">
+      <header className="relative p-8 flex items-center justify-between z-20">
         <button 
           onClick={reset}
-          className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors"
+          className="w-12 h-12 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
         >
-          <ArrowLeft size={24} />
+          <ArrowLeft size={20} />
         </button>
         <div className="text-right">
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Progreso</p>
-          <p className="text-xl font-black text-white">{currentRep}/{reps}</p>
+          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Progreso</p>
+          <p className="text-3xl font-mono font-black text-white">{currentRep}<span className="text-sm opacity-20">/{reps}</span></p>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-12 relative">
+      <main className="flex-1 flex items-center justify-center p-8 relative z-10">
         <AnimatePresence mode="wait">
-          {isStimulusVisible && (
+          {isStimulusVisible ? (
             <motion.div
               key={currentStimulus?.id}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 1.1, opacity: 0 }}
-              className="w-full max-w-lg aspect-square"
+              initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={{ scale: 1.2, opacity: 0, filter: 'blur(10px)' }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="w-full max-w-xs md:max-w-md"
             >
               {renderStimulus()}
             </motion.div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center gap-6"
+            >
+              <div className="w-1.5 h-1.5 bg-zinc-800 rounded-full animate-ping" />
+              <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.5em] animate-pulse">Atento...</p>
+            </motion.div>
           )}
         </AnimatePresence>
-
-        {!isStimulusVisible && !isFinished && (
-          <div className="text-zinc-800 flex flex-col items-center gap-4">
-            <Zap size={48} className="animate-pulse" />
-            <p className="text-xs font-black uppercase tracking-[0.3em]">Esperando estímulo...</p>
-          </div>
-        )}
       </main>
 
-      <footer className="p-12 text-center z-10">
-        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Toca la pantalla al ver el estímulo</p>
+      <footer className="relative p-12 text-center z-20">
+        <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.4em]">Toca la pantalla al reaccionar</p>
       </footer>
     </div>
   );
@@ -356,25 +410,34 @@ interface ConfigItemProps {
   step?: number;
   unit?: string;
   min?: number;
+  icon?: React.ReactNode;
 }
 
-const ConfigItem = ({ label, value, onChange, step = 1, unit = '', min = 0.1 }: ConfigItemProps) => {
+const ConfigItem = ({ label, value, onChange, step = 1, unit = '', min = 0.1, icon }: ConfigItemProps) => {
   return (
-    <div className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 flex items-center justify-between">
-      <div>
-        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-2xl font-black text-white">{value.toFixed(step < 1 ? 1 : 0)}{unit}</p>
+    <div className="bg-zinc-900/50 p-5 rounded-[2rem] border border-zinc-800 flex items-center justify-between group hover:border-zinc-700 transition-colors">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors">
+          {icon}
+        </div>
+        <div className="text-left">
+          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">{label}</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-mono font-black text-white">{value.toFixed(step < 1 ? 1 : 0)}</span>
+            <span className="text-xs font-bold text-zinc-600">{unit}</span>
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 bg-black p-1 rounded-2xl">
         <button 
           onClick={() => onChange(Math.max(min, value - step))}
-          className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl font-bold hover:bg-zinc-700 active:scale-90 transition-all"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-600 hover:bg-zinc-800 hover:text-white transition-all active:scale-75"
         >
           -
         </button>
         <button 
           onClick={() => onChange(value + step)}
-          className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl font-bold hover:bg-zinc-700 active:scale-90 transition-all"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-600 hover:bg-zinc-800 hover:text-white transition-all active:scale-75"
         >
           +
         </button>

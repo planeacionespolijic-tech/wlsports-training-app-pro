@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Calendar, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, User, Mail, Calendar, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle, Lock, Dumbbell, History } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, createSecondaryUser } from '../firebase';
 import { collection, query, onSnapshot, orderBy, where, setDoc, doc, serverTimestamp, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
@@ -14,6 +15,7 @@ interface DeportistasScreenProps {
 }
 
 export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: DeportistasScreenProps) => {
+  const navigate = useNavigate();
   const [deportistas, setDeportistas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -357,6 +359,26 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
                       {item.role === 'client' ? 'Atleta' : item.role}
                     </div>
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/atleta/${item.id}/entrenamientos`, { state: item });
+                        }}
+                        className="p-2 text-zinc-600 hover:text-[#D4AF37] hover:bg-zinc-800 rounded-lg transition-all"
+                        title="Entrenamientos"
+                      >
+                        <Dumbbell size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/atleta/${item.id}/historial`, { state: item });
+                        }}
+                        className="p-2 text-zinc-600 hover:text-[#D4AF37] hover:bg-zinc-800 rounded-lg transition-all"
+                        title="Historial"
+                      >
+                        <History size={16} />
+                      </button>
                       <button
                         onClick={(e) => handleToggleBlockAthlete(e, item)}
                         className={`p-2 rounded-lg transition-all ${item.status === 'blocked' ? 'text-green-500 hover:bg-green-500/10' : 'text-zinc-600 hover:text-red-500 hover:bg-red-500/10'}`}

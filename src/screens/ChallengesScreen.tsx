@@ -49,7 +49,7 @@ export const ChallengesScreen = ({ onBack, userId, role, userProfile }: Challeng
   const isTrainer = role === 'trainer' || role === 'superadmin';
 
   useEffect(() => {
-    const q = query(collection(db, 'challenges'), orderBy('level', 'asc'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'challenges'), orderBy('level', 'asc'));
     const unsubscribeChallenges = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
