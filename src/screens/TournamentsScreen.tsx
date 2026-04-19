@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Trophy, Users, Plus, X, Loader2, 
   ChevronRight, Award, Calendar, Star, Trash2,
-  Medal, TrendingUp, UserPlus
+  Medal, UserPlus
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { 
   collection, query, onSnapshot, orderBy, 
-  doc, addDoc, serverTimestamp, getDocs, 
+  doc, addDoc, serverTimestamp, 
   updateDoc, deleteDoc, where
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 interface Tournament {
   id: string;
@@ -42,13 +44,9 @@ interface Bonus {
   createdAt: any;
 }
 
-interface TournamentsScreenProps {
-  onBack: () => void;
-  userId: string;
-  role?: string;
-}
-
-export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenProps) => {
+export const TournamentsScreen = () => {
+  const navigate = useNavigate();
+  const { userProfile, isTrainer } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
   const [matchDays, setMatchDays] = useState<MatchDay[]>([]);
@@ -73,8 +71,6 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
     points: 0,
     reason: ''
   });
-
-  const isTrainer = role === 'trainer';
 
   useEffect(() => {
     const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
@@ -146,7 +142,7 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
 
   const handleAddBonus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTournament || !newBonus.playerId || !newBonus.points) return;
+    if (!selectedTournament || !newBonus.playerId) return;
     try {
       await addDoc(collection(db, 'tournamentBonuses'), {
         tournamentId: selectedTournament.id,
@@ -210,6 +206,10 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
     return Object.values(standings).sort((a, b) => b.points - a.points);
   };
 
+  const handleBack = () => {
+    navigate(-1);
+  };
+
   if (selectedTournament) {
     const standings = calculateStandings();
     return (
@@ -226,8 +226,17 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
           </div>
           {isTrainer && (
             <div className="flex gap-2">
-              <button onClick={() => setShowEditPlayersModal(true)} className="p-2 bg-zinc-900 rounded-xl text-zinc-400 hover:text-white"><Users size={20} /></button>
-              <button onClick={() => setShowAddMatchModal(true)} className="bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+              <button 
+                onClick={() => setShowEditPlayersModal(true)} 
+                className="p-2 bg-zinc-900 rounded-xl text-zinc-400 hover:text-white transition-all active:scale-95"
+                title="Gestionar Jugadores"
+              >
+                <Users size={20} />
+              </button>
+              <button 
+                onClick={() => setShowAddMatchModal(true)} 
+                className="bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+              >
                 <Plus size={16} /> Nueva Fecha
               </button>
             </div>
@@ -341,12 +350,26 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
                     <p className="text-zinc-600 text-xs italic text-center py-4">No hay bonos otorgados.</p>
                   ) : (
                     bonuses.map(b => (
-                      <div key={b.id} className="bg-black/30 p-3 rounded-xl border border-zinc-800/50">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="font-bold text-xs">{b.playerName}</span>
-                          <span className="text-[#D4AF37] font-black text-xs">+{b.points}</span>
+                      <div key={b.id} className="bg-black/30 p-3 rounded-xl border border-zinc-800/50 flex justify-between items-start group">
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-bold text-xs">{b.playerName}</span>
+                            <span className="text-[#D4AF37] font-black text-xs">+{b.points}</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-500 italic">"{b.reason}"</p>
                         </div>
-                        <p className="text-[10px] text-zinc-500 italic">"{b.reason}"</p>
+                        {isTrainer && (
+                          <button 
+                            onClick={async () => {
+                              if (window.confirm('¿Eliminar este bono?')) {
+                                await deleteDoc(doc(db, 'tournamentBonuses', b.id));
+                              }
+                            }}
+                            className="ml-2 text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -416,7 +439,7 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 p-8 shadow-2xl">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-black">Otorgar Bono</h2>
-                  <button onClick={() => setShowAddBonusModal(null)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
+                  <button onClick={() => setShowAddBonusModal(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button>
                 </div>
                 <form onSubmit={handleAddBonus} className="space-y-4">
                   <div>
@@ -428,7 +451,7 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Puntos</label>
-                    <input type="number" required value={newBonus.points} onChange={(e) => setNewBonus({ ...newBonus, points: parseInt(e.target.value) })} className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-sm outline-none focus:border-[#D4AF37]" />
+                    <input type="number" required value={newBonus.points} onChange={(e) => setNewBonus({ ...newBonus, points: parseInt(e.target.value) || 0 })} className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-sm outline-none focus:border-[#D4AF37]" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Razón</label>
@@ -474,15 +497,15 @@ export const TournamentsScreen = ({ onBack, userId, role }: TournamentsScreenPro
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={handleBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-bold">Torneos</h1>
+          <h1 className="text-xl font-bold italic tracking-tighter uppercase font-black">Torneos</h1>
         </div>
         {isTrainer && (
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="bg-[#D4AF37] text-black p-2 rounded-xl hover:scale-110 transition-all active:scale-95"
+            className="bg-[#D4AF37] text-black p-2 rounded-xl hover:scale-110 transition-all active:scale-95 shadow-[0_0_15px_rgba(212,175,55,0.3)]"
           >
             <Plus size={20} />
           </button>
