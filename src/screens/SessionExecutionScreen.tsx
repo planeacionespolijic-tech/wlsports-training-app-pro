@@ -412,7 +412,32 @@ export const SessionExecutionScreen = () => {
           </AnimatePresence>
         </section>
 
-        {/* 3. LISTA DE EJERCICIOS */}
+        {/* 3. ACCIONES RÁPIDAS (MOVED UP FOR BETTER ACCESSIBILITY) */}
+        <section className="grid grid-cols-3 gap-3">
+          <button 
+            onClick={() => setShowAdd(true)}
+            className="flex flex-col items-center justify-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl active:scale-95 transition-transform hover:border-zinc-700"
+          >
+            <Plus size={24} className="text-[#D4AF37] mb-2" />
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Añadir</span>
+          </button>
+          <button 
+            onClick={() => setShowTabata(true)}
+            className="flex flex-col items-center justify-center p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-orange-500/20"
+          >
+            <Timer size={24} className="text-orange-500 mb-2" />
+            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Tabata</span>
+          </button>
+          <button 
+            onClick={() => setShowReaction(true)}
+            className="flex flex-col items-center justify-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-purple-500/20"
+          >
+            <Zap size={24} className="text-purple-500 mb-2" />
+            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Reacción</span>
+          </button>
+        </section>
+
+        {/* 4. LISTA DE EJERCICIOS */}
         <section className="space-y-3">
           <h2 className="text-xs font-black text-zinc-500 uppercase tracking-widest mx-1 mb-2">Ejercicios a Completar</h2>
           {allExercises.length === 0 ? (
@@ -449,31 +474,6 @@ export const SessionExecutionScreen = () => {
               );
             })
           )}
-        </section>
-
-        {/* 4. ACCIONES RÁPIDAS */}
-        <section className="grid grid-cols-3 gap-3">
-          <button 
-            onClick={() => setShowAdd(true)}
-            className="flex flex-col items-center justify-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl active:scale-95 transition-transform hover:border-zinc-700"
-          >
-            <Plus size={24} className="text-[#D4AF37] mb-2" />
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Añadir</span>
-          </button>
-          <button 
-            onClick={() => setShowTabata(true)}
-            className="flex flex-col items-center justify-center p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-orange-500/20"
-          >
-            <Timer size={24} className="text-orange-500 mb-2" />
-            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Tabata</span>
-          </button>
-          <button 
-            onClick={() => setShowReaction(true)}
-            className="flex flex-col items-center justify-center p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl active:scale-95 transition-transform hover:bg-purple-500/20"
-          >
-            <Zap size={24} className="text-purple-500 mb-2" />
-            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Reacción</span>
-          </button>
         </section>
 
         {/* 5. EVALUACIÓN RÁPIDA (BONO ATRIBUTOS) */}

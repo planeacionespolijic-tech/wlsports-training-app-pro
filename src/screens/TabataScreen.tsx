@@ -144,7 +144,7 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
 
   if (isConfiguring) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+      <div className="h-full bg-black text-white flex flex-col font-sans">
         <header className="p-6 border-b border-zinc-900 flex items-center justify-between sticky top-0 bg-black/90 backdrop-blur-md z-10">
           <div className="flex items-center gap-4">
             <button onClick={handleBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
@@ -160,8 +160,8 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
           </button>
         </header>
 
-        <main className="flex-1 p-6 space-y-6 overflow-y-auto">
-          <div className="bg-zinc-900/40 rounded-[2.5rem] p-8 border border-zinc-800/50 backdrop-blur-sm">
+        <main className="flex-1 p-6 space-y-6 overflow-y-auto pb-12">
+          <div className="bg-zinc-900/40 rounded-[2.5rem] p-6 border border-zinc-800/50 backdrop-blur-sm">
             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-6 text-center">Configura tu entrenamiento</p>
             <div className="grid grid-cols-1 gap-4">
               <ConfigItem 
@@ -239,7 +239,7 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col relative overflow-hidden font-sans">
+    <div className="h-full bg-black flex flex-col relative overflow-hidden font-sans">
       {/* Dynamic Background */}
       <div className={`absolute inset-0 bg-gradient-to-b ${gradient} to-black transition-colors duration-700`} />
       
@@ -344,7 +344,7 @@ interface ConfigItemProps {
 
 const ConfigItem = ({ label, value, onChange, icon, unit = '', min = 1, color }: ConfigItemProps) => {
   return (
-    <div className="bg-black/40 p-5 rounded-[2rem] border border-zinc-800 flex items-center justify-between group hover:border-zinc-700 transition-colors">
+    <div className="bg-black/40 p-4 rounded-[1.5rem] border border-zinc-800 flex items-center justify-between group hover:border-zinc-700 transition-colors">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
           {icon}

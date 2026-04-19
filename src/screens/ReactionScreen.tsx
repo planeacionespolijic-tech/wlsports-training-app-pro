@@ -190,7 +190,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
 
   if (isConfiguring) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+      <div className="h-full bg-black text-white flex flex-col font-sans">
         <header className="p-6 border-b border-zinc-900 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur-md z-20">
           <div className="flex items-center gap-4">
             <button onClick={handleBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
@@ -206,7 +206,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
           </button>
         </header>
 
-        <main className="flex-1 p-6 space-y-8 overflow-y-auto">
+        <main className="flex-1 p-6 space-y-8 overflow-y-auto pb-12">
           <section className="space-y-4">
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Selecciona el modo</p>
             <div className="grid grid-cols-2 gap-2">
@@ -219,9 +219,9 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
                 <button
                   key={m.id}
                   onClick={() => setMode(m.id as any)}
-                  className={`flex flex-col items-center justify-center py-6 rounded-[2rem] border transition-all gap-2 ${mode === m.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-zinc-900/50 text-zinc-500 border-zinc-800'}`}
+                  className={`flex flex-col items-center justify-center py-4 rounded-3xl border transition-all gap-2 ${mode === m.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-zinc-900/50 text-zinc-500 border-zinc-800'}`}
                 >
-                  <m.icon size={24} />
+                  <m.icon size={20} />
                   <span className="text-[10px] font-black uppercase tracking-widest">{m.label}</span>
                 </button>
               ))}
@@ -322,7 +322,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
       : '---';
 
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center font-sans overflow-hidden">
+      <div className="h-full bg-black text-white flex flex-col items-center justify-center p-8 text-center font-sans overflow-hidden">
         {/* Result Background Effect */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,#D4AF3715_0%,transparent_60%)]" />
         
@@ -361,7 +361,7 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
 
   return (
     <div 
-      className="min-h-screen bg-black flex flex-col cursor-pointer select-none overflow-hidden relative"
+      className="h-full bg-black flex flex-col cursor-pointer select-none overflow-hidden relative"
       onClick={handleReaction}
     >
       <header className="relative p-8 flex items-center justify-between z-20">
@@ -422,7 +422,7 @@ interface ConfigItemProps {
 
 const ConfigItem = ({ label, value, onChange, step = 1, unit = '', min = 0.1, icon }: ConfigItemProps) => {
   return (
-    <div className="bg-zinc-900/50 p-5 rounded-[2rem] border border-zinc-800 flex items-center justify-between group hover:border-zinc-700 transition-colors">
+    <div className="bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800 flex items-center justify-between group hover:border-zinc-700 transition-colors">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors">
           {icon}
