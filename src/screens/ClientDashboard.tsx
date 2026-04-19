@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   Dumbbell, History, FileText, TrendingUp, 
   Trophy, Zap, Timer, Video, Loader2, 
@@ -10,14 +12,9 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, doc, getDocs, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 
-interface ClientDashboardProps {
-  user: any;
-  onNavigate: (screen: string, data?: any) => void;
-  onLogout: () => void;
-  onBack?: () => void;
-}
-
-export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDashboardProps) => {
+export const ClientDashboard = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [userData, setUserData] = useState<any>(null);
   const [recentHistory, setRecentHistory] = useState<any[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
@@ -138,7 +135,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
                       <p className="text-[10px] text-zinc-500">{challenge.score} PTS</p>
                     </div>
                     <button 
-                      onClick={() => onNavigate('retos', challenge)}
+                      onClick={() => navigate('/retos', { state: challenge })}
                       className="p-2 bg-zinc-800 rounded-xl text-[#D4AF37]"
                     >
                       <ChevronRight size={16} />
@@ -180,7 +177,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
             </div>
             <div className="grid grid-cols-2 gap-4">
               <button 
-                onClick={() => onNavigate('retos')}
+                onClick={() => navigate('/retos')}
                 className="p-6 bg-zinc-900 border border-zinc-800 rounded-3xl flex flex-col items-center gap-3 hover:border-[#D4AF37]/50 transition-all"
               >
                 <div className="p-3 bg-yellow-500/10 rounded-2xl text-yellow-500">
@@ -189,7 +186,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
                 <span className="text-xs font-black uppercase tracking-widest">Retos</span>
               </button>
               <button 
-                onClick={() => onNavigate('torneos')}
+                onClick={() => navigate('/torneos')}
                 className="p-6 bg-zinc-900 border border-zinc-800 rounded-3xl flex flex-col items-center gap-3 hover:border-[#D4AF37]/50 transition-all"
               >
                 <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-500">
@@ -266,7 +263,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
             <section>
               <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Historial Completo</h2>
               <button 
-                onClick={() => onNavigate('historial')}
+                onClick={() => navigate('/historial')}
                 className="w-full bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center justify-between text-zinc-400 hover:text-white transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -329,27 +326,24 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
       <header className="p-8 pt-12 bg-zinc-900/50 border-b border-zinc-800">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            {onBack && (
-              <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
-                <ArrowLeft size={24} />
-              </button>
-            )}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <img 
-                  src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=${themeColor.replace('#', '')}&color=000`} 
-                  alt={user.displayName} 
-                  className="w-16 h-16 rounded-3xl object-cover border-2"
-                  style={{ borderColor: themeColor }}
-                  referrerPolicy="no-referrer"
-                />
+                {user && (
+                  <img 
+                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=${themeColor.replace('#', '')}&color=000`} 
+                    alt={user.displayName || ''} 
+                    className="w-16 h-16 rounded-3xl object-cover border-2"
+                    style={{ borderColor: themeColor }}
+                    referrerPolicy="no-referrer"
+                  />
+                )}
                 <div className="absolute -bottom-2 -right-2 bg-black border border-zinc-800 px-2 py-1 rounded-xl flex items-center gap-1">
                   <Star size={12} style={{ color: themeColor }} fill={themeColor} />
                   <span className="text-xs font-black" style={{ color: themeColor }}>{userData?.level || 1}</span>
                 </div>
               </div>
               <div>
-                <h1 className="text-xl font-black tracking-tight">{user.displayName?.split(' ')[0]}</h1>
+                <h1 className="text-xl font-black tracking-tight">{user?.displayName?.split(' ')[0] || 'Atleta'}</h1>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atleta Elite</p>
               </div>
             </div>
@@ -363,7 +357,7 @@ export const ClientDashboard = ({ user, onNavigate, onLogout, onBack }: ClientDa
               <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
             </button>
             <button 
-              onClick={onLogout}
+              onClick={() => logout()}
               className="p-3 bg-zinc-900 rounded-2xl text-zinc-600 hover:text-red-500 transition-colors"
             >
               <LogOut size={20} />

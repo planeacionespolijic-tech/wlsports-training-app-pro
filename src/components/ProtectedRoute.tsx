@@ -1,31 +1,26 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { UserProfile, UserRole } from '../types';
+import { UserRole } from '../types';
 import { ShieldAlert, Loader2 } from 'lucide-react';
-import { logout } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
-  user: any;
-  userProfile: UserProfile | null;
-  loading: boolean;
   allowedRoles?: UserRole[];
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  user, 
-  userProfile, 
-  loading, 
   allowedRoles, 
   children 
 }) => {
+  const { user, userProfile, loading, logout } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center">
         <Loader2 className="text-[#D4AF37] animate-spin mb-4" size={48} />
-        <p className="text-zinc-500 font-medium animate-pulse">Cargando perfil...</p>
+        <p className="text-zinc-500 font-medium animate-pulse uppercase tracking-[0.2em] text-[10px]">Cargando perfil...</p>
       </div>
     );
   }
@@ -36,10 +31,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Handle blocked/deleted status
   if (userProfile && (userProfile.status === 'blocked' || userProfile.status === 'deleted')) {
-    const handleLogout = async () => {
-      localStorage.setItem('wlsports_logged_out', 'true');
+    const handleLogoutSession = async () => {
       await logout();
-      window.location.href = '/login';
     };
 
     return (
@@ -47,14 +40,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
           <ShieldAlert className="text-red-500" size={40} />
         </div>
-        <h1 className="text-2xl font-bold mb-2">Acceso Restringido</h1>
-        <p className="text-zinc-500 max-w-xs mb-8">
+        <h1 className="text-2xl font-bold mb-2 uppercase italic tracking-tighter">Acceso Restringido</h1>
+        <p className="text-zinc-500 max-w-xs mb-8 text-sm">
           Tu cuenta ha sido {userProfile.status === 'blocked' ? 'bloqueada' : 'eliminada'} por el administrador. 
           Si crees que esto es un error, contacta con soporte.
         </p>
         <button 
-          onClick={handleLogout}
-          className="bg-zinc-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-all border border-zinc-800"
+          onClick={handleLogoutSession}
+          className="bg-zinc-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-zinc-800 transition-all border border-zinc-800 uppercase tracking-widest text-xs"
         >
           Cerrar Sesión
         </button>
@@ -63,13 +56,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Handle role validation
-  if (allowedRoles && userProfile && !allowedRoles.includes(userProfile.role)) {
-    // If client tries to access trainer dashboard, redirect to client dashboard
-    if (userProfile.role === 'client') {
-      return <Navigate to="/dashboard" replace />;
-    }
-    // If trainer tries to access something restricted, redirect to trainer home
-    return <Navigate to="/" replace />;
+  if (allowedRoles && userProfile) {
+     // superadmin matches trainer for UI routes
+     const effectiveRole = userProfile.role === 'superadmin' ? 'trainer' : userProfile.role;
+     if (!allowedRoles.includes(effectiveRole as UserRole) && !allowedRoles.includes(userProfile.role)) {
+        if (userProfile.role === 'client') {
+          return <Navigate to="/client-dashboard" replace />;
+        }
+        return <Navigate to="/trainer-dashboard" replace />;
+     }
   }
 
   return <>{children}</>;

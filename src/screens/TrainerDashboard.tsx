@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   Users, Activity, Dumbbell, History, FileText, TrendingUp, 
   Trophy, Zap, Timer, Video, Plus, Search, Loader2, 
@@ -7,19 +8,12 @@ import {
   LayoutDashboard, Award
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs, startAfter } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
-interface TrainerDashboardProps {
-  user: any;
-  userProfile?: any;
-  onNavigate: (screen: string, data?: any) => void;
-  onLogout: () => void;
-  onBack?: () => void;
-}
-
-export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBack }: TrainerDashboardProps) => {
+export const TrainerDashboard = () => {
   const navigate = useNavigate();
+  const { user, userProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'athletes' | 'challenges' | 'tools'>('dashboard');
   const [athletes, setAthletes] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
@@ -305,7 +299,7 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
                   />
                 </div>
                 <button 
-                  onClick={() => onNavigate('deportistas')}
+                  onClick={() => navigate('/deportistas')}
                   className="bg-[#D4AF37] text-black p-1.5 rounded-full hover:scale-110 transition-transform"
                   title="Gestionar Atletas"
                 >
@@ -323,7 +317,7 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
                 {filteredAthletes.map((athlete) => (
                   <div 
                     key={athlete.id}
-                    onClick={() => onNavigate('athlete-profile', athlete)}
+                    onClick={() => navigate(`/atleta/${athlete.id}`, { state: athlete })}
                     className="w-full flex items-center justify-between p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl hover:bg-zinc-900 transition-all group cursor-pointer active:scale-[0.98]"
                   >
                     <div className="flex items-center gap-4">
@@ -380,7 +374,7 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
               ].map((item) => (
                 <button 
                   key={item.id}
-                  onClick={() => onNavigate(item.id as any)}
+                  onClick={() => navigate(`/${item.id}`)}
                   className="w-full flex items-center gap-4 p-5 bg-zinc-900 border border-zinc-800 rounded-3xl hover:border-[#D4AF37]/50 transition-all text-left"
                 >
                   <div className={`p-4 rounded-2xl ${item.bg} ${item.color}`}>
@@ -404,13 +398,13 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
               {[
                 { id: 'tabata', title: 'Tabata Timer', icon: Timer, color: 'text-orange-500', bg: 'bg-orange-500/10' },
                 { id: 'reaccion', title: 'Reacción Visual', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-                { id: 'videoAnalysis', title: 'Análisis Video', icon: Video, color: 'text-red-500', bg: 'bg-red-500/10' },
+                { id: 'video-analysis', title: 'Análisis Video', icon: Video, color: 'text-red-500', bg: 'bg-red-500/10' },
                 { id: 'entrenamientos', title: 'Rutinas Globales', icon: Dumbbell, color: 'text-green-500', bg: 'bg-green-500/10' },
                 { id: 'exercise-bank', title: 'Banco Ejercicios', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               ].map((tool) => (
                 <button 
                   key={tool.id}
-                  onClick={() => onNavigate(tool.id)}
+                  onClick={() => navigate(`/${tool.id}`)}
                   className="flex flex-col items-center justify-center p-6 bg-zinc-900 border border-zinc-800 rounded-3xl hover:border-[#D4AF37]/50 transition-all group"
                 >
                   <div className={`p-4 rounded-2xl mb-3 transition-transform group-hover:scale-110 ${tool.bg} ${tool.color}`}>
@@ -431,11 +425,6 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
       <header className="p-6 pt-10 border-b border-zinc-900 bg-black/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            {onBack && (
-              <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
-                <ArrowLeft size={24} />
-              </button>
-            )}
             <div>
               <h1 className="text-2xl font-black tracking-tight">Panel <span className="text-[#D4AF37]">Entrenador</span></h1>
               <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-1">Gestión de Alto Rendimiento</p>
@@ -450,17 +439,19 @@ export const TrainerDashboard = ({ user, userProfile, onNavigate, onLogout, onBa
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
             <button 
-              onClick={onLogout}
+              onClick={() => logout()}
               className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
             >
               <LogOutIcon size={20} />
             </button>
-            <img 
-              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=D4AF37&color=000`} 
-              alt={user.displayName} 
-              className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
-              referrerPolicy="no-referrer"
-            />
+            {user && (
+              <img 
+                src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=D4AF37&color=000`} 
+                alt={user.displayName || ''} 
+                className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
         </div>
 

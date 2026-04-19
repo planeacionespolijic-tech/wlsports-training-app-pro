@@ -254,8 +254,8 @@ service cloud.firestore {
     }
 
     function isValidSession(data) {
-      return data.athleteId is string && data.exercisesCompleted is int &&
-             (data.athleteId == request.auth.uid || isTrainer());
+      return data.get('athleteId', '') is string && data.get('exercisesCompleted', 0) is number &&
+             (data.get('athleteId', '') == request.auth.uid || isTrainer());
     }
 
     function isValidVideoAnalysis(data) {
@@ -456,7 +456,7 @@ service cloud.firestore {
 
     match /sessions/{sessionId} {
       allow read: if isSuperAdmin() || request.auth.uid == resource.data.athleteId || request.auth.uid == resource.data.trainerId;
-      allow create: if (request.auth.uid == request.resource.data.athleteId || isTrainer()) && isNotBlocked() && isValidSession(request.resource.data);
+      allow create: if (request.auth.uid == request.resource.data.get('athleteId', '') || isTrainer()) && isNotBlocked() && isValidSession(request.resource.data);
       allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }

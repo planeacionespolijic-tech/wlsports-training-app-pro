@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, X, Search, Dumbbell, ChevronRight } from 'lucide-react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { TabataScreen } from './TabataScreen';
 import { ReactionScreen } from './ReactionScreen';
+import { useAuth } from '../context/AuthContext';
 
 interface SessionExecutionScreenProps {
-  onBack: () => void;
-  userId: string;
-  workout: any;
-  trainerId: string | null;
+  userId?: string;
+  workout?: any;
+  trainerId?: string | null;
   isAdmin?: boolean;
 }
 
@@ -23,14 +23,29 @@ const MODIFIERS = [
   "Finalización obligatoria"
 ];
 
-export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout, trainerId, isAdmin }: SessionExecutionScreenProps) => {
+export const SessionExecutionScreen = ({ 
+  userId: propUserId, 
+  workout: propWorkout, 
+  trainerId: propTrainerId, 
+  isAdmin: propIsAdmin 
+}: SessionExecutionScreenProps) => {
   const { workoutId } = useParams();
-  const [workout, setWorkout] = useState(initialWorkout);
-  const [loading, setLoading] = useState(!initialWorkout && !!workoutId);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  const workout = propWorkout || location.state;
+  const userId = propUserId || (location.state?.athleteId) || user?.uid || '';
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const isAdmin = propIsAdmin ?? authIsTrainer;
+
+  const [loading, setLoading] = useState(!workout && !!workoutId);
+  const [currentWorkout, setCurrentWorkout] = useState(workout);
   const [saving, setSaving] = useState(false);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [modifier, setModifier] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [bonusAttributes, setBonusAttributes] = useState<string[]>([]);
 
   // States for tools
   const [showTabata, setShowTabata] = useState(false);
@@ -46,12 +61,12 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
   const [showBankPicker, setShowBankPicker] = useState(false);
 
   useEffect(() => {
-    if (!workout && workoutId) {
+    if (!currentWorkout && workoutId) {
       const fetchWorkout = async () => {
         try {
           const wDoc = await getDoc(doc(db, 'workouts', workoutId));
           if (wDoc.exists()) {
-            setWorkout({ id: wDoc.id, ...wDoc.data() });
+            setCurrentWorkout({ id: wDoc.id, ...wDoc.data() });
           }
         } catch (err) {
           console.error("Error fetching workout:", err);
@@ -61,7 +76,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
       };
       fetchWorkout();
     }
-  }, [workoutId, workout]);
+  }, [workoutId, currentWorkout]);
 
   // Fetch Bank Exercises when Modal opens
   useEffect(() => {
@@ -96,7 +111,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
       return [];
     })();
     return [...base, ...extraExercises];
-  }, [workout, extraExercises]);
+  }, [currentWorkout, extraExercises]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -104,7 +119,11 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
         if (userId) {
           const uDoc = await getDoc(doc(db, 'users', userId));
           if (uDoc.exists()) {
-            setUserData(uDoc.data());
+            const data = uDoc.data();
+            if (!data.attributes) {
+              data.attributes = { ritmo: 50, tecnica: 50, fuerza: 50, mentalidad: 50 };
+            }
+            setUserData(data);
           }
         }
       } catch (err) {
@@ -145,7 +164,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
   };
 
   const handleFinish = async () => {
-    if (!workout) return;
+    if (!currentWorkout) return;
     setSaving(true);
     try {
       const xpGained = completedExercises.length * 10;
@@ -157,26 +176,60 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
         exercisesCompleted: completedExercises.length,
         xpGained: xpGained,
         modifier: modifier,
-        workoutName: workout.name || 'Entrenamiento'
+        workoutName: currentWorkout.name || 'Entrenamiento'
       });
 
-      // Update actual user profile XP
+      // Update actual user profile XP, Streak and Attributes
       if (userId) {
         const userRef = doc(db, 'users', userId);
         const snap = await getDoc(userRef);
         if (snap.exists()) {
-          const currentXp = (snap.data().xp || 0) + xpGained;
+          const data = snap.data();
+          const currentXp = (data.xp || 0) + xpGained;
           const newLevel = Math.floor(currentXp / 1000) + 1;
+          
+          // Streak Logic
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+
+          let currentStreak = data.streak || 0;
+          let lastSessionDate = data.lastSessionDate?.toDate() || null;
+
+          if (!lastSessionDate) {
+             currentStreak = 1;
+          } else {
+             const lastDay = new Date(lastSessionDate.getFullYear(), lastSessionDate.getMonth(), lastSessionDate.getDate());
+             if (lastDay.getTime() === yesterday.getTime()) {
+                currentStreak += 1;
+             } else if (lastDay.getTime() !== today.getTime()) {
+                currentStreak = 1;
+             }
+          }
+
+          // Attributes Logic
+          let currentAttributes = data.attributes || { ritmo: 50, tecnica: 50, fuerza: 50, mentalidad: 50 };
+          let newAttributes = { ...currentAttributes };
+          ['ritmo', 'tecnica', 'fuerza', 'mentalidad'].forEach(attr => {
+             let gain = 1;
+             if (bonusAttributes.includes(attr)) gain += 1;
+             newAttributes[attr] = Math.min(99, (newAttributes[attr] || 50) + gain);
+          });
+
           await updateDoc(userRef, {
             xp: increment(xpGained),
             points: increment(xpGained),
-            level: newLevel
+            level: newLevel,
+            streak: currentStreak,
+            lastSessionDate: serverTimestamp(),
+            attributes: newAttributes
           });
         }
       }
 
-      alert(`Sesión guardada correctamente. ¡Has ganado ${xpGained} XP!`);
-      onBack();
+      alert(`¡Sesión guardada! +${xpGained} XP | Atributos mejorados.`);
+      navigate(-1);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'sessions');
     } finally {
@@ -208,7 +261,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
             exit={{ opacity: 0, scale: 1.1 }}
             className="fixed inset-0 z-50 bg-black"
           >
-            <TabataScreen onBack={() => setShowTabata(false)} userId={userId} />
+            <TabataScreen onBack={() => setShowTabata(false)} userId={userId as string} />
           </motion.div>
         )}
 
@@ -219,7 +272,7 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
             exit={{ opacity: 0, scale: 1.1 }}
             className="fixed inset-0 z-50 bg-black"
           >
-            <ReactionScreen onBack={() => setShowReaction(false)} userId={userId} />
+            <ReactionScreen onBack={() => setShowReaction(false)} userId={userId as string} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -323,17 +376,26 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
       {/* 1. HEADER */}
       <header className="p-4 border-b border-zinc-800 bg-zinc-900/50 sticky top-0 z-10 flex items-center justify-between backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-3 bg-black hover:bg-zinc-800 rounded-full transition-colors border border-zinc-800">
+          <button onClick={() => navigate(-1)} className="p-3 bg-black hover:bg-zinc-800 rounded-full transition-colors border border-zinc-800">
             <ArrowLeft size={24} />
           </button>
           <div>
             <h1 className="text-xl font-black">{userData?.displayName || 'Deportista'}</h1>
-            {userData?.level ? (
-              <p className="text-xs text-[#D4AF37] font-bold uppercase tracking-widest flex items-center gap-1">
-                <Trophy size={12} /> Nivel {userData.level} | {userData.xp || 0} XP
-              </p>
+            {userData ? (
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                <div className="flex items-center gap-3">
+                  <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest flex items-center gap-1">
+                    <Trophy size={10} /> {userData.level ? `Nivel ${userData.level}` : 'Nivel 1'}
+                  </p>
+                  {userData.streak > 0 && (
+                    <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest flex items-center gap-1">
+                      <Flame size={12} /> {userData.streak} Días
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : (
-              <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Modo Sesión</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Modo Sesión</p>
             )}
           </div>
         </div>
@@ -341,6 +403,27 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
 
       <main className="flex-1 p-4 pb-32 space-y-8 overflow-y-auto w-full max-w-2xl mx-auto">
         
+        {userData?.attributes && (
+          <section className="bg-zinc-900 border border-zinc-800 p-5 rounded-[2rem] shadow-xl">
+            <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Medal size={14}/> Perfil de Atributos
+            </h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              {['ritmo', 'tecnica', 'fuerza', 'mentalidad'].map(attr => (
+                 <div key={attr} className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                       <span>{attr}</span>
+                       <span className="text-[#D4AF37] text-xs">{userData.attributes[attr] || 50}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-black rounded-full overflow-hidden">
+                       <div className="h-full bg-gradient-to-r from-[#D4AF37]/50 to-[#D4AF37]" style={{ width: `${userData.attributes[attr] || 50}%` }} />
+                    </div>
+                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* 2. MODIFICADOR (GAMIFICACIÓN) */}
         <section className="space-y-4">
           <button 
@@ -427,6 +510,26 @@ export const SessionExecutionScreen = ({ onBack, userId, workout: initialWorkout
             <Zap size={24} className="text-purple-500 mb-2" />
             <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Reacción</span>
           </button>
+        </section>
+
+        {/* 5. EVALUACIÓN RÁPIDA (BONO ATRIBUTOS) */}
+        <section className="bg-zinc-900 border border-zinc-800 p-5 rounded-[2rem]">
+          <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Evaluación (Puntos Extra)</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {['ritmo', 'tecnica', 'fuerza', 'mentalidad'].map(attr => (
+              <button 
+                key={attr}
+                onClick={() => setBonusAttributes(prev => prev.includes(attr) ? prev.filter(a => a !== attr) : [...prev, attr])}
+                className={`p-3 rounded-xl border flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] font-black transition-all active:scale-95 ${
+                  bonusAttributes.includes(attr) 
+                    ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.3)]' 
+                    : 'bg-black border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                + {attr}
+              </button>
+            ))}
+          </div>
         </section>
 
       </main>

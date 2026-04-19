@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { LogIn, Activity, AlertCircle, Mail, Lock, Key, CheckCircle2, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 import { loginWithEmail, resetPassword } from '../firebase';
 
-interface LoginScreenProps {
-  onLogin: () => void;
-  onLoginAnonymous: () => void;
-  externalError?: string | null;
-}
-
-export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginScreenProps) => {
+export const LoginScreen = ({ externalError }: { externalError?: string | null }) => {
+  const { loginWithGoogle, loginAnonymously } = useAuth();
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -188,7 +184,7 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
         {/* Social Buttons */}
         <div className="w-full grid grid-cols-2 gap-4 mb-4">
           <button 
-            onClick={() => handleLogin(onLogin as any)}
+            onClick={() => handleLogin(loginWithGoogle)}
             disabled={isLoading}
             className="flex items-center justify-center gap-3 bg-white text-black py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all transform active:scale-95 disabled:opacity-50"
           >
@@ -197,7 +193,7 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
           </button>
 
           <button 
-            onClick={() => handleLogin(onLoginAnonymous as any)}
+            onClick={() => handleLogin(loginAnonymously)}
             disabled={isLoading}
             className="flex items-center justify-center gap-3 bg-zinc-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50"
           >
@@ -211,7 +207,7 @@ export const LoginScreen = ({ onLogin, onLoginAnonymous, externalError }: LoginS
             const url = new URL(window.location.href);
             url.searchParams.set('guest', 'true');
             window.history.replaceState({}, '', url);
-            handleLogin(onLoginAnonymous as any);
+            handleLogin(loginAnonymously);
           }}
           disabled={isLoading}
           className="w-full bg-zinc-800/50 text-[#D4AF37] py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-[#D4AF37]/20 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
