@@ -1,18 +1,21 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, Calendar, TrendingUp, ClipboardList, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2 } from 'lucide-react';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, ClipboardList, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { handleFirestoreError, OperationType } from '../firebase';
 import { uploadProfilePhoto } from '../services/storageService';
+import { useAuth } from '../context/AuthContext';
 
-interface AthleteProfileScreenProps {
-  athlete: any;
-  onBack: () => void;
-  onNavigate: (screen: string) => void;
-  isAdmin: boolean;
-}
-
-export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: AthleteProfileScreenProps) => {
+export const AthleteProfileScreen = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
+  const { isTrainer } = useAuth();
+  
+  // Use state athlete or basic object if not provided
+  const athlete = location.state || { id: id, displayName: 'Cargando...', photoURL: null, type: 'adult' };
+  
   const [uploading, setUploading] = useState(false);
   const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete.photoURL);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -20,7 +23,7 @@ export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: A
 
   const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !isAdmin) return;
+    if (!file || !isTrainer) return;
 
     setUploading(true);
     try {
@@ -53,12 +56,12 @@ export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: A
     return name?.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || '??';
   };
 
-  const themeColor = isChild ? '#3B82F6' : '#D4AF37'; // Blue for kids, Gold for adults
+  const themeColor = isChild ? '#3B82F6' : '#D4AF37';
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center gap-4 sticky top-0 bg-black z-10">
-        <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-xl font-bold">Perfil del {isChild ? 'Niño' : 'Deportista'}</h1>
@@ -84,7 +87,7 @@ export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: A
               </div>
             )}
             
-            {isAdmin && (
+            {isTrainer && (
               <>
                 <button 
                   onClick={() => fileInputRef.current?.click()}
@@ -123,8 +126,7 @@ export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: A
           )}
         </div>
 
-        {/* Coach Intelligence Dashboard */}
-        {isAdmin && (
+        {isTrainer && (
           <div className="mb-10">
             <CoachAthleteDashboard 
               athleteId={athlete.id} 
@@ -144,7 +146,7 @@ export const AthleteProfileScreen = ({ athlete, onBack, onNavigate, isAdmin }: A
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => navigate(`/${item.id}`, { state: { athleteId: athlete.id, athlete } })}
               className="w-full bg-zinc-900/50 hover:bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4 transition-all group active:scale-[0.98]"
             >
               <div className="p-3 bg-black rounded-xl group-hover:text-white transition-colors" style={{ color: themeColor }}>

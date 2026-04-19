@@ -1,8 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, loginWithGoogle as fbLoginWithGoogle, loginAnonymously as fbLoginAnonymously, logout as fbLogout } from '../firebase';
-import { AuthContextType, UserProfile, UserRole } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { 
+  User, 
+  onAuthStateChanged, 
+  getRedirectResult,
+  signInWithPopup,
+  signInAnonymously,
+  signOut
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { auth, db, googleProvider } from '../firebase';
+import { AuthContextType, UserProfile, UserRole, UserStatus } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -11,13 +18,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Memoized login functions
+  const loginWithGoogle = useCallback(async () => {
+    localStorage.removeItem('wlsports_logged_out');
+    return signInWithPopup(auth, googleProvider);
+  }, []);
+
+  const loginAnonymously = useCallback(async () => {
+    localStorage.removeItem('wlsports_logged_out');
+    return signInAnonymously(auth);
+  }, []);
+
+  const logout = useCallback(async () => {
+    localStorage.setItem('wlsports_logged_out', 'true');
+    await signOut(auth);
+    setUser(null);
+    setUserProfile(null);
+  }, []);
+
   useEffect(() => {
-    // Handle redirect result
+    // Process redirect results if any
     getRedirectResult(auth).catch((error) => {
-      console.error("Error in login redirect:", error);
+      console.error("Auth redirect error:", error);
     });
 
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       
       if (u) {
@@ -27,95 +52,92 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           let role: UserRole = 'client';
 
-          // 1. Account Claiming Logic (for Trainers created by email)
+          // 1. Account Claiming Logic (Pre-created accounts by email)
           if (!userDoc.exists() && u.email) {
             const emailRef = doc(db, 'users', u.email.toLowerCase());
             const emailDoc = await getDoc(emailRef);
+            
             if (emailDoc.exists()) {
-              const data = emailDoc.data();
-              let dbRole = data.role || role;
-              if (dbRole === 'superadmin') {
-                role = 'trainer';
-              } else {
-                role = dbRole as UserRole;
+              const preCreatedData = emailDoc.data();
+              role = (preCreatedData.role as UserRole) || role;
+              
+              if (role === 'superadmin' && u.email !== 'planeacionespolijic@gmail.com') {
+                role = 'trainer'; // Safety fallback
               }
-              // Link the pre-created account to the real UID
+
+              // Claim the account: Transfer data to the UID-based document
               await setDoc(userRef, { 
-                ...data, 
+                ...preCreatedData, 
                 uid: u.uid,
                 lastLogin: serverTimestamp(),
-                photoURL: u.photoURL || data.photoURL || null,
-                displayName: u.displayName || data.displayName || 'Usuario',
-                role: dbRole
+                photoURL: u.photoURL || preCreatedData.photoURL || null,
+                displayName: u.displayName || preCreatedData.displayName || 'Usuario',
+                role: preCreatedData.role === 'superadmin' ? 'superadmin' : role,
+                status: (preCreatedData.status as UserStatus) || 'active'
               }, { merge: true });
+              
               userDoc = await getDoc(userRef);
             }
           }
 
-          // 3. Normal Role Fetching
-          let dbRole = role;
+          // 2. Role Determination
+          let dbRole: UserRole = 'client';
           if (userDoc.exists()) {
-            dbRole = (userDoc.data().role as UserRole) || role;
+            dbRole = (userDoc.data().role as UserRole) || 'client';
           }
           
-          // Superadmin override
+          // Superadmin override constant
           if (u.email === 'planeacionespolijic@gmail.com') {
             dbRole = 'superadmin';
           }
 
-          // Check for unauthorized access (only for non-anonymous accounts)
+          // 3. Security Check: Only allow registered users (except anonymous or superadmin)
           if (!userDoc.exists() && !u.isAnonymous && u.email !== 'planeacionespolijic@gmail.com') {
-            await auth.signOut();
+            console.warn("Unregistered user attempted access:", u.email);
+            await signOut(auth);
             setLoading(false);
             return;
           }
 
-          // 4. Update/Create User Document
-          const profileData: Partial<UserProfile> = {
+          // 4. Update Profile Basic Data
+          const profileUpdate: Partial<UserProfile> = {
             uid: u.uid,
-            email: u.email || 'invitado@wlsports.com',
+            email: u.email || 'invitado@wlsports.app',
             displayName: u.displayName || 'Invitado',
             photoURL: u.photoURL || null,
             lastLogin: serverTimestamp(),
-            role: dbRole as UserRole,
+            role: dbRole,
             isAnonymous: u.isAnonymous,
             status: userDoc.exists() ? (userDoc.data().status || 'active') : 'active'
           };
 
-          await setDoc(userRef, profileData, { merge: true });
+          await setDoc(userRef, profileUpdate, { merge: true });
 
-          const finalDoc = await getDoc(userRef);
-          if (finalDoc.exists()) {
-            setUserProfile(finalDoc.data() as UserProfile);
-          }
+          // 5. Setup Real-time Profile Listener
+          const unsubscribeProfile = onSnapshot(userRef, (doc) => {
+            if (doc.exists()) {
+              setUserProfile(doc.data() as UserProfile);
+            }
+            setLoading(false);
+          }, (err) => {
+            console.error("Profile sync error:", err);
+            setLoading(false);
+          });
+
+          return () => unsubscribeProfile();
+
         } catch (error) {
-          console.error('Auth Context error:', error);
+          console.error('Initial profile setup failed:', error);
+          setLoading(false);
         }
       } else {
         setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, []);
-
-  const loginWithGoogle = async () => {
-    localStorage.removeItem('wlsports_logged_out');
-    return fbLoginWithGoogle();
-  };
-
-  const loginAnonymously = async () => {
-    localStorage.removeItem('wlsports_logged_out');
-    return fbLoginAnonymously();
-  };
-
-  const logout = async () => {
-    localStorage.setItem('wlsports_logged_out', 'true');
-    await fbLogout();
-    setUser(null);
-    setUserProfile(null);
-  };
 
   const isTrainer = userProfile?.role === 'trainer' || userProfile?.role === 'superadmin';
 

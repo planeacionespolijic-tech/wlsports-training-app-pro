@@ -8,13 +8,6 @@ import { TabataScreen } from './TabataScreen';
 import { ReactionScreen } from './ReactionScreen';
 import { useAuth } from '../context/AuthContext';
 
-interface SessionExecutionScreenProps {
-  userId?: string;
-  workout?: any;
-  trainerId?: string | null;
-  isAdmin?: boolean;
-}
-
 const MODIFIERS = [
   "Gol vale doble",
   "Solo pierna no dominante",
@@ -23,21 +16,17 @@ const MODIFIERS = [
   "Finalización obligatoria"
 ];
 
-export const SessionExecutionScreen = ({ 
-  userId: propUserId, 
-  workout: propWorkout, 
-  trainerId: propTrainerId, 
-  isAdmin: propIsAdmin 
-}: SessionExecutionScreenProps) => {
+export const SessionExecutionScreen = () => {
   const { workoutId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
   
-  const workout = propWorkout || location.state;
-  const userId = propUserId || (location.state?.athleteId) || user?.uid || '';
-  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
-  const isAdmin = propIsAdmin ?? authIsTrainer;
+  // Resolve context and state
+  const workout = location.state?.workout || location.state;
+  const userId = location.state?.athleteId || user?.uid || '';
+  const trainerId = (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const isAdmin = authIsTrainer;
 
   const [loading, setLoading] = useState(!workout && !!workoutId);
   const [currentWorkout, setCurrentWorkout] = useState(workout);
@@ -101,12 +90,12 @@ export const SessionExecutionScreen = ({
   // Extract exercises safely from varying structures
   const allExercises = React.useMemo(() => {
     const base = (() => {
-      if (!workout) return [];
-      if (workout.exercises && Array.isArray(workout.exercises)) {
-        return workout.exercises;
+      if (!currentWorkout) return [];
+      if (currentWorkout.exercises && Array.isArray(currentWorkout.exercises)) {
+        return currentWorkout.exercises;
       }
-      if (workout.blocks && Array.isArray(workout.blocks)) {
-        return workout.blocks.flatMap((b: any) => b.exercises || []);
+      if (currentWorkout.blocks && Array.isArray(currentWorkout.blocks)) {
+        return currentWorkout.blocks.flatMap((b: any) => b.exercises || []);
       }
       return [];
     })();

@@ -1,5 +1,5 @@
 import { User } from 'firebase/auth';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, FieldValue } from 'firebase/firestore';
 
 export type UserRole = 'trainer' | 'client' | 'superadmin';
 export type UserStatus = 'active' | 'blocked' | 'deleted';
@@ -16,7 +16,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL: string | null;
-  lastLogin: Timestamp | any;
+  lastLogin: Timestamp | Date | FieldValue | null;
   role: UserRole;
   isAnonymous: boolean;
   status: UserStatus;
@@ -25,8 +25,10 @@ export interface UserProfile {
   points?: number;
   level?: number;
   streak?: number;
-  lastSessionDate?: Timestamp | any;
+  lastSessionDate?: Timestamp | Date | FieldValue | null;
   attributes?: UserAttributes;
+  type?: 'adult' | 'child';
+  trustScore?: number;
 }
 
 export interface Exercise {
@@ -67,8 +69,11 @@ export interface Workout {
   trainerId: string;
   athleteId?: string;
   exercises?: Exercise[];
-  blocks?: WorkoutBlock[];
-  createdAt?: Timestamp | any;
+  blocks?: (WorkoutBlock | TrainingBlock)[];
+  createdAt?: Timestamp | Date | FieldValue | null;
+  totalTime?: number | string;
+  duration?: string;
+  updatedAt?: Timestamp | Date | FieldValue | null;
 }
 
 export interface Athlete {
@@ -79,6 +84,8 @@ export interface Athlete {
   photoURL: string | null;
   status?: UserStatus;
   trainerId?: string;
+  level?: number;
+  points?: number;
 }
 
 export interface AuthContextType {

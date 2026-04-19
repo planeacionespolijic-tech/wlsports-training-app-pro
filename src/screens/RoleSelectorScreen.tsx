@@ -1,15 +1,15 @@
 import React from 'react';
 import { Shield, Users, User, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-interface RoleSelectorScreenProps {
-  onSelectRole: (role: 'trainer' | 'client') => void;
-  onLogout: () => void;
-  user: any;
-  currentRole: string;
-}
+export const RoleSelectorScreen = () => {
+  const navigate = useNavigate();
+  const { user, userProfile, logout } = useAuth();
+  
+  const currentRole = userProfile?.role || 'client';
 
-export const RoleSelectorScreen = ({ onSelectRole, onLogout, user, currentRole }: RoleSelectorScreenProps) => {
   const roles = [
     { 
       id: 'trainer', 
@@ -18,7 +18,7 @@ export const RoleSelectorScreen = ({ onSelectRole, onLogout, user, currentRole }
       icon: Users, 
       color: 'text-[#D4AF37]', 
       bg: 'bg-[#D4AF37]/10',
-      allowed: currentRole === 'trainer'
+      allowed: currentRole === 'trainer' || currentRole === 'superadmin'
     },
     { 
       id: 'client', 
@@ -49,7 +49,7 @@ export const RoleSelectorScreen = ({ onSelectRole, onLogout, user, currentRole }
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            onClick={() => role.allowed && onSelectRole(role.id as any)}
+            onClick={() => role.allowed && navigate(role.id === 'trainer' ? '/trainer-dashboard' : '/client-dashboard')}
             disabled={!role.allowed}
             className={`flex items-center gap-6 p-6 rounded-3xl border transition-all text-left relative overflow-hidden group ${
               role.allowed 
@@ -74,24 +74,26 @@ export const RoleSelectorScreen = ({ onSelectRole, onLogout, user, currentRole }
       </div>
 
       <footer className="mt-12 flex flex-col items-center gap-6">
-        <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-          <img 
-            src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=D4AF37&color=000`} 
-            alt={user.displayName} 
-            className="w-8 h-8 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className="text-left">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">Sesión activa</p>
-            <p className="text-xs font-bold text-white">{user.displayName}</p>
+        {user && (
+          <div className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-2xl border border-zinc-800">
+            <img 
+              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=D4AF37&color=000`} 
+              alt={user.displayName || ''} 
+              className="w-8 h-8 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="text-left">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">Sesión activa</p>
+              <p className="text-xs font-bold text-white">{user.displayName}</p>
+            </div>
+            <button 
+              onClick={() => logout()}
+              className="ml-4 p-2 text-zinc-500 hover:text-red-500 transition-colors"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
-          <button 
-            onClick={onLogout}
-            className="ml-4 p-2 text-zinc-500 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={18} />
-          </button>
-        </div>
+        )}
         <p className="text-zinc-800 text-[10px] uppercase tracking-widest">
           © 2026 WL Sports Systems
         </p>

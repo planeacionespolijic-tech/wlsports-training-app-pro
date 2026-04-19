@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Calendar, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle, Lock, Dumbbell, History } from 'lucide-react';
-import { db, handleFirestoreError, OperationType, createSecondaryUser } from '../firebase';
-import { collection, query, onSnapshot, orderBy, where, setDoc, doc, serverTimestamp, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { ArrowLeft, User, Mail, Loader2, Trash2, AlertTriangle, Ban, CheckCircle2, CheckCircle, Dumbbell, History } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, query, onSnapshot, orderBy, where, setDoc, doc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { logAuditEvent, AuditAction } from '../services/auditService';
+import { useAuth } from '../context/AuthContext';
 
-interface DeportistasScreenProps {
-  onBack: () => void;
-  onSelectAthlete: (athlete: any) => void;
-  role: 'trainer' | 'client' | 'superadmin';
-  userId: string;
-}
-
-export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: DeportistasScreenProps) => {
+export const DeportistasScreen = () => {
   const navigate = useNavigate();
+  const { user, userProfile } = useAuth();
+  
+  const userId = user?.uid || '';
+  const role = userProfile?.role || 'client';
+
   const [deportistas, setDeportistas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -47,11 +46,9 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
   }, [feedback]);
 
   useEffect(() => {
-    let q = query(
-      collection(db, 'users'),
-      orderBy('lastLogin', 'desc')
-    );
+    if (!userId) return;
 
+    let q;
     if (role === 'trainer') {
       q = query(
         collection(db, 'users'),
@@ -65,6 +62,7 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         orderBy('lastLogin', 'desc')
       );
     } else {
+      // Clients shouldn't really see this, but for safety
       q = query(
         collection(db, 'users'),
         where('role', '==', 'client'),
@@ -86,7 +84,7 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userId, role]);
 
   const getInitials = (name: string) => {
     return name?.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || '??';
@@ -105,13 +103,11 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
 
     setIsCreating(true);
     try {
-      // Create account using the secondary app helper in firebase.ts
       const { createAthleteAccount } = await import('../firebase');
-      const user = await createAthleteAccount(newAthlete.email, newAthlete.password, newAthlete.displayName);
+      const authUser = await createAthleteAccount(newAthlete.email, newAthlete.password, newAthlete.displayName);
       
-      // Create doc in users collection
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
+      await setDoc(doc(db, 'users', authUser.uid), {
+        uid: authUser.uid,
         email: newAthlete.email,
         displayName: newAthlete.displayName,
         type: newAthlete.type,
@@ -136,7 +132,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
   const handleToggleBlockAthlete = (e: React.MouseEvent, athlete: any) => {
     e.stopPropagation();
     
-    // Validation
     if (role === 'trainer' && athlete.trainerId !== userId) {
       setFeedback({ message: 'No tienes permisos para bloquear este usuario', type: 'error' });
       return;
@@ -158,7 +153,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
             status: isBlocked ? 'active' : 'blocked'
           });
 
-          // Audit Log
           await logAuditEvent(
             isBlocked ? AuditAction.UNBLOCK_USER : AuditAction.BLOCK_USER,
             userId,
@@ -185,7 +179,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
   const handleDeleteAthlete = (e: React.MouseEvent, athlete: any) => {
     e.stopPropagation();
     
-    // Validation
     if (role === 'trainer' && athlete.trainerId !== userId) {
       setFeedback({ message: 'No tienes permisos para eliminar este usuario', type: 'error' });
       return;
@@ -208,7 +201,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
             restoreUntil: Timestamp.fromDate(restoreUntil)
           });
 
-          // Audit Log
           await logAuditEvent(
             AuditAction.DELETE_USER,
             userId,
@@ -233,7 +225,7 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-xl font-bold">Mis Atletas</h1>
@@ -324,7 +316,7 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
               deportistas.map((item) => (
                 <div 
                   key={item.id} 
-                  onClick={() => onSelectAthlete(item)}
+                  onClick={() => navigate(`/atleta/${item.id}`, { state: item })}
                   className="w-full text-left p-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center gap-4 hover:border-[#D4AF37]/50 transition-all cursor-pointer active:scale-[0.98] group"
                 >
                   {item.photoURL ? (
@@ -402,7 +394,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         )}
       </main>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={modalConfig.isOpen}
         onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
@@ -413,7 +404,6 @@ export const DeportistasScreen = ({ onBack, onSelectAthlete, role, userId }: Dep
         confirmText={modalConfig.confirmText}
       />
 
-      {/* Add Athlete Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
           <motion.div 
