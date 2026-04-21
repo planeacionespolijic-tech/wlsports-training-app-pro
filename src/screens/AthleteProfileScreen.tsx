@@ -1,11 +1,26 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, ClipboardList, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2 } from 'lucide-react';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, ClipboardList, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { uploadProfilePhoto } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
+import { useEffect } from 'react';
+
+const LEVELS = [
+  { name: "Canterano", minXP: 0 },
+  { name: "Debutante", minXP: 500 },
+  { name: "Titular", minXP: 1000 },
+  { name: "Capitán", minXP: 2000 },
+  { name: "Estrella", minXP: 3500 },
+  { name: "Leyenda", minXP: 5000 }
+];
+
+const getLevelFromXP = (xp: number) => {
+  return [...LEVELS].reverse().find(l => xp >= l.minXP) || LEVELS[0];
+};
 
 export const AthleteProfileScreen = () => {
   const navigate = useNavigate();
@@ -14,12 +29,33 @@ export const AthleteProfileScreen = () => {
   const { isTrainer } = useAuth();
   
   // Use state athlete or basic object if not provided
-  const athlete = location.state || { id: id, displayName: 'Cargando...', photoURL: null, type: 'adult' };
+  const [athlete, setAthlete] = useState<any>(location.state || { id: id || '', displayName: 'Cargando...', photoURL: null, type: 'adult' });
+  const [loading, setLoading] = useState(!location.state);
   
   const [uploading, setUploading] = useState(false);
-  const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete.photoURL);
+  const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete?.photoURL || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isChild = athlete.type === 'child';
+  const isChild = athlete?.type === 'child';
+
+  useEffect(() => {
+    const fetchAthlete = async () => {
+      if (!id) return;
+      try {
+        const docRef = doc(db, 'users', id);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = { id: snap.id, ...snap.data() } as any;
+          setAthlete(data);
+          setCurrentPhotoURL(data.photoURL);
+        }
+      } catch (error) {
+        console.error("Error fetching athlete", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAthlete();
+  }, [id]);
 
   const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,13 +154,71 @@ export const AthleteProfileScreen = () => {
             <span>{athlete.email || 'Sin correo'}</span>
           </div>
           
-          {isChild && (
-            <div className="mt-4 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-full flex items-center gap-2">
-              <Trophy size={16} className="text-blue-500" />
-              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">Nivel {athlete.level || 1} • {athlete.points || 0} Puntos</span>
+          {loading ? (
+            <div className="mt-4"><Loader2 className="animate-spin text-zinc-500" size={24} /></div>
+          ) : (
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <div className={`${isChild ? 'bg-blue-500/10 border-blue-500/20' : 'bg-[#D4AF37]/10 border-[#D4AF37]/20'} px-4 py-2 rounded-full flex items-center gap-2`}>
+                <Trophy size={16} className={isChild ? 'text-blue-500' : 'text-[#D4AF37]'} />
+                <span className={`text-xs font-bold uppercase tracking-widest ${isChild ? 'text-blue-500' : 'text-[#D4AF37]'}`}>
+                  {getLevelFromXP(athlete.xp || 0).name} • {athlete.xp || 0} XP
+                </span>
+              </div>
+              
+              {/* Level Progress Bar */}
+              {(() => {
+                const currentXP = athlete.xp || 0;
+                const currentLevel = getLevelFromXP(currentXP);
+                const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1];
+                if (!nextLevel) return null;
+                
+                const progress = Math.min(100, Math.max(0, 
+                  ((currentXP - currentLevel.minXP) / (nextLevel.minXP - currentLevel.minXP)) * 100
+                ));
+                
+                return (
+                  <div className="w-48 h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                    <div 
+                      className="h-full transition-all duration-1000" 
+                      style={{ 
+                        width: `${progress}%`,
+                        backgroundColor: isChild ? '#3B82F6' : '#D4AF37'
+                      }} 
+                    />
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
+
+        {/* Atributos Section */}
+        {athlete.attributes && (
+          <section className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-[2rem] shadow-xl mb-10 max-w-md mx-auto">
+            <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Medal size={14} style={{ color: themeColor }} /> Atributos de Rendimiento
+            </h2>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+              {['ritmo', 'tecnica', 'fuerza', 'mentalidad'].map(attr => (
+                <div key={attr} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                    <span>{attr}</span>
+                    <span className="text-zinc-200">{athlete.attributes[attr] || 50}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-black rounded-full overflow-hidden">
+                    <div 
+                      className="h-full transition-all duration-1000" 
+                      style={{ 
+                        width: `${athlete.attributes[attr] || 50}%`,
+                        backgroundColor: themeColor
+                      }} 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {isTrainer && (
           <div className="mb-10">
