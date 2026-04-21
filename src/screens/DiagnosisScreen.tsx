@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Brain, Save, Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, Brain, Save, Loader2, AlertCircle, Sparkles, Zap } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { analyzeProgress } from '../services/intelligenceService';
 import { motion } from 'motion/react';
-import { Zap } from 'lucide-react';
 
 interface DiagnosisScreenProps {
   onBack: () => void;
@@ -21,7 +22,20 @@ interface Diagnosis {
   createdAt: any;
 }
 
-export const DiagnosisScreen = ({ onBack, userId, isAdmin, trainerId }: DiagnosisScreenProps) => {
+export const DiagnosisScreen = ({ 
+  onBack: propOnBack, 
+  userId: propUserId, 
+  isAdmin: propIsAdmin, 
+  trainerId: propTrainerId 
+}: Partial<DiagnosisScreenProps>) => {
+  const navigate = useNavigate();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  // Context determination
+  const userId = propUserId || user?.uid || '';
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : authIsTrainer;
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const onBack = propOnBack || (() => navigate(-1));
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);

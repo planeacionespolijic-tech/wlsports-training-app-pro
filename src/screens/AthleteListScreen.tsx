@@ -45,6 +45,7 @@ export const AthleteListScreen = ({ onSelectAthlete }: AthleteListScreenProps) =
   const handleAddAthlete = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { uid } = auth.currentUser || {};
       await addDoc(collection(db, 'users'), {
         displayName: newName,
         email: newEmail || null, // Email opcional
@@ -54,6 +55,8 @@ export const AthleteListScreen = ({ onSelectAthlete }: AthleteListScreenProps) =
         xp: 0,
         points: 0,
         streak: 0,
+        trainerId: uid,
+        createdBy: uid,
         createdAt: serverTimestamp(),
       });
       setShowAddModal(false);

@@ -345,64 +345,64 @@ service cloud.firestore {
     match /workouts/{workoutId} {
       allow read: if isAuthenticated();
       allow create: if isNotBlocked() && isValidWorkout(request.resource.data);
-      allow update: if (isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidWorkout(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked()));
-      allow delete: if isSuperAdmin() || (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /history/{historyId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidHistory(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidHistory(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin() || (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /reports/{reportId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidReport(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidReport(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin() || (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /assessments/{assessmentId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidAssessment(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidAssessment(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin() || (isDocOwner() && isNotBlocked()) || (isDocTrainer() && isNotBlocked());
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /anamnesis/{anamnesisId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidAnamnesis(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidAnamnesis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /tests/{testId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidTest(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /videoAnalysis/{analysisId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidVideoAnalysis(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidVideoAnalysis(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /diagnoses/{diagnosisId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
       allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /trainingPlans/{planId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTrainingPlan(request.resource.data);
       allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTrainingPlan(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /motorEvaluations/{evalId} {
@@ -430,7 +430,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournament(request.resource.data);
       allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournament(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /tournamentMatches/{matchId} {
@@ -444,28 +444,28 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentBonus(request.resource.data);
       allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidTournamentBonus(request.resource.data);
-      allow delete: if isSuperAdmin();
+      allow delete: if (isTrainer() || isSuperAdmin()) && isNotBlocked();
     }
 
     match /challengeSubmissions/{submissionId} {
       allow read: if isSuperAdmin() || isDocOwner() || (isAuthenticated() && resource.data.get('trainerId', '') == request.auth.uid);
       allow create: if isNotBlocked() && isValidChallengeSubmission(request.resource.data);
       allow update: if isSuperAdmin() || (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || isTrainerOf(resource.data.get('userId', '')))) && isNotBlocked();
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /sessions/{sessionId} {
       allow read: if isSuperAdmin() || request.auth.uid == resource.data.athleteId || request.auth.uid == resource.data.trainerId;
       allow create: if (request.auth.uid == request.resource.data.get('athleteId', '') || isTrainer()) && isNotBlocked() && isValidSession(request.resource.data);
-      allow update: if isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isNotBlocked() && isTrainer());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /reactionTests/{testId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
       allow create: if isNotBlocked() && isValidReactionTest(request.resource.data);
-      allow update: if isSuperAdmin() || (isDocOwner() && isNotBlocked() && isValidReactionTest(request.resource.data) && userIdUnchanged()) || (isDocTrainer() && isNotBlocked());
-      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
     }
 
     match /liveSessions/{userId} {

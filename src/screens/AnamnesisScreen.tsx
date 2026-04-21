@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Save, Loader2, ClipboardList } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, setDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -11,7 +13,20 @@ interface AnamnesisScreenProps {
   trainerId: string | null;
 }
 
-export const AnamnesisScreen = ({ onBack, userId, isAdmin, trainerId }: AnamnesisScreenProps) => {
+export const AnamnesisScreen = ({ 
+  onBack: propOnBack, 
+  userId: propUserId, 
+  isAdmin: propIsAdmin, 
+  trainerId: propTrainerId 
+}: Partial<AnamnesisScreenProps>) => {
+  const navigate = useNavigate();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  // Context determination
+  const userId = propUserId || user?.uid || '';
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : authIsTrainer;
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const onBack = propOnBack || (() => navigate(-1));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState({

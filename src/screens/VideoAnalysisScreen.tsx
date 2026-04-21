@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Plus, Save, Loader2, Trash2, Video, Play, ExternalLink, Camera, StopCircle, CheckCircle2, AlertCircle, Sparkles, Trophy, Lightbulb, Eye } from 'lucide-react';
 import { db, storage, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc, getDoc } from 'firebase/firestore';
@@ -28,8 +30,21 @@ interface AIAnalysis {
   positiveReinforcement: string;
 }
 
-export const VideoAnalysisScreen = ({ onBack, userId, isAdmin, trainerId }: VideoAnalysisScreenProps) => {
-  const isOwner = auth.currentUser?.uid === userId;
+export const VideoAnalysisScreen = ({ 
+  onBack: propOnBack, 
+  userId: propUserId, 
+  isAdmin: propIsAdmin, 
+  trainerId: propTrainerId 
+}: Partial<VideoAnalysisScreenProps>) => {
+  const navigate = useNavigate();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  // Context determination
+  const userId = propUserId || user?.uid || '';
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : authIsTrainer;
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const onBack = propOnBack || (() => navigate(-1));
+  const isOwner = user?.uid === userId;
   const canRecord = isAdmin || isOwner;
   const [analyses, setAnalyses] = useState<AnalysisResult[]>([]);
   const [loading, setLoading] = useState(true);

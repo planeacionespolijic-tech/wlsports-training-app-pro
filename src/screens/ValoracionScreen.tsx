@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Save, Plus, History, Loader2, Trash2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
@@ -23,7 +25,20 @@ interface Assessment {
   createdAt: any;
 }
 
-export const ValoracionScreen = ({ onBack, userId, isAdmin, trainerId }: ValoracionScreenProps) => {
+export const ValoracionScreen = ({ 
+  onBack: propOnBack, 
+  userId: propUserId, 
+  isAdmin: propIsAdmin, 
+  trainerId: propTrainerId 
+}: Partial<ValoracionScreenProps>) => {
+  const navigate = useNavigate();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  // Context determination
+  const userId = propUserId || user?.uid || '';
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : authIsTrainer;
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const onBack = propOnBack || (() => navigate(-1));
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

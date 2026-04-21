@@ -16,6 +16,19 @@ const MODIFIERS = [
   "Finalización obligatoria"
 ];
 
+const LEVELS = [
+  { name: "Canterano", minXP: 0 },
+  { name: "Debutante", minXP: 500 },
+  { name: "Titular", minXP: 1000 },
+  { name: "Capitán", minXP: 2000 },
+  { name: "Estrella", minXP: 3500 },
+  { name: "Leyenda", minXP: 5000 }
+];
+
+const getLevelFromXP = (xp: number) => {
+  return [...LEVELS].reverse().find(l => xp >= l.minXP) || LEVELS[0];
+};
+
 export const SessionExecutionScreen = () => {
   const { workoutId } = useParams();
   const navigate = useNavigate();
@@ -174,8 +187,13 @@ export const SessionExecutionScreen = () => {
         const snap = await getDoc(userRef);
         if (snap.exists()) {
           const data = snap.data();
-          const currentXp = (data.xp || 0) + xpGained;
-          const newLevel = Math.floor(currentXp / 1000) + 1;
+          const currentTotalXp = (data.xp || 0) + xpGained;
+          const oldLevel = getLevelFromXP(data.xp || 0);
+          const newLevel = getLevelFromXP(currentTotalXp);
+          
+          if (newLevel.name !== oldLevel.name) {
+             alert(`🔥 ¡Nuevo nivel desbloqueado: ${newLevel.name}!`);
+          }
           
           // Streak Logic
           const now = new Date();
@@ -209,7 +227,8 @@ export const SessionExecutionScreen = () => {
           await updateDoc(userRef, {
             xp: increment(xpGained),
             points: increment(xpGained),
-            level: newLevel,
+            levelName: newLevel.name,
+            levelMinXP: newLevel.minXP,
             streak: currentStreak,
             lastSessionDate: serverTimestamp(),
             attributes: newAttributes
@@ -346,10 +365,10 @@ export const SessionExecutionScreen = () => {
           <div>
             <h1 className="text-xl font-black">{userData?.displayName || 'Deportista'}</h1>
             {userData ? (
-              <div className="flex flex-col gap-0.5 mt-0.5">
+              <div className="flex flex-col gap-1 mt-1">
                 <div className="flex items-center gap-3">
                   <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest flex items-center gap-1">
-                    <Trophy size={10} /> {userData.level ? `Nivel ${userData.level}` : 'Nivel 1'}
+                    <Trophy size={10} /> {getLevelFromXP(userData.xp || 0).name} | {userData.xp || 0} XP
                   </p>
                   {userData.streak > 0 && (
                     <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest flex items-center gap-1">
@@ -357,6 +376,26 @@ export const SessionExecutionScreen = () => {
                     </p>
                   )}
                 </div>
+                {/* Level Progress Bar */}
+                {(() => {
+                  const currentXP = userData.xp || 0;
+                  const currentLevel = getLevelFromXP(currentXP);
+                  const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1];
+                  if (!nextLevel) return null;
+                  
+                  const progress = Math.min(100, Math.max(0, 
+                    ((currentXP - currentLevel.minXP) / (nextLevel.minXP - currentLevel.minXP)) * 100
+                  ));
+                  
+                  return (
+                    <div className="w-32 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#D4AF37] transition-all duration-500" 
+                        style={{ width: `${progress}%` }} 
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Modo Sesión</p>

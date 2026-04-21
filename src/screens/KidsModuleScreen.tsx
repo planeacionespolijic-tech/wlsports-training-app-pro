@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Baby, Save, Loader2, Trash2, Trophy, Star, Target, Activity, Zap } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
@@ -28,7 +30,20 @@ const LEVELS = [
   { id: 'pro', label: 'Pro', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' }
 ];
 
-export const KidsModuleScreen = ({ onBack, userId, isAdmin, trainerId }: KidsModuleScreenProps) => {
+export const KidsModuleScreen = ({ 
+  onBack: propOnBack, 
+  userId: propUserId, 
+  isAdmin: propIsAdmin, 
+  trainerId: propTrainerId 
+}: Partial<KidsModuleScreenProps>) => {
+  const navigate = useNavigate();
+  const { user, userProfile, isTrainer: authIsTrainer } = useAuth();
+  
+  // Context determination
+  const userId = propUserId || user?.uid || '';
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : authIsTrainer;
+  const trainerId = propTrainerId || (authIsTrainer ? user?.uid : userProfile?.trainerId) || null;
+  const onBack = propOnBack || (() => navigate(-1));
   const [evaluations, setEvaluations] = useState<MotorEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

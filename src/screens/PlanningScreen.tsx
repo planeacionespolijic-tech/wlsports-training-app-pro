@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Save, Loader2, Trash2, CalendarClock, LayoutGrid, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, Plus, Save, Loader2, Trash2, CalendarClock, CheckCircle2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface PlanningScreenProps {
-  onBack: () => void;
-  userId: string;
-  isAdmin: boolean;
-  trainerId: string | null;
-}
+import { useAuth } from '../context/AuthContext';
 
 interface TrainingPlan {
   id: string;
@@ -21,7 +16,17 @@ interface TrainingPlan {
   createdAt: any;
 }
 
-export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningScreenProps) => {
+export const PlanningScreen = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, userProfile } = useAuth();
+  
+  // Resolve athlete ID from state or use current user
+  const stateAthleteId = location.state?.athleteId;
+  const targetUserId = stateAthleteId || user?.uid;
+  const isAdminOrTrainer = userProfile?.role === 'trainer' || userProfile?.role === 'superadmin';
+  const trainerIdForLog = userProfile?.role === 'trainer' || userProfile?.role === 'superadmin' ? user?.uid : (userProfile?.trainerId || null);
+
   const [plans, setPlans] = useState<TrainingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -35,9 +40,11 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
+    if (!targetUserId) return;
+
     const q = query(
       collection(db, 'trainingPlans'),
-      where('userId', '==', userId),
+      where('userId', '==', targetUserId),
       orderBy('createdAt', 'desc')
     );
 
@@ -53,17 +60,17 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
     });
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [targetUserId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !objective) return;
+    if (!title || !objective || !targetUserId) return;
 
     setSaving(true);
     try {
       await addDoc(collection(db, 'trainingPlans'), {
-        userId,
-        trainerId,
+        userId: targetUserId,
+        trainerId: trainerIdForLog,
         title,
         objective,
         blocks,
@@ -76,6 +83,7 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
       setObjective('');
       setStartDate('');
       setEndDate('');
+      alert('Planificación creada con éxito');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'trainingPlans');
     } finally {
@@ -83,11 +91,12 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
+  const handleDelete = async (planId: string) => {
+    if (!isAdminOrTrainer) return;
     if (!confirm('¿Eliminar este plan de entrenamiento?')) return;
     try {
-      await deleteDoc(doc(db, 'trainingPlans', id));
+      await deleteDoc(doc(db, 'trainingPlans', planId));
+      alert('Planificación eliminada correctamente');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'trainingPlans');
     }
@@ -97,12 +106,17 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
     <div className="min-h-screen bg-black text-white flex flex-col">
       <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-xl font-bold">Planificación Inteligente</h1>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold leading-tight">Planificación Inteligente</h1>
+            {location.state?.athlete && (
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Para: {location.state.athlete.displayName}</p>
+            )}
+          </div>
         </div>
-        {isAdmin && (
+        {isAdminOrTrainer && (
           <button 
             onClick={() => setShowForm(!showForm)}
             className="bg-[#D4AF37] text-black p-2 rounded-full hover:scale-105 transition-transform"
@@ -218,7 +232,7 @@ export const PlanningScreen = ({ onBack, userId, isAdmin, trainerId }: PlanningS
                         </p>
                       </div>
                     </div>
-                    {isAdmin && (
+                    {isAdminOrTrainer && (
                       <button onClick={() => handleDelete(item.id)} className="text-zinc-600 hover:text-red-500 transition-colors">
                         <Trash2 size={18} />
                       </button>

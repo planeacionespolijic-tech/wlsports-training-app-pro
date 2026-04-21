@@ -15,15 +15,15 @@ export const WorkoutsScreen = () => {
   const { user, userProfile } = useAuth();
   
   // Resolve context
-  const athleteFromState = location.state as any;
-  const targetUserId = id || user?.uid || '';
-  const isViewingAthlete = !!id;
+  const targetUserId = id || location.state?.athleteId || user?.uid || '';
+  const isViewingAthlete = !!id || !!location.state?.athleteId;
   const trainerId = userProfile?.role === 'trainer' || userProfile?.role === 'superadmin' ? user?.uid : (userProfile?.trainerId || null);
 
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   
@@ -53,34 +53,32 @@ export const WorkoutsScreen = () => {
   const [bankTargetBlockId, setBankTargetBlockId] = useState<string | null>(null);
   const [bankTargetType, setBankTargetType] = useState<'normal' | 'circuit' | null>(null);
 
-  const fetchWorkouts = useCallback(async (isRefresh = false) => {
+  useEffect(() => {
     if (!targetUserId) return;
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    
+    setLoading(true);
+    const q = query(
+      collection(db, 'workouts'),
+      where('userId', '==', targetUserId),
+      orderBy('createdAt', 'desc')
+    );
 
-    try {
-      const q = query(
-        collection(db, 'workouts'),
-        where('userId', '==', targetUserId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       setWorkouts(data);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'workouts');
-    } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  }, [targetUserId]);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'workouts');
+      setLoading(false);
+      setRefreshing(false);
+    });
 
-  useEffect(() => {
-    fetchWorkouts();
-  }, [fetchWorkouts]);
+    return () => unsubscribe();
+  }, [targetUserId]);
 
   useEffect(() => {
     const currentTrainerId = trainerId || targetUserId;
@@ -299,17 +297,25 @@ export const WorkoutsScreen = () => {
   };
 
   const handleAddWorkout = async () => {
-    if (!newName || blocks.length === 0) return;
+    if (!newName || blocks.length === 0) {
+      alert('Por favor agrega un nombre y al menos un bloque de ejercicios.');
+      return;
+    }
+    
+    setSaving(true);
     try {
       const workoutData = {
         name: newName,
         duration: formatTime(sessionTotalTime),
         totalTime: sessionTotalTime,
         blocks: blocks,
-        userId: targetUserId,
-        trainerId: trainerId,
+        userId: targetUserId || user?.uid,
+        trainerId: trainerId || user?.uid,
         updatedAt: serverTimestamp()
       };
+
+      if (!workoutData.userId) throw new Error('No se pudo identificar al usuario destino.');
+
       if (editingWorkoutId) {
         await updateDoc(doc(db, 'workouts', editingWorkoutId), workoutData);
       } else {
@@ -318,9 +324,13 @@ export const WorkoutsScreen = () => {
           createdAt: serverTimestamp()
         });
       }
+      
+      alert(editingWorkoutId ? 'Entrenamiento actualizado' : 'Entrenamiento guardado con éxito');
       resetForm();
     } catch (error) {
       handleFirestoreError(error, editingWorkoutId ? OperationType.UPDATE : OperationType.CREATE, 'workouts');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -362,8 +372,12 @@ export const WorkoutsScreen = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este entrenamiento?')) {
       try {
+        console.log('Attempting to delete workout:', id);
         await deleteDoc(doc(db, 'workouts', id));
-      } catch (error) {
+        alert('Entrenamiento eliminado correctamente');
+      } catch (error: any) {
+        console.error('Full delete error:', error);
+        alert(`Error al eliminar: ${error.message || 'Sin permisos suficientes'}`);
         handleFirestoreError(error, OperationType.DELETE, 'workouts');
       }
     }
@@ -417,15 +431,12 @@ export const WorkoutsScreen = () => {
           </button>
           <h1 className="text-xl font-bold">
             {isAdding ? (editingWorkoutId ? 'Editar Entrenamiento' : 'Nuevo Entrenamiento') : 
-            (isViewingAthlete ? `Entrenamientos de ${athleteFromState?.displayName || 'Atleta'}` : 'Mis Entrenamientos')}
+            (isViewingAthlete ? `Entrenamientos de ${location.state?.athlete?.displayName || 'Atleta'}` : 'Mis Entrenamientos')}
           </h1>
         </div>
         {!isAdding && (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') && (
           <div className="flex items-center gap-2">
-            <button onClick={() => fetchWorkouts(true)} disabled={refreshing} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
-              <RefreshCw size={24} className={refreshing ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={() => { resetForm(); setIsAdding(true); }} className="bg-[#D4AF37] text-black p-2 rounded-full hover:bg-[#B8962E] transition-colors">
+            <button onClick={() => { resetForm(); setIsAdding(true); }} className="bg-[#D4AF37] text-black p-2 rounded-xl hover:bg-[#B8962E] transition-colors">
               <Plus size={24} />
             </button>
           </div>
@@ -557,8 +568,15 @@ export const WorkoutsScreen = () => {
             </div>
 
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-black/80 backdrop-blur-xl border-t border-zinc-800 flex gap-3 z-20">
-              <button onClick={handleAddWorkout} disabled={!newName || blocks.length === 0} className="flex-1 bg-[#D4AF37] text-black font-bold py-4 rounded-2xl shadow-lg disabled:opacity-50">{editingWorkoutId ? 'Actualizar' : 'Guardar'}</button>
-              <button onClick={resetForm} className="flex-1 bg-zinc-800 text-white font-bold py-4 rounded-2xl">Cancelar</button>
+              <button 
+                onClick={handleAddWorkout} 
+                disabled={saving || !newName || blocks.length === 0} 
+                className="flex-1 bg-[#D4AF37] text-black font-bold py-4 rounded-2xl shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? <Loader2 className="animate-spin" size={20} /> : null}
+                {editingWorkoutId ? 'Actualizar' : 'Guardar Entrenamiento'}
+              </button>
+              <button onClick={resetForm} disabled={saving} className="flex-1 bg-zinc-800 text-white font-bold py-4 rounded-2xl disabled:opacity-50">Cancelar</button>
             </div>
           </div>
         ) : (
@@ -580,7 +598,7 @@ export const WorkoutsScreen = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/?share=workout&id=${item.id}`); alert('Enlace copiado'); }} className="p-2 text-zinc-700 hover:text-[#D4AF37]"><Share2 size={18} /></button>
-                    {(userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') && (
+                    {(userProfile?.role === 'trainer' || userProfile?.role === 'superadmin' || item.userId === user?.uid) && (
                       <>
                         <button onClick={() => handleEdit(item)} className="p-2 text-zinc-700 hover:text-[#D4AF37]"><Edit2 size={20} /></button>
                         <button onClick={() => handleDelete(item.id)} className="p-2 text-zinc-700 hover:text-red-500"><Trash2 size={20} /></button>

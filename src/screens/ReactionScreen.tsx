@@ -42,8 +42,18 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
   const [reactionTimes, setReactionTimes] = useState<number[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const speak = (text: string) => {
+    if (!soundEnabled) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.3;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const playBeep = (frequency = 660, duration = 0.1) => {
     if (!soundEnabled) return;
@@ -103,7 +113,21 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
     setCurrentRep(0);
     setReactionTimes([]);
     setIsFinished(false);
-    scheduleNextStimulus(1500); // 1.5s initial wait
+    setCountdown(5);
+    speak("5");
+    
+    const cdInterval = setInterval(() => {
+      setCountdown((prev) => {
+        const next = prev - 1;
+        if (next > 0) {
+          speak(String(next));
+          return next;
+        }
+        clearInterval(cdInterval);
+        scheduleNextStimulus(500);
+        return 0;
+      });
+    }, 1000);
   };
 
   const scheduleNextStimulus = (delay: number) => {
@@ -145,6 +169,8 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
     setIsActive(false);
     setIsConfiguring(true);
     setIsFinished(false);
+    setCountdown(0);
+    window.speechSynthesis.cancel();
     if (timerRef.current) clearTimeout(timerRef.current);
   };
 
@@ -379,7 +405,20 @@ export const ReactionScreen = ({ onBack, userId }: ReactionScreenProps) => {
 
       <main className="flex-1 flex items-center justify-center p-8 relative z-10">
         <AnimatePresence mode="wait">
-          {isStimulusVisible ? (
+          {countdown > 0 ? (
+            <motion.div
+              key="countdown"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <span className="text-[12rem] font-mono font-black text-[#D4AF37] leading-none">
+                {countdown}
+              </span>
+              <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.4em]">Preparado...</p>
+            </motion.div>
+          ) : isStimulusVisible ? (
             <motion.div
               key={currentStimulus?.id}
               initial={{ scale: 0.5, opacity: 0, rotate: -20 }}

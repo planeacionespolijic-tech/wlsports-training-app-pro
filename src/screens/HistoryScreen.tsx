@@ -93,6 +93,7 @@ export const HistoryScreen = () => {
     if (window.confirm('¿Eliminar este registro del historial?')) {
       try {
         await deleteDoc(doc(db, 'history', id));
+        alert('Registro eliminado correctamente');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, 'history');
       }

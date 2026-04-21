@@ -50,6 +50,17 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
     }
   };
 
+  const speak = (text: string) => {
+    if (!soundEnabled) return;
+    // Cancel any previous speech to avoid overlapping in fast countdowns
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.3;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
+
   const startTimer = () => {
     setIsConfiguring(false);
     setIsActive(true);
@@ -63,19 +74,27 @@ export const TabataScreen = ({ onBack, userId }: TabataScreenProps) => {
     setIsActive(false);
     setIsConfiguring(true);
     setPhase('PREPARE');
+    window.speechSynthesis.cancel();
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
   const togglePause = () => {
     setIsActive(!isActive);
+    if (isActive) window.speechSynthesis.cancel();
   };
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
       timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-        if (timeLeft <= 3 && timeLeft > 0) {
-          playBeep(440, 0.05); // Countdown beeps
+        const nextTime = timeLeft - 1;
+        setTimeLeft(nextTime);
+        
+        if (nextTime <= 5 && nextTime > 0) {
+          speak(String(nextTime));
+          playBeep(440, 0.05); 
+        } else if (nextTime === 0) {
+          // Transitions handle their own big beeps, but we can clear speech
+          window.speechSynthesis.cancel();
         }
       }, 1000);
     } else if (timeLeft === 0) {

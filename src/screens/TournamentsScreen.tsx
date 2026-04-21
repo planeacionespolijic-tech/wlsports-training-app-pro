@@ -114,10 +114,12 @@ export const TournamentsScreen = () => {
     try {
       await addDoc(collection(db, 'tournaments'), {
         ...newTournament,
+        players: newTournament.players.map(p => p.trim()),
         createdAt: serverTimestamp()
       });
       setShowCreateModal(false);
       setNewTournament({ title: '', players: [] });
+      alert('¡Torneo creado con éxito!');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'tournaments');
     }
@@ -130,11 +132,12 @@ export const TournamentsScreen = () => {
       await addDoc(collection(db, 'tournamentMatches'), {
         tournamentId: selectedTournament.id,
         dateName: newMatchDay.dateName,
-        results: newMatchDay.results,
+        results: newMatchDay.results.map(r => ({ ...r, playerName: r.playerName.trim() })),
         createdAt: serverTimestamp()
       });
       setShowAddMatchModal(false);
       setNewMatchDay({ dateName: '', results: [] });
+      alert('¡Fecha guardada con éxito!');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'tournamentMatches');
     }
@@ -142,15 +145,18 @@ export const TournamentsScreen = () => {
 
   const handleAddBonus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTournament || !newBonus.playerId) return;
+    if (!selectedTournament || !newBonus.playerName) return;
     try {
       await addDoc(collection(db, 'tournamentBonuses'), {
         tournamentId: selectedTournament.id,
         ...newBonus,
+        playerName: newBonus.playerName.trim(),
+        playerId: newBonus.playerName.trim(), 
         createdAt: serverTimestamp()
       });
       setShowAddBonusModal(false);
       setNewBonus({ playerId: '', playerName: '', points: 0, reason: '' });
+      alert('¡Bono otorgado con éxito!');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'tournamentBonuses');
     }
@@ -172,8 +178,21 @@ export const TournamentsScreen = () => {
     if (window.confirm('¿Estás seguro de que deseas eliminar esta fecha? Esta acción no se puede deshacer.')) {
       try {
         await deleteDoc(doc(db, 'tournamentMatches', matchId));
+        alert('Fecha eliminada correctamente');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, 'tournamentMatches');
+      }
+    }
+  };
+
+  const handleDeleteTournament = async (tournamentId: string) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este torneo? Se borrarán todos los datos asociados.')) {
+      try {
+        await deleteDoc(doc(db, 'tournaments', tournamentId));
+        setSelectedTournament(null);
+        alert('Torneo eliminado correctamente');
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'tournaments');
       }
     }
   };
@@ -182,24 +201,28 @@ export const TournamentsScreen = () => {
     if (!selectedTournament) return [];
     const standings: Record<string, { name: string; points: number; wins: number; draws: number; losses: number }> = {};
     
-    selectedTournament.players.forEach(p => {
-      standings[p] = { name: p, points: 0, wins: 0, draws: 0, losses: 0 };
+    // Normalize and initialize players
+    const players = selectedTournament.players.map(p => p.trim());
+    players.forEach(p => {
+      standings[p.toLowerCase()] = { name: p, points: 0, wins: 0, draws: 0, losses: 0 };
     });
 
     matchDays.forEach(md => {
       md.results.forEach(r => {
-        if (standings[r.playerName]) {
-          standings[r.playerName].points += r.points;
-          if (r.outcome === 'win') standings[r.playerName].wins++;
-          else if (r.outcome === 'draw') standings[r.playerName].draws++;
-          else if (r.outcome === 'loss') standings[r.playerName].losses++;
+        const pKey = r.playerName.trim().toLowerCase();
+        if (standings[pKey]) {
+          standings[pKey].points += r.points;
+          if (r.outcome === 'win') standings[pKey].wins++;
+          else if (r.outcome === 'draw') standings[pKey].draws++;
+          else if (r.outcome === 'loss') standings[pKey].losses++;
         }
       });
     });
 
     bonuses.forEach(b => {
-      if (standings[b.playerName]) {
-        standings[b.playerName].points += b.points;
+      const pKey = b.playerName.trim().toLowerCase();
+      if (standings[pKey]) {
+        standings[pKey].points += b.points;
       }
     });
 
@@ -238,6 +261,13 @@ export const TournamentsScreen = () => {
                 className="bg-[#D4AF37] text-black px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)]"
               >
                 <Plus size={16} /> Nueva Fecha
+              </button>
+              <button 
+                onClick={() => handleDeleteTournament(selectedTournament.id)} 
+                className="p-2 bg-zinc-900 rounded-xl text-zinc-600 hover:text-red-500 transition-all active:scale-95"
+                title="Eliminar Torneo"
+              >
+                <Trash2 size={20} />
               </button>
             </div>
           )}
@@ -362,7 +392,12 @@ export const TournamentsScreen = () => {
                           <button 
                             onClick={async () => {
                               if (window.confirm('¿Eliminar este bono?')) {
-                                await deleteDoc(doc(db, 'tournamentBonuses', b.id));
+                                try {
+                                  await deleteDoc(doc(db, 'tournamentBonuses', b.id));
+                                  alert('Bono eliminado');
+                                } catch (error) {
+                                  handleFirestoreError(error, OperationType.DELETE, 'tournamentBonuses');
+                                }
                               }
                             }}
                             className="ml-2 text-zinc-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
