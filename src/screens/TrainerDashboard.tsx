@@ -11,7 +11,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
-export const TrainerDashboard = () => {
+export const TrainerDashboard = ({ onNavigate }: any) => {
   const navigate = useNavigate();
   const { user, userProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'athletes' | 'challenges' | 'tools'>('dashboard');

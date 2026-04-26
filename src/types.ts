@@ -11,6 +11,50 @@ export interface UserAttributes {
   mentalidad: number;
 }
 
+export interface InitialEvaluation {
+  createdAt: Timestamp | Date | FieldValue;
+  profile: {
+    name: string;
+    age: number;
+    sport: string;
+    position: string;
+    laterality: string;
+    inspiration: string;
+  };
+  health: {
+    injuries: string;
+    illnesses: string;
+    medication: string;
+    restrictions: string;
+  };
+  habits: {
+    sleepHours: number;
+    stressLevel: string;
+    sittingHours: number;
+    nutritionQuality: string;
+    hydration: string;
+  };
+  environment: {
+    surfaceType: string;
+    footwear: string;
+    material: string;
+    weeklyFrequency: number;
+  };
+  goals: {
+    goal90Days: string;
+    priority: string;
+    motivation: string;
+  };
+  flags: string[];
+  status: 'Verde' | 'Amarillo' | 'Rojo';
+  strategy: {
+    m1: string;
+    m2: string;
+    m3: string;
+  };
+  commitment: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -29,6 +73,7 @@ export interface UserProfile {
   attributes?: UserAttributes;
   type?: 'adult' | 'child';
   trustScore?: number;
+  initialEvaluation?: InitialEvaluation;
 }
 
 export interface Exercise {

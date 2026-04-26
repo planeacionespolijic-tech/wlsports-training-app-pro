@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { TabataScreen } from './TabataScreen';
 import { ReactionScreen } from './ReactionScreen';
 import { useAuth } from '../context/AuthContext';
+import { LEVELS, getLevelFromXP } from '../constants';
 
 const MODIFIERS = [
   "Gol vale doble",
@@ -15,19 +16,6 @@ const MODIFIERS = [
   "Máximo 3 toques",
   "Finalización obligatoria"
 ];
-
-const LEVELS = [
-  { name: "Canterano", minXP: 0 },
-  { name: "Debutante", minXP: 500 },
-  { name: "Titular", minXP: 1000 },
-  { name: "Capitán", minXP: 2000 },
-  { name: "Estrella", minXP: 3500 },
-  { name: "Leyenda", minXP: 5000 }
-];
-
-const getLevelFromXP = (xp: number) => {
-  return [...LEVELS].reverse().find(l => xp >= l.minXP) || LEVELS[0];
-};
 
 export const SessionExecutionScreen = () => {
   const { workoutId } = useParams();
@@ -100,20 +88,31 @@ export const SessionExecutionScreen = () => {
     }
   }, [showAdd, trainerId]);
 
-  // Extract exercises safely from varying structures
+  // Extract blocks safely
+  const workoutBlocks = React.useMemo(() => {
+    if (!currentWorkout) return [];
+    if (currentWorkout.blocks && Array.isArray(currentWorkout.blocks)) {
+      return currentWorkout.blocks;
+    }
+    // If it's an old workout with just a flat exercises array, create a virtual block
+    if (currentWorkout.exercises && Array.isArray(currentWorkout.exercises)) {
+      return [{
+        id: 'default',
+        name: 'Ejercicios',
+        exercises: currentWorkout.exercises
+      }];
+    }
+    return [];
+  }, [currentWorkout]);
+
+  // Extract all exercises for progress tracking
   const allExercises = React.useMemo(() => {
-    const base = (() => {
-      if (!currentWorkout) return [];
-      if (currentWorkout.exercises && Array.isArray(currentWorkout.exercises)) {
-        return currentWorkout.exercises;
-      }
-      if (currentWorkout.blocks && Array.isArray(currentWorkout.blocks)) {
-        return currentWorkout.blocks.flatMap((b: any) => b.exercises || []);
-      }
-      return [];
-    })();
-    return [...base, ...extraExercises];
-  }, [currentWorkout, extraExercises]);
+    const fromBlocks = workoutBlocks.flatMap((b: any) => [
+      ...(b.exercises || []),
+      ...(b.circuit?.items || [])
+    ]);
+    return [...fromBlocks, ...extraExercises];
+  }, [workoutBlocks, extraExercises]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -380,7 +379,8 @@ export const SessionExecutionScreen = () => {
                 {(() => {
                   const currentXP = userData.xp || 0;
                   const currentLevel = getLevelFromXP(currentXP);
-                  const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1];
+                  const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+                  const nextLevel = LEVELS[currentIndex + 1];
                   if (!nextLevel) return null;
                   
                   const progress = Math.min(100, Math.max(0, 
@@ -476,42 +476,102 @@ export const SessionExecutionScreen = () => {
           </button>
         </section>
 
-        {/* 4. LISTA DE EJERCICIOS */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-black text-zinc-500 uppercase tracking-widest mx-1 mb-2">Ejercicios a Completar</h2>
-          {allExercises.length === 0 ? (
+        {/* 4. LISTA DE EJERCICIOS AGRUPADOS */}
+        <section className="space-y-8">
+          {workoutBlocks.length === 0 && extraExercises.length === 0 ? (
             <div className="bg-zinc-900 border border-dashed border-zinc-800 p-8 rounded-3xl text-center">
-              <p className="text-zinc-500 text-sm">No hay ejercicios asignados en este entrenamiento.</p>
+              <p className="text-zinc-500 text-sm">No hay ejercicios asignados.</p>
             </div>
           ) : (
-            allExercises.map((ex: any, idx: number) => {
-              const exId = ex.id || `ex-${idx}`;
-              const isCompleted = completedExercises.includes(exId);
-              
-              return (
-                <button
-                  key={exId}
-                  onClick={() => handleToggle(exId)}
-                  className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all active:scale-[0.98] ${
-                    isCompleted 
-                      ? 'bg-emerald-500/10 border-emerald-500/30' 
-                      : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'
-                  }`}
-                >
-                  <div className="flex-1 text-left pr-4">
-                    <h3 className={`font-bold text-lg ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>
-                      {ex.name || 'Ejercicio sin nombre'}
-                    </h3>
-                    {ex.fromBank && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Desde Biblioteca</span>}
+            <>
+              {workoutBlocks.map((block: any, bIdx: number) => {
+                const blockExercises = [
+                  ...(block.exercises || []),
+                  ...(block.circuit?.items || [])
+                ];
+                
+                if (blockExercises.length === 0) return null;
+
+                return (
+                  <div key={block.id || bIdx} className="space-y-4">
+                    <div className="flex items-center gap-3 px-1">
+                      <span className="w-6 h-6 bg-[#D4AF37] text-black rounded-lg flex items-center justify-center text-[10px] font-black">{bIdx + 1}</span>
+                      <h2 className="text-xs font-black text-[#D4AF37] uppercase tracking-[0.15em]">{block.name}</h2>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {blockExercises.map((ex: any, idx: number) => {
+                        const exId = ex.id || `block-${bIdx}-ex-${idx}`;
+                        const isCompleted = completedExercises.includes(exId);
+                        
+                        return (
+                          <button
+                            key={exId}
+                            onClick={() => handleToggle(exId)}
+                            className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all active:scale-[0.98] ${
+                              isCompleted 
+                                ? 'bg-emerald-500/10 border-emerald-500/30' 
+                                : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <div className="flex-1 text-left pr-4">
+                              <h3 className={`font-bold text-sm ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>
+                                {ex.name || 'Ejercicio'}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1">
+                                {ex.series && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.series} Series</span>}
+                                {ex.reps && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.reps} Reps</span>}
+                                {ex.timePerSeries > 0 && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.timePerSeries}s</span>}
+                              </div>
+                            </div>
+                            <div className={`p-2 rounded-full ${
+                              isCompleted ? 'bg-emerald-500 text-black' : 'bg-black border border-zinc-800 text-zinc-800'
+                            }`}>
+                              <CheckCircle2 size={24} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className={`p-3 rounded-full ${
-                    isCompleted ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'bg-black border border-zinc-700 text-zinc-600'
-                  }`}>
-                    <CheckCircle2 size={28} />
+                );
+              })}
+
+              {extraExercises.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 px-1">
+                    <span className="w-6 h-6 bg-zinc-800 text-zinc-500 rounded-lg flex items-center justify-center text-[10px] font-black">+</span>
+                    <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.15em]">Extras de Sesión</h2>
                   </div>
-                </button>
-              );
-            })
+                  <div className="space-y-3">
+                    {extraExercises.map((ex, idx) => {
+                      const isCompleted = completedExercises.includes(ex.id);
+                      return (
+                        <button
+                          key={ex.id}
+                          onClick={() => handleToggle(ex.id)}
+                          className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all active:scale-[0.98] ${
+                            isCompleted ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-zinc-900 border-zinc-800'
+                          }`}
+                        >
+                          <div className="flex-1 text-left pr-4">
+                            <h3 className={`font-bold text-sm ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>
+                              {ex.name}
+                            </h3>
+                            <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Añadido manualmente</span>
+                          </div>
+                          <div className={`p-2 rounded-full ${
+                            isCompleted ? 'bg-emerald-500 text-black' : 'bg-black border border-zinc-800 text-zinc-800'
+                          }`}>
+                            <CheckCircle2 size={24} />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
 

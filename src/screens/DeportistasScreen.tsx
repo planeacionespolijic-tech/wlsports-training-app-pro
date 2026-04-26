@@ -53,20 +53,20 @@ export const DeportistasScreen = () => {
       q = query(
         collection(db, 'users'),
         where('trainerId', '==', userId),
-        orderBy('lastLogin', 'desc')
+        orderBy('createdAt', 'desc')
       );
     } else if (role === 'superadmin') {
       q = query(
         collection(db, 'users'),
         where('role', '==', 'client'),
-        orderBy('lastLogin', 'desc')
+        orderBy('createdAt', 'desc')
       );
     } else {
       // Clients shouldn't really see this, but for safety
       q = query(
         collection(db, 'users'),
         where('role', '==', 'client'),
-        orderBy('lastLogin', 'desc')
+        orderBy('createdAt', 'desc')
       );
     }
 
@@ -114,6 +114,12 @@ export const DeportistasScreen = () => {
         role: 'client',
         status: 'active',
         trainerId: userId,
+        xp: 0,
+        level: 1,
+        points: 0,
+        streak: 0,
+        attributes: { ritmo: 50, tecnica: 50, fuerza: 50, mentalidad: 50 },
+        lastLogin: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
 

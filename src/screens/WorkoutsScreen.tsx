@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, RefreshCw, Share2 } from 'lucide-react';
+import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, RefreshCw, Share2, Search } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
@@ -40,6 +40,7 @@ export const WorkoutsScreen = () => {
   const [exTime, setExTime] = useState(0);
   const [exLoad, setExLoad] = useState('');
   const [exRpe, setExRpe] = useState(0);
+  const [exNotes, setExNotes] = useState('');
 
   // Circuit form state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -49,9 +50,30 @@ export const WorkoutsScreen = () => {
 
   // Exercise Bank state
   const [exerciseBank, setExerciseBank] = useState<any[]>([]);
+  const [bankSearchQuery, setBankSearchQuery] = useState('');
+  const [bankSelectedCategory, setBankSelectedCategory] = useState<string>('all');
   const [showBankModal, setShowBankModal] = useState(false);
   const [bankTargetBlockId, setBankTargetBlockId] = useState<string | null>(null);
   const [bankTargetType, setBankTargetType] = useState<'normal' | 'circuit' | null>(null);
+
+  const CATEGORIES = [
+    "ACTIVACIÓN BIOSENSORIAL",
+    "FASE DE ALTA INTENSIDAD - H.I.T.",
+    "DINÁMICA ESPECÍFICA DE JUEGO",
+    "EL DESAFÍO DEL COACH",
+    "PROTOCOLO DE RECUPERACIÓN"
+  ];
+
+  const filteredBank = useMemo(() => {
+    return exerciseBank.filter(ex => {
+      const matchesSearch = ex.name.toLowerCase().includes(bankSearchQuery.toLowerCase()) ||
+        (ex.muscleGroup && ex.muscleGroup.toLowerCase().includes(bankSearchQuery.toLowerCase()));
+      
+      const matchesCategory = bankSelectedCategory === 'all' || ex.muscleGroup === bankSelectedCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [exerciseBank, bankSearchQuery, bankSelectedCategory]);
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -112,10 +134,10 @@ export const WorkoutsScreen = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const addBlock = () => {
+  const addBlock = (name?: string) => {
     const newBlock: TrainingBlock = {
       id: Date.now().toString(),
-      name: `Bloque ${blocks.length + 1}`,
+      name: name || `Bloque ${blocks.length + 1}`,
       type: 'normal',
       exercises: [],
       totalTime: 0
@@ -153,7 +175,7 @@ export const WorkoutsScreen = () => {
         if (b.id === blockId) {
           const updatedExercises = b.exercises.map(ex => 
             ex.id === editingExerciseId 
-              ? { ...ex, name: exName, series: exSeries, reps: exReps, timePerSeries: exTime, load: exLoad, rpe: exRpe, totalTime }
+              ? { ...ex, name: exName, series: exSeries, reps: exReps, timePerSeries: exTime, load: exLoad, rpe: exRpe, notes: exNotes, totalTime }
               : ex
           );
           const updatedTotalTime = updatedExercises.reduce((acc, ex) => acc + (ex.totalTime || 0), 0);
@@ -171,6 +193,7 @@ export const WorkoutsScreen = () => {
         timePerSeries: exTime,
         load: exLoad,
         rpe: exRpe,
+        notes: exNotes,
         totalTime
       };
 
@@ -190,6 +213,7 @@ export const WorkoutsScreen = () => {
     setExTime(0);
     setExLoad('');
     setExRpe(0);
+    setExNotes('');
   };
 
   const startEditExercise = (ex: Exercise) => {
@@ -200,6 +224,7 @@ export const WorkoutsScreen = () => {
     setExTime(ex.timePerSeries || 0);
     setExLoad(ex.load || '');
     setExRpe(ex.rpe || 0);
+    setExNotes(ex.notes || '');
   };
 
   const addExerciseToCircuit = (blockId: string) => {
@@ -460,8 +485,8 @@ export const WorkoutsScreen = () => {
             <AnimatePresence>
               {showOverview && (
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Estructura</h3>
-                  {blocks.length === 0 ? <p className="text-xs text-zinc-600 italic">Sin bloques</p> : (
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Esquema</h3>
+                  {blocks.length === 0 ? <p className="text-xs text-zinc-600 italic">Sin categorías añadidas</p> : (
                     <div className="space-y-2">
                       {blocks.map((b, idx) => (
                         <div key={b.id} className="flex items-start gap-2">
@@ -482,11 +507,35 @@ export const WorkoutsScreen = () => {
             </AnimatePresence>
 
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-[#D4AF37] font-bold text-sm uppercase tracking-widest">Bloques</h2>
-                <button onClick={addBlock} className="flex items-center gap-2 text-xs font-bold bg-[#D4AF37]/10 text-[#D4AF37] px-4 py-2 rounded-full border border-[#D4AF37]/20"><Plus size={14} />Añadir Bloque</button>
+              <div className="flex flex-col gap-4">
+                <h2 className="text-[#D4AF37] font-bold text-sm uppercase tracking-widest">Estructura de la Sesión</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {CATEGORIES.map((cat, idx) => {
+                    const isAdded = blocks.some(b => b.name === cat);
+                    return (
+                      <button 
+                        key={cat}
+                        onClick={() => addBlock(cat)} 
+                        disabled={isAdded}
+                        className={`flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl border transition-all ${
+                          isAdded 
+                          ? 'bg-zinc-800/20 border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50' 
+                          : 'bg-[#D4AF37]/5 text-[#D4AF37] border-[#D4AF37]/20 hover:bg-[#D4AF37]/10'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="opacity-50">{idx + 1}.</span>
+                          {cat}
+                        </span>
+                        {!isAdded && <Plus size={14} />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-4">
+              
+              <div className="space-y-4 pt-4 border-t border-zinc-800/50">
+                {blocks.length > 0 && <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Categorías Añadidas</h3>}
                 {blocks.map((block) => (
                   <div key={block.id} className="bg-zinc-900 rounded-3xl border border-zinc-800 overflow-hidden">
                     <div className="p-4 bg-zinc-800/30 flex items-center justify-between cursor-pointer" onClick={() => setActiveBlockId(activeBlockId === block.id ? null : block.id)}>
@@ -512,14 +561,21 @@ export const WorkoutsScreen = () => {
                                     <div className="flex-1 cursor-pointer" onClick={() => startEditExercise(ex)}>
                                       <p className="font-bold text-sm group-hover:text-[#D4AF37]">{ex.name}</p>
                                       <p className="text-[10px] text-zinc-500 uppercase font-bold">{ex.series} series | {formatTime(ex.totalTime || 0)}</p>
+                                      {ex.notes && <p className="text-[10px] text-zinc-600 italic line-clamp-1">{ex.notes}</p>}
                                     </div>
                                     <button onClick={() => removeExerciseFromBlock(block.id, ex.id)} className="text-zinc-700 hover:text-red-500 ml-2"><X size={16} /></button>
                                   </div>
                                 ))}
                                 <div className={`p-4 rounded-2xl border space-y-4 ${editingExerciseId ? 'bg-[#D4AF37]/5 border-[#D4AF37]/30' : 'bg-black/50 border-dashed border-zinc-800'}`}>
-                                  <div className="flex justify-between items-center">
+                                  <div className="flex flex-col gap-3">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{editingExerciseId ? 'Editando' : 'Nuevo Ejercicio'}</h4>
-                                    <button onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('normal'); setShowBankModal(true); }} className="text-[10px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-1 rounded">Banco</button>
+                                    <button 
+                                      onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('normal'); setShowBankModal(true); }} 
+                                      className="flex items-center justify-center gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all group"
+                                    >
+                                      <Search size={14} className="group-hover:scale-110 transition-transform" />
+                                      Elegir de Biblioteca
+                                    </button>
                                   </div>
                                   <input type="text" placeholder="Nombre" className="w-full bg-transparent border-b border-zinc-800 p-2 text-sm outline-none" value={exName} onChange={(e) => setExName(e.target.value)} />
                                   <div className="grid grid-cols-2 gap-4">
@@ -528,6 +584,7 @@ export const WorkoutsScreen = () => {
                                     <input type="number" placeholder="Segundos" className="bg-zinc-900 p-2 rounded-lg text-center" value={exTime} onChange={(e) => setExTime(parseInt(e.target.value) || 0)} />
                                     <input type="text" placeholder="Carga" className="bg-zinc-900 p-2 rounded-lg text-center" value={exLoad} onChange={(e) => setExLoad(e.target.value)} />
                                   </div>
+                                  <textarea placeholder="Notas / Instrucciones" className="w-full bg-zinc-900 p-2 rounded-lg text-sm resize-none" rows={2} value={exNotes} onChange={(e) => setExNotes(e.target.value)} />
                                   <button onClick={() => addExerciseToBlock(block.id)} className="w-full bg-[#D4AF37] text-black font-bold py-2 rounded-lg">{editingExerciseId ? 'Actualizar' : 'Añadir'}</button>
                                 </div>
                               </>
@@ -548,7 +605,13 @@ export const WorkoutsScreen = () => {
                                   </div>
                                 ))}
                                 <div className={`p-4 rounded-2xl border space-y-4 ${editingItemId ? 'bg-[#D4AF37]/5 border-[#D4AF37]/30' : 'bg-black/50 border-dashed border-zinc-800'}`}>
-                                  <button onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('circuit'); setShowBankModal(true); }} className="text-[10px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-1 rounded">Banco</button>
+                                  <button 
+                                    onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('circuit'); setShowBankModal(true); }} 
+                                    className="w-full flex items-center justify-center gap-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all group"
+                                  >
+                                    <Search size={14} className="group-hover:scale-110 transition-transform" />
+                                    Elegir de Biblioteca
+                                  </button>
                                   <input type="text" placeholder="Nombre" className="w-full bg-transparent border-b border-zinc-800 p-2 text-sm outline-none" value={circExName} onChange={(e) => setCircExName(e.target.value)} />
                                   <div className="grid grid-cols-2 gap-4">
                                     <input type="number" placeholder="Tiempo" className="bg-zinc-900 p-2 rounded-lg text-center" value={circExTime} onChange={(e) => setCircExTime(parseInt(e.target.value) || 0)} />
@@ -592,7 +655,7 @@ export const WorkoutsScreen = () => {
                       <h3 className="font-bold text-lg">{item.name}</h3>
                       <div className="flex items-center gap-2 text-zinc-500 text-xs font-bold">
                         <Clock size={12} /><span>{item.duration || '0:00'}</span>
-                        <span className="mx-1">•</span><span>{item.blocks?.length || 0} Bloques</span>
+                        <span className="mx-1">•</span><span>{item.blocks?.length || 0} Fases</span>
                       </div>
                     </div>
                   </div>
@@ -616,16 +679,95 @@ export const WorkoutsScreen = () => {
       <AnimatePresence>
         {showBankModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 flex flex-col max-h-[80vh]">
-              <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-black">Banco</h2><button onClick={() => setShowBankModal(false)} className="text-zinc-500 hover:text-white"><X size={24} /></button></div>
-              <div className="flex-1 overflow-y-auto space-y-3">
-                {exerciseBank.map(ex => (
-                  <div key={ex.id} className="bg-black border border-zinc-800 p-4 rounded-xl flex justify-between items-center cursor-pointer" onClick={() => {
-                    if (bankTargetType === 'normal') { setExName(ex.name); setExSeries(ex.series || 3); setExReps(ex.reps || ''); setExTime(ex.timePerSeries || ex.time || 0); setExLoad(ex.load || ''); setExRpe(ex.rpe || 0); }
-                    else { setCircExName(ex.name); setCircExTime(ex.timePerSeries || ex.time || 30); setCircExReps(ex.reps || ''); }
-                    setShowBankModal(false);
-                  }}><p className="font-bold text-sm">{ex.name}</p><Plus size={18} className="text-[#D4AF37]" /></div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-6 flex flex-col max-h-[85vh] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)]"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-black">Biblioteca</h2>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Selecciona un ejercicio</p>
+                </div>
+                <button onClick={() => { setShowBankModal(false); setBankSearchQuery(''); }} className="text-zinc-500 hover:text-white transition-colors p-2">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3 mb-6">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="Buscar ejercicio..."
+                    className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:border-[#D4AF37] transition-all"
+                    value={bankSearchQuery}
+                    onChange={(e) => setBankSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <select 
+                  value={bankSelectedCategory}
+                  onChange={(e) => setBankSelectedCategory(e.target.value)}
+                  className="w-full bg-black border border-zinc-800 rounded-2xl py-3 px-4 text-[10px] font-black uppercase tracking-widest outline-none focus:border-[#D4AF37] appearance-none cursor-pointer"
+                >
+                  <option value="all">Todas las Categorías</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {filteredBank.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Dumbbell className="mx-auto text-zinc-800 mb-4 opacity-20" size={48} />
+                    <p className="text-zinc-500 text-xs italic">No se encontraron resultados</p>
+                  </div>
+                ) : filteredBank.map(ex => (
+                  <div 
+                    key={ex.id} 
+                    className="bg-black border border-zinc-800 p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:border-[#D4AF37] hover:bg-zinc-900/50 transition-all group" 
+                    onClick={() => {
+                      if (bankTargetType === 'normal') { 
+                        setExName(ex.name); 
+                        setExNotes(ex.description || '');
+                        // Preserve defaults or existing values if they don't exist in bank
+                        setExSeries(ex.series || exSeries || 3); 
+                        setExReps(ex.reps || ''); 
+                        setExTime(ex.timePerSeries || ex.time || 0); 
+                        setExLoad(ex.load || ''); 
+                        setExRpe(ex.rpe || 0); 
+                      } else { 
+                        setCircExName(ex.name); 
+                        setCircExTime(ex.timePerSeries || ex.time || 30); 
+                        setCircExReps(ex.reps || ''); 
+                      }
+                      setShowBankModal(false);
+                      setBankSearchQuery('');
+                    }}
+                  >
+                    <div className="flex-1">
+                      <p className="font-bold text-sm group-hover:text-[#D4AF37] transition-colors">{ex.name}</p>
+                      {ex.muscleGroup && (
+                        <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">{ex.muscleGroup}</span>
+                      )}
+                    </div>
+                    <div className="bg-[#D4AF37] text-black p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
+                      <Plus size={16} />
+                    </div>
+                  </div>
                 ))}
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <button 
+                  onClick={() => navigate('/exercise-bank')} 
+                  className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+                >
+                  Gestionar Biblioteca Completa
+                </button>
               </div>
             </motion.div>
           </div>

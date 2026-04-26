@@ -1,5 +1,5 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, ClipboardList, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal } from 'lucide-react';
-import { motion } from 'motion/react';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -8,29 +8,20 @@ import { doc, getDoc } from 'firebase/firestore';
 import { uploadProfilePhoto } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import { useEffect } from 'react';
+import { LEVELS, getLevelFromXP } from '../constants';
 
-const LEVELS = [
-  { name: "Canterano", minXP: 0 },
-  { name: "Debutante", minXP: 500 },
-  { name: "Titular", minXP: 1000 },
-  { name: "Capitán", minXP: 2000 },
-  { name: "Estrella", minXP: 3500 },
-  { name: "Leyenda", minXP: 5000 }
-];
-
-const getLevelFromXP = (xp: number) => {
-  return [...LEVELS].reverse().find(l => xp >= l.minXP) || LEVELS[0];
-};
-
-export const AthleteProfileScreen = () => {
+export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: isTrainerProp, onNavigate }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const { isTrainer } = useAuth();
+  const { isTrainer: authIsTrainer } = useAuth();
   
+  const isTrainer = isTrainerProp !== undefined ? isTrainerProp : authIsTrainer;
+  const athleteId = userId || id || '';
+
   // Use state athlete or basic object if not provided
-  const [athlete, setAthlete] = useState<any>(location.state || { id: id || '', displayName: 'Cargando...', photoURL: null, type: 'adult' });
-  const [loading, setLoading] = useState(!location.state);
+  const [athlete, setAthlete] = useState<any>(propAthlete || location.state || { id: athleteId, displayName: 'Cargando...', photoURL: null, type: 'adult' });
+  const [loading, setLoading] = useState(!propAthlete && !location.state);
   
   const [uploading, setUploading] = useState(false);
   const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete?.photoURL || null);
@@ -39,9 +30,9 @@ export const AthleteProfileScreen = () => {
 
   useEffect(() => {
     const fetchAthlete = async () => {
-      if (!id) return;
+      if (!athleteId || propAthlete) return;
       try {
-        const docRef = doc(db, 'users', id);
+        const docRef = doc(db, 'users', athleteId);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           const data = { id: snap.id, ...snap.data() } as any;
@@ -55,7 +46,7 @@ export const AthleteProfileScreen = () => {
       }
     };
     fetchAthlete();
-  }, [id]);
+  }, [athleteId, propAthlete]);
 
   const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,7 +64,7 @@ export const AthleteProfileScreen = () => {
   };
   
   const menuItems = [
-    { id: 'anamnesis', title: 'Anamnesis', icon: ClipboardList, desc: 'Historial médico y deportivo', type: 'both' },
+    { id: 'evaluacion360', title: 'Evaluación Inicial 360°', icon: Shield, desc: 'Escáner inicial integral de rendimiento', type: 'both' },
     { id: 'valoracion', title: 'Valoración Física', icon: Activity, desc: 'Métricas antropométricas y tests', type: 'both' },
     { id: 'diagnostico', title: 'Diagnóstico', icon: Brain, desc: 'Análisis y enfoque sugerido', type: 'adult' },
     { id: 'planificacion', title: 'Planificación', icon: CalendarClock, desc: 'Planes y progresiones', type: 'adult' },
@@ -169,7 +160,8 @@ export const AthleteProfileScreen = () => {
               {(() => {
                 const currentXP = athlete.xp || 0;
                 const currentLevel = getLevelFromXP(currentXP);
-                const nextLevel = LEVELS[LEVELS.indexOf(currentLevel) + 1];
+                const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+                const nextLevel = LEVELS[currentIndex + 1];
                 if (!nextLevel) return null;
                 
                 const progress = Math.min(100, Math.max(0, 
@@ -240,7 +232,13 @@ export const AthleteProfileScreen = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
-              onClick={() => navigate(`/${item.id}`, { state: { athleteId: athlete.id, athlete } })}
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate(item.id, { athleteId: athlete.id, athlete });
+                } else {
+                  navigate(item.id, { state: { athleteId: athlete.id, athlete } });
+                }
+              }}
               className="w-full bg-zinc-900/50 hover:bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4 transition-all group active:scale-[0.98]"
             >
               <div className="p-3 bg-black rounded-xl group-hover:text-white transition-colors" style={{ color: themeColor }}>

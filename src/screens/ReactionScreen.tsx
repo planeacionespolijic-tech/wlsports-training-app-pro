@@ -5,7 +5,7 @@ import {
   ArrowLeft as ArrowLeftIcon, ArrowRight, ArrowUpLeft, ArrowUpRight, 
   ArrowDownLeft, ArrowDownRight, Palette, Move, Hash, Timer, Target, Volume2, VolumeX 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ReactionScreenProps {
   onBack?: () => void;

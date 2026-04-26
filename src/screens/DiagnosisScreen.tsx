@@ -172,7 +172,7 @@ export const DiagnosisScreen = ({
             <div>
               <h2 className="font-bold text-lg mb-1">Análisis de Capacidades</h2>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Este módulo integra los resultados de anamnesis, valoración física y tests para generar un enfoque de entrenamiento optimizado.
+                Este módulo integra los resultados de la evaluación inicial, valoración física y tests para generar un enfoque de entrenamiento optimizado.
               </p>
             </div>
           </div>

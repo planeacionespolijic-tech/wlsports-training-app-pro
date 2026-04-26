@@ -6,13 +6,14 @@ import {
   Trophy, Zap, Timer, Video, Loader2, 
   ChevronRight, Calendar, Bell, LogOut,
   Star, Target, Award, ShieldCheck, RefreshCw, ArrowLeft,
-  Flame, Users
+  Flame, Users, Shield
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, doc, getDocs, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
+import { LEVELS, getLevelFromXP } from '../constants';
 
-export const ClientDashboard = () => {
+export const ClientDashboard = ({ onNavigate }: any) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [userData, setUserData] = useState<any>(null);
@@ -117,6 +118,23 @@ export const ClientDashboard = () => {
                 <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Confianza</p>
               </div>
             </div>
+
+            {/* Initial Evaluation Call to Action */}
+            {!userData?.initialEvaluation && (
+              <section 
+                className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 p-6 rounded-3xl relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer" 
+                onClick={() => onNavigate ? onNavigate('evaluacion360') : navigate(`/evaluacion360`)}
+              >
+                <div className="relative z-10">
+                  <div className="bg-black/20 w-10 h-10 rounded-xl flex items-center justify-center text-[#D4AF37] mb-4">
+                    <Shield size={20} />
+                  </div>
+                  <h3 className="text-lg font-black text-[#D4AF37] mb-1">Evaluación Inicial 360°</h3>
+                  <p className="text-xs text-zinc-400 font-medium">Realiza tu escáner inicial integral para un entrenamiento personalizado.</p>
+                </div>
+                <Shield size={120} className="absolute -right-8 -bottom-8 opacity-5 text-[#D4AF37] group-hover:scale-110 transition-transform" />
+              </section>
+            )}
 
             {/* Active Challenges Preview */}
             <section>
@@ -225,6 +243,21 @@ export const ClientDashboard = () => {
           </div>
         );
       case 'progreso':
+        const currentXP = userData?.xp || 0;
+        const currentLevel = getLevelFromXP(currentXP);
+        const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+        const nextLevel = LEVELS[currentIndex + 1];
+        
+        let progress = 0;
+        let xpForNext = nextLevel ? nextLevel.minXP : currentLevel.minXP;
+        let xpStart = currentLevel.minXP;
+        
+        if (nextLevel) {
+          progress = ((currentXP - xpStart) / (nextLevel.minXP - xpStart)) * 100;
+        } else {
+          progress = 100;
+        }
+
         return (
           <div className="space-y-8 pb-24">
             <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 space-y-6">
@@ -233,14 +266,16 @@ export const ClientDashboard = () => {
                   <TrendingUp size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black">Nivel {userData?.level || 1}</h3>
-                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">{userData?.xp || 0} / 1000 XP para el siguiente nivel</p>
+                  <h3 className="text-xl font-black">{currentLevel.name}</h3>
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">
+                    {nextLevel ? `${currentXP} / ${nextLevel.minXP} XP para el siguiente nivel` : '¡Nivel máximo alcanzado!'}
+                  </p>
                 </div>
               </div>
               <div className="h-3 bg-black rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(((userData?.xp || 0) / 1000) * 100, 100)}%` }}
+                  animate={{ width: `${Math.min(progress, 100)}%` }}
                   className="h-full bg-[#D4AF37] rounded-full shadow-[0_0_10px_rgba(212,175,55,0.5)]"
                 />
               </div>
@@ -337,9 +372,11 @@ export const ClientDashboard = () => {
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <div className="absolute -bottom-2 -right-2 bg-black border border-zinc-800 px-2 py-1 rounded-xl flex items-center gap-1">
+                <div className="absolute -bottom-2 -right-2 bg-black border border-zinc-800 px-2 py-1 rounded-xl flex items-center gap-1 shadow-lg">
                   <Star size={12} style={{ color: themeColor }} fill={themeColor} />
-                  <span className="text-xs font-black" style={{ color: themeColor }}>{userData?.level || 1}</span>
+                  <span className="text-[10px] font-black" style={{ color: themeColor }}>
+                    {getLevelFromXP(userData?.xp || 0).name}
+                  </span>
                 </div>
               </div>
               <div>

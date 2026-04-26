@@ -19,30 +19,43 @@ interface Exercise {
   trainerId: string;
 }
 
+const CATEGORIES = [
+  "ACTIVACIÓN BIOSENSORIAL",
+  "FASE DE ALTA INTENSIDAD - H.I.T.",
+  "DINÁMICA ESPECÍFICA DE JUEGO",
+  "EL DESAFÍO DEL COACH",
+  "PROTOCOLO DE RECUPERACIÓN"
+];
+
 export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBankScreenProps) => {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
-    muscleGroup: '',
+    muscleGroup: CATEGORIES[0],
     description: '',
     videoUrl: ''
   });
 
   useEffect(() => {
-    let q = query(
-      collection(db, 'exerciseBank'),
-      where('trainerId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    if (!userId && userProfile?.role !== 'superadmin') return;
 
+    let q;
+    
     if (userProfile?.role === 'superadmin') {
       q = query(
         collection(db, 'exerciseBank'),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(
+        collection(db, 'exerciseBank'),
+        where('trainerId', '==', userId),
         orderBy('createdAt', 'desc')
       );
     }
@@ -94,7 +107,7 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
     setEditingExercise(exercise);
     setFormData({
       name: exercise.name || '',
-      muscleGroup: exercise.muscleGroup || '',
+      muscleGroup: exercise.muscleGroup || CATEGORIES[0],
       description: exercise.description || '',
       videoUrl: exercise.videoUrl || ''
     });
@@ -104,13 +117,17 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingExercise(null);
-    setFormData({ name: '', muscleGroup: '', description: '', videoUrl: '' });
+    setFormData({ name: '', muscleGroup: CATEGORIES[0], description: '', videoUrl: '' });
   };
 
-  const filteredExercises = exercises.filter(ex => 
-    ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (ex.muscleGroup && ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredExercises = exercises.filter(ex => {
+    const matchesSearch = ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ex.muscleGroup && ex.muscleGroup.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesCategory = selectedCategory === 'all' || ex.muscleGroup === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
@@ -134,15 +151,27 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
 
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <input 
-              type="text"
-              placeholder="Buscar por nombre o grupo muscular..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:border-[#D4AF37] transition-colors"
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+              <input 
+                type="text"
+                placeholder="Buscar por nombre..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:border-[#D4AF37] transition-colors"
+              />
+            </div>
+            <select 
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-4 text-xs font-black uppercase tracking-widest outline-none focus:border-[#D4AF37] appearance-none cursor-pointer"
+            >
+              <option value="all">Todas las Categorías</option>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           {loading ? (
@@ -173,11 +202,11 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
                   </div>
                   <h3 className="font-bold text-lg mb-1 line-clamp-1">{exercise.name}</h3>
                   {exercise.muscleGroup && (
-                    <span className="inline-block bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md mb-3 self-start">
+                    <span className="inline-block bg-zinc-800 text-zinc-400 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mb-3 self-start">
                       {exercise.muscleGroup}
                     </span>
                   )}
-                  <p className="text-xs text-zinc-500 line-clamp-2 mb-4 flex-1">
+                  <p className="text-[11px] text-zinc-500 line-clamp-3 mb-4 flex-1 leading-relaxed">
                     {exercise.description || 'Sin descripción'}
                   </p>
                   {exercise.videoUrl && (
@@ -185,7 +214,7 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
                       href={exercise.videoUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full bg-black border border-zinc-800 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors mt-auto"
+                      className="flex items-center justify-center gap-2 w-full bg-black border border-zinc-800 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:text-white hover:border-[#D4AF37] transition-colors mt-auto"
                     >
                       <Play size={14} /> Ver Video
                     </a>
@@ -204,7 +233,7 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
               initial={{ opacity: 0, scale: 0.95 }} 
               animate={{ opacity: 1, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95 }} 
-              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-8 shadow-2xl"
+              className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-zinc-800 p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-black">{editingExercise ? 'Editar Ejercicio' : 'Nuevo Ejercicio'}</h2>
@@ -223,14 +252,17 @@ export const ExerciseBankScreen = ({ onBack, userId, userProfile }: ExerciseBank
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Grupo Muscular</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Categoría</label>
+                  <select 
                     value={formData.muscleGroup} 
                     onChange={(e) => setFormData({ ...formData, muscleGroup: e.target.value })} 
-                    className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-sm outline-none focus:border-[#D4AF37]" 
-                    placeholder="Ej: Piernas, Pecho, Espalda..." 
-                  />
+                    className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-sm outline-none focus:border-[#D4AF37] appearance-none"
+                  >
+                    {CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="OTRO">OTRO</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Descripción / Notas</label>

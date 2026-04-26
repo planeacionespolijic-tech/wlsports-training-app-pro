@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Calculator, Info, Heart } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 interface ZonasScreenProps {
   onBack: () => void;

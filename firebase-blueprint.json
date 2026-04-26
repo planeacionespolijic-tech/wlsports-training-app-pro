@@ -71,7 +71,22 @@
         "streak": { "type": "integer" },
         "trustScore": { "type": "number", "description": "Reliability score of the user" },
         "goals": { "type": "string" },
-        "lastLogin": { "type": "string", "format": "date-time" }
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "initialEvaluation": {
+          "type": "object",
+          "properties": {
+            "createdAt": { "type": "string", "format": "date-time" },
+            "profile": { "type": "object" },
+            "health": { "type": "object" },
+            "habits": { "type": "object" },
+            "environment": { "type": "object" },
+            "goals": { "type": "object" },
+            "flags": { "type": "array", "items": { "type": "string" } },
+            "status": { "type": "string", "enum": ["Verde", "Amarillo", "Rojo"] },
+            "strategy": { "type": "object" },
+            "commitment": { "type": "string" }
+          }
+        }
       },
       "required": ["uid", "email", "role"]
     },

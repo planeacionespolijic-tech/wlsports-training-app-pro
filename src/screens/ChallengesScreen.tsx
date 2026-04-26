@@ -10,7 +10,7 @@ import {
   doc, updateDoc, increment, addDoc, serverTimestamp, 
   getDocs, arrayUnion, getDoc 
 } from 'firebase/firestore';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Challenge {
   id: string;

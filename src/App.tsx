@@ -20,7 +20,6 @@ const AthleteProfileScreen = lazy(() => import('./screens/AthleteProfileScreen')
 const ValoracionScreen = lazy(() => import('./screens/ValoracionScreen').then(m => ({ default: m.ValoracionScreen })));
 const ZonasScreen = lazy(() => import('./screens/ZonasScreen').then(m => ({ default: m.ZonasScreen })));
 const SeguimientoScreen = lazy(() => import('./screens/SeguimientoScreen').then(m => ({ default: m.SeguimientoScreen })));
-const AnamnesisScreen = lazy(() => import('./screens/AnamnesisScreen').then(m => ({ default: m.AnamnesisScreen })));
 const TestsScreen = lazy(() => import('./screens/TestsScreen').then(m => ({ default: m.TestsScreen })));
 const VideoAnalysisScreen = lazy(() => import('./screens/VideoAnalysisScreen').then(m => ({ default: m.VideoAnalysisScreen })));
 const DiagnosisScreen = lazy(() => import('./screens/DiagnosisScreen').then(m => ({ default: m.DiagnosisScreen })));
@@ -32,6 +31,7 @@ const TournamentsScreen = lazy(() => import('./screens/TournamentsScreen').then(
 const ProgressionScreen = lazy(() => import('./screens/ProgressionScreen').then(m => ({ default: m.ProgressionScreen })));
 const TabataScreen = lazy(() => import('./screens/TabataScreen').then(m => ({ default: m.TabataScreen })));
 const ReactionScreen = lazy(() => import('./screens/ReactionScreen').then(m => ({ default: m.ReactionScreen })));
+const InitialEvaluationScreen = lazy(() => import('./screens/evaluation/InitialEvaluationScreen').then(m => ({ default: m.InitialEvaluationScreen })));
 
 // Global Loading Component
 const PageLoader = () => (
@@ -45,6 +45,24 @@ const AppShell: React.FC = () => {
   const { user, userProfile, isTrainer, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Helper for screen navigation
+  const getOnNavigate = (basePath?: string) => (screen: string, data?: any) => {
+    if (screen === 'home') navigate('/');
+    else if (screen === 'trainer-dashboard') navigate('/trainer-dashboard');
+    else if (screen === 'client-dashboard') navigate('/client-dashboard');
+    else if (screen === 'deportistas') navigate('/deportistas');
+    else if (screen === 'exercise-bank') navigate('/exercise-bank');
+    else if (screen === 'athlete-profile') navigate(`/atleta/${data?.id || data?.athleteId}`, { state: data });
+    else if (screen === 'evaluacion360') {
+      const athleteId = data?.id || data?.athleteId || (basePath?.includes('/atleta/') ? basePath.split('/').pop() : null);
+      if (athleteId) navigate(`/atleta/${athleteId}/evaluacion360`, { state: data });
+      else navigate('/evaluacion360', { state: data });
+    }
+    else if (screen === 'ejecucion-directa') navigate(`/ejecucion-sesion`, { state: data?.workout });
+    else if (basePath) navigate(`${basePath}/${screen}`, { state: data });
+    else navigate(`/${screen}`, { state: data });
+  };
 
   if (loading) return <PageLoader />;
 
@@ -68,13 +86,13 @@ const AppShell: React.FC = () => {
           {/* Core Dashboards */}
           <Route path="/trainer-dashboard" element={
             <ProtectedRoute allowedRoles={['trainer', 'superadmin']}>
-              <TrainerDashboard />
+              <TrainerDashboard onNavigate={getOnNavigate()} />
             </ProtectedRoute>
           } />
 
           <Route path="/client-dashboard" element={
             <ProtectedRoute allowedRoles={['client']}>
-              <ClientDashboard />
+              <ClientDashboard onNavigate={getOnNavigate(`/atleta/${user?.uid}`)} />
             </ProtectedRoute>
           } />
 
@@ -92,14 +110,26 @@ const AppShell: React.FC = () => {
           } />
 
           <Route path="/atleta/:id" element={
-            <ProtectedRoute allowedRoles={['trainer', 'superadmin']}>
-              <AthleteProfileScreen />
+            <ProtectedRoute allowedRoles={['trainer', 'superadmin', 'client']}>
+              <AthleteProfileScreen onNavigate={getOnNavigate()} />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/atleta/:id/evaluacion360" element={
+            <ProtectedRoute allowedRoles={['trainer', 'superadmin', 'client']}>
+              <InitialEvaluationScreen />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/evaluacion360" element={
+            <ProtectedRoute allowedRoles={['trainer', 'superadmin', 'client']}>
+              <InitialEvaluationScreen />
             </ProtectedRoute>
           } />
 
           <Route path="/exercise-bank" element={
             <ProtectedRoute allowedRoles={['trainer', 'superadmin']}>
-              <ExerciseBankScreen />
+              <ExerciseBankScreen userId={user?.uid || ''} onBack={() => navigate(-1)} userProfile={userProfile} />
             </ProtectedRoute>
           } />
 
@@ -107,7 +137,6 @@ const AppShell: React.FC = () => {
           <Route path="/valoracion" element={<ProtectedRoute><ValoracionScreen /></ProtectedRoute>} />
           <Route path="/zonas" element={<ProtectedRoute><ZonasScreen /></ProtectedRoute>} />
           <Route path="/seguimiento" element={<ProtectedRoute><SeguimientoScreen /></ProtectedRoute>} />
-          <Route path="/anamnesis" element={<ProtectedRoute><AnamnesisScreen /></ProtectedRoute>} />
           <Route path="/tests" element={<ProtectedRoute><TestsScreen /></ProtectedRoute>} />
           <Route path="/video-analysis" element={<ProtectedRoute><VideoAnalysisScreen /></ProtectedRoute>} />
           <Route path="/diagnostico" element={<ProtectedRoute><DiagnosisScreen /></ProtectedRoute>} />
