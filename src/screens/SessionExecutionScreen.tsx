@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight, Shield } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -8,14 +8,7 @@ import { TabataScreen } from './TabataScreen';
 import { ReactionScreen } from './ReactionScreen';
 import { useAuth } from '../context/AuthContext';
 import { LEVELS, getLevelFromXP } from '../constants';
-
-const MODIFIERS = [
-  "Gol vale doble",
-  "Solo pierna no dominante",
-  "Tiempo límite 1 minuto",
-  "Máximo 3 toques",
-  "Finalización obligatoria"
-];
+import { generateChallenge, ChallengeCard } from '../services/intelligenceService';
 
 export const SessionExecutionScreen = () => {
   const { workoutId } = useParams();
@@ -33,7 +26,8 @@ export const SessionExecutionScreen = () => {
   const [currentWorkout, setCurrentWorkout] = useState(workout);
   const [saving, setSaving] = useState(false);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
-  const [modifier, setModifier] = useState<string | null>(null);
+  const [challenge, setChallenge] = useState<ChallengeCard | null>(null);
+  const [isGeneratingChallenge, setIsGeneratingChallenge] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [bonusAttributes, setBonusAttributes] = useState<string[]>([]);
 
@@ -142,9 +136,16 @@ export const SessionExecutionScreen = () => {
     );
   };
 
-  const handleRollModifier = () => {
-    const random = Math.floor(Math.random() * MODIFIERS.length);
-    setModifier(MODIFIERS[random]);
+  const handleRollChallenge = async () => {
+    setIsGeneratingChallenge(true);
+    try {
+      const card = await generateChallenge(userId);
+      setChallenge(card);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGeneratingChallenge(false);
+    }
   };
 
   const handleAddManualExercise = (exerciseToUse?: any) => {
@@ -176,7 +177,11 @@ export const SessionExecutionScreen = () => {
         date: serverTimestamp(),
         exercisesCompleted: completedExercises.length,
         xpGained: xpGained,
-        modifier: modifier,
+        challenge: challenge ? {
+          title: challenge.title,
+          userBuff: challenge.userBuff,
+          coachHandicap: challenge.coachHandicap
+        } : null,
         workoutName: currentWorkout.name || 'Entrenamiento'
       });
 
@@ -427,25 +432,81 @@ export const SessionExecutionScreen = () => {
           </section>
         )}
 
-        {/* 2. MODIFICADOR (GAMIFICACIÓN) */}
+        {/* 2. GAME MASTER DE DESAFÍOS (TARJETAS) */}
         <section className="space-y-4">
           <button 
-            onClick={handleRollModifier}
-            className="w-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 p-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all"
+            onClick={handleRollChallenge}
+            disabled={isGeneratingChallenge}
+            className="w-full bg-gradient-to-r from-rose-600 to-amber-600 text-white p-6 rounded-[2.5rem] flex items-center justify-center gap-4 active:scale-95 transition-all shadow-xl border-b-4 border-black/20"
           >
-            <Dice5 size={28} />
-            <span className="font-black text-lg uppercase tracking-wider">Modo Desafío</span>
+            {isGeneratingChallenge ? (
+              <Loader2 className="animate-spin" size={28} />
+            ) : (
+              <>
+                <Dice5 size={32} className="animate-bounce" />
+                <div className="text-left">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Game Master</p>
+                  <p className="font-black text-xl italic uppercase tracking-tighter">Activar Desafío</p>
+                </div>
+              </>
+            )}
           </button>
 
           <AnimatePresence>
-            {modifier && (
+            {challenge && (
               <motion.div 
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="bg-indigo-600 text-white p-5 rounded-2xl text-center shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-400"
+                initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                className="bg-zinc-900 border-2 border-amber-500/50 p-1 rounded-[2.5rem] overflow-hidden shadow-2xl"
               >
-                <p className="text-[10px] uppercase font-black tracking-widest text-indigo-200 mb-1">Modificador Activo</p>
-                <p className="text-xl font-black">{modifier}</p>
+                <div className="bg-gradient-to-b from-amber-500/20 to-transparent p-8 space-y-6">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-amber-500 text-[10px] font-black uppercase tracking-[0.3em]">🔥 ¡DUELO DE TITANES ACTIVADO! 🔥</h3>
+                    <div className="flex flex-col items-center gap-1">
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest bg-black px-3 py-1 rounded-full">🃏 Tarjeta de Reto</p>
+                      <p className="text-3xl font-black italic uppercase italic tracking-tighter text-white">{challenge.title}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/60 rounded-3xl border border-zinc-800 text-center">
+                    <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-2">📝 Dinámica</p>
+                    <p className="text-sm text-zinc-300 font-medium leading-relaxed italic">"{challenge.description}"</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-500 text-black rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+                        <Trophy size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">🟢 Para el Usuario</p>
+                        <p className="text-sm font-bold text-white">{challenge.userBuff}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-rose-500/10 border border-rose-500/30 rounded-3xl flex items-center gap-4">
+                      <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+                        <Shield size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">🔴 Para el Coach</p>
+                        <p className="text-sm font-bold text-white">{challenge.coachHandicap}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-zinc-800/50 text-center">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-amber-500 mb-1">🏆 Penitencia Sugerida</p>
+                    <p className="text-xs text-zinc-400">El perdedor <span className="text-white font-bold">{challenge.suggestedPenalty}</span>.</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setChallenge(null)}
+                    className="w-full py-4 text-xs font-black uppercase tracking-widest text-zinc-600 hover:text-zinc-400 transition-colors"
+                  >
+                    Cerrar Desafío
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, Activity, Dumbbell, History, FileText, TrendingUp, 
-  Trophy, Zap, Timer, Video, Plus, Search, Loader2, 
+  Trophy, Zap, Timer, Video, Plus, Search, Loader2, Trash2,
   ChevronRight, Calendar, MessageSquare, Bell, CheckCircle2, X, Play, ExternalLink, LogOut as LogOutIcon, RefreshCw, ArrowLeft,
   LayoutDashboard, Award
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const TrainerDashboard = ({ onNavigate }: any) => {
@@ -176,10 +176,30 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
     }
   };
 
+  const handleDismissSubmission = async (submissionId: string) => {
+    try {
+      await updateDoc(doc(db, 'challengeSubmissions', submissionId), {
+        status: 'dismissed',
+        dismissedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'challengeSubmissions');
+    }
+  };
+
   const filteredAthletes = athletes.filter(a => 
     a.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     a.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDeleteActivity = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'history', id));
+      setRecentActivity(prev => prev.filter(a => a.id !== id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'history');
+    }
+  };
 
   const stats = [
     { label: 'Atletas', value: athletes.length, icon: Users, color: 'text-blue-500' },
@@ -248,7 +268,14 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
                             onClick={() => handleValidateSubmission(sub, false)}
                             className="flex-1 bg-red-500/10 text-red-500 border border-red-500/20 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
                           >
-                            Rechazar
+                            Anular
+                          </button>
+                          <button 
+                            onClick={() => handleDismissSubmission(sub.id)}
+                            className="p-2 bg-zinc-800 text-zinc-500 rounded-xl hover:text-white transition-all"
+                            title="Descartar notificación"
+                          >
+                            <X size={16} />
                           </button>
                         </div>
                       </div>
@@ -263,7 +290,7 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
               <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Actividad Reciente</h2>
               <div className="space-y-3">
                 {recentActivity.map((log) => (
-                  <div key={log.id} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex items-center gap-4">
+                  <div key={log.id} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex items-center gap-4 group">
                     <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
                       <CheckCircle size={18} />
                     </div>
@@ -273,6 +300,13 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
                       </p>
                       <p className="text-[10px] text-zinc-500 mt-0.5">{log.createdAt?.toDate().toLocaleString()}</p>
                     </div>
+                    <button 
+                      onClick={() => handleDeleteActivity(log.id)}
+                      className="p-2 opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-500 transition-all border border-zinc-800 rounded-lg hover:bg-black"
+                      title="Eliminar registro"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
                 {recentActivity.length === 0 && (

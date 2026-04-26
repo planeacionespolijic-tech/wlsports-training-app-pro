@@ -20,6 +20,7 @@ interface Diagnosis {
   focus: string;
   recommendations: string;
   createdAt: any;
+  source?: string;
 }
 
 export const DiagnosisScreen = ({ 
@@ -165,15 +166,24 @@ export const DiagnosisScreen = ({
             )}
           </div>
 
-          <div className="bg-zinc-900/50 p-6 rounded-3xl border border-[#D4AF37]/20 flex gap-4 items-start">
-            <div className="p-3 bg-[#D4AF37]/10 rounded-2xl text-[#D4AF37] shrink-0">
-              <Sparkles size={24} />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg mb-1">Análisis de Capacidades</h2>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Este módulo integra los resultados de la evaluación inicial, valoración física y tests para generar un enfoque de entrenamiento optimizado.
-              </p>
+          <div className="bg-zinc-900/50 p-6 rounded-3xl border border-[#D4AF37]/20 flex flex-col gap-4">
+            <div className="flex gap-4 items-start">
+              <div className="p-3 bg-[#D4AF37]/10 rounded-2xl text-[#D4AF37] shrink-0">
+                <Sparkles size={24} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="font-bold text-lg">Análisis de Capacidades</h2>
+                  {diagnosis?.source === 'initial_evaluation' && (
+                    <span className="bg-[#D4AF37] text-black text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                      Generado por 360°
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Este módulo integra los resultados de la evaluación inicial, valoración física y tests para generar un enfoque de entrenamiento optimizado.
+                </p>
+              </div>
             </div>
           </div>
 

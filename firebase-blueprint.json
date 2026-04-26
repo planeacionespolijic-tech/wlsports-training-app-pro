@@ -232,6 +232,8 @@
         "bodyFat": { "type": "number" },
         "muscleMass": { "type": "number" },
         "vo2Max": { "type": "number" },
+        "hrRest": { "type": "number" },
+        "hrRecovery": { "type": "number" },
         "notes": { "type": "string" },
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
@@ -255,18 +257,35 @@
     },
     "test": {
       "title": "Test",
-      "description": "Physical or technical test result",
+      "description": "Physical, technical or custom test result",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["physical", "technical"] },
+        "trainerId": { "type": "string" },
+        "type": { "type": "string", "enum": ["physical", "technical", "custom"] },
+        "category": { "type": "string" },
         "name": { "type": "string" },
-        "value": { "type": "string" },
+        "value": { "type": "number" },
         "unit": { "type": "string" },
+        "objective": { "type": "string" },
+        "suggestedRange": { "type": "string" },
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "name", "value", "createdAt"]
+    },
+    "testBattery": {
+      "title": "Test Battery",
+      "description": "A collection of tests grouped for a specific purpose",
+      "type": "object",
+      "properties": {
+        "trainerId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "testIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["trainerId", "name", "testIds", "createdAt"]
     },
     "videoAnalysis": {
       "title": "Video Analysis",
@@ -351,6 +370,7 @@
     "/assessments/{assessmentId}": { "schema": "assessment", "description": "Physical assessments" },
     "/anamnesis/{anamnesisId}": { "schema": "anamnesis", "description": "Medical history" },
     "/tests/{testId}": { "schema": "test", "description": "Physical/Technical tests" },
+    "/testBatteries/{batteryId}": { "schema": "testBattery", "description": "Custom test combinations created by trainers" },
     "/videoAnalysis/{analysisId}": { "schema": "videoAnalysis", "description": "Movement analysis" },
     "/diagnoses/{diagnosisId}": { "schema": "diagnosis", "description": "Automatic diagnoses" },
     "/trainingPlans/{planId}": { "schema": "trainingPlan", "description": "Training plans" },

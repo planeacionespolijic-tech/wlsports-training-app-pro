@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, TrendingUp, AlertTriangle, CheckCircle2, Clock, Zap, BarChart3, MessageSquare } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, CheckCircle2, Clock, Zap, BarChart3, MessageSquare, X, Heart } from 'lucide-react';
 import { analyzeProgress, AnalysisResult } from '../services/intelligenceService';
 import { subscribeToLiveSession, LiveSessionState } from '../services/liveSessionService';
 import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface CoachAthleteDashboardProps {
   athleteId: string;
@@ -13,14 +15,22 @@ interface CoachAthleteDashboardProps {
 export const CoachAthleteDashboard = ({ athleteId, athleteName, athleteType }: CoachAthleteDashboardProps) => {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [liveSession, setLiveSession] = useState<LiveSessionState | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const [dismissedLive, setDismissedLive] = useState(false);
+  const [dismissedRecs, setDismissedRecs] = useState<number[]>([]);
 
   useEffect(() => {
     if (!athleteId) return;
 
     const fetchData = async () => {
-      const result = await analyzeProgress(athleteId);
-      setAnalysis(result);
+      const [analysisResult, userSnap] = await Promise.all([
+        analyzeProgress(athleteId),
+        getDoc(doc(db, 'users', athleteId))
+      ]);
+      setAnalysis(analysisResult);
+      if (userSnap.exists()) setUserData(userSnap.data());
       setLoading(false);
     };
 
@@ -46,12 +56,12 @@ export const CoachAthleteDashboard = ({ athleteId, athleteName, athleteType }: C
     <div className="space-y-6">
       {/* Live Session Alert */}
       <AnimatePresence>
-        {liveSession && (
+        {liveSession && !dismissedLive && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-[#D4AF37]/10 border border-[#D4AF37] p-4 rounded-2xl flex items-center justify-between"
+            className="bg-[#D4AF37]/10 border border-[#D4AF37] p-4 rounded-2xl flex items-center justify-between relative overflow-hidden"
           >
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -65,8 +75,16 @@ export const CoachAthleteDashboard = ({ athleteId, athleteName, athleteType }: C
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-black text-[#D4AF37]">ACTIVA</span>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="text-xs font-black text-[#D4AF37]">ACTIVA</span>
+              </div>
+              <button 
+                onClick={() => setDismissedLive(true)}
+                className="p-1 hover:bg-[#D4AF37]/20 rounded-lg transition-colors text-[#D4AF37]"
+              >
+                <X size={16} />
+              </button>
             </div>
           </motion.div>
         )}
@@ -115,6 +133,23 @@ export const CoachAthleteDashboard = ({ athleteId, athleteName, athleteType }: C
           </div>
         )}
 
+        {userData?.hrZones && (
+          <div className="pt-4 border-t border-zinc-800">
+            <div className="flex items-center gap-2 mb-3">
+              <Heart size={14} className="text-red-500" />
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Zonas de Intensidad (BPM)</h3>
+            </div>
+            <div className="flex gap-1">
+              {userData.hrZones.map((zone: any, i: number) => (
+                <div key={i} className="flex-1 h-8 bg-black/40 rounded-lg flex flex-col items-center justify-center border border-zinc-800/50">
+                  <div className={`w-full h-1 ${zone.color} rounded-t-lg mb-1`} />
+                  <span className="text-[8px] font-bold text-zinc-400">{zone.min}-{zone.max}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {analysis?.recommendations && analysis.recommendations.length > 0 && (
           <div className="space-y-3 pt-4 border-t border-zinc-800">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
@@ -122,10 +157,16 @@ export const CoachAthleteDashboard = ({ athleteId, athleteName, athleteType }: C
               Recomendaciones del Sistema
             </h3>
             <div className="space-y-2">
-              {analysis.recommendations.map((rec, i) => (
-                <div key={i} className="flex gap-3 bg-black/20 p-3 rounded-xl border border-zinc-800/30">
+              {analysis.recommendations.filter((_, i) => !dismissedRecs.includes(i)).map((rec, i) => (
+                <div key={i} className="flex gap-3 bg-black/20 p-3 rounded-xl border border-zinc-800/30 group relative">
                   <AlertTriangle size={16} className="text-[#D4AF37] shrink-0" />
-                  <p className="text-xs text-zinc-400 leading-relaxed">{rec}</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed pr-6">{rec}</p>
+                  <button 
+                    onClick={() => setDismissedRecs(prev => [...prev, i])}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-800 rounded transition-all text-zinc-500"
+                  >
+                    <X size={12} />
+                  </button>
                 </div>
               ))}
             </div>

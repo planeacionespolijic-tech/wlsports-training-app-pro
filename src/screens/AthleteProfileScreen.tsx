@@ -1,25 +1,28 @@
 import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { uploadProfilePhoto } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
-import { useEffect } from 'react';
 import { LEVELS, getLevelFromXP } from '../constants';
+import { ValoracionScreen } from './ValoracionScreen';
+import { DiagnosisScreen } from './DiagnosisScreen';
+import { ReportsScreen } from './ReportsScreen';
 
 export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: isTrainerProp, onNavigate }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const { isTrainer: authIsTrainer } = useAuth();
+  const { user, isTrainer: authIsTrainer } = useAuth();
   
   const isTrainer = isTrainerProp !== undefined ? isTrainerProp : authIsTrainer;
   const athleteId = userId || id || '';
 
-  // Use state athlete or basic object if not provided
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'physical' | 'intelligence' | 'reports'>('overview');
+  
   const [athlete, setAthlete] = useState<any>(propAthlete || location.state || { id: athleteId, displayName: 'Cargando...', photoURL: null, type: 'adult' });
   const [loading, setLoading] = useState(!propAthlete && !location.state);
   
@@ -65,18 +68,18 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   
   const menuItems = [
     { id: 'evaluacion360', title: 'Evaluación Inicial 360°', icon: Shield, desc: 'Escáner inicial integral de rendimiento', type: 'both' },
-    { id: 'valoracion', title: 'Valoración Física', icon: Activity, desc: 'Métricas antropométricas y tests', type: 'both' },
-    { id: 'diagnostico', title: 'Diagnóstico', icon: Brain, desc: 'Análisis y enfoque sugerido', type: 'adult' },
+    { id: 'valoracion', title: 'Valoración Física', icon: Activity, desc: 'Métricas antropométricas y tests', type: 'both', subTab: 'physical' },
+    { id: 'diagnostico', title: 'Diagnóstico e Inteligencia', icon: Brain, desc: 'Análisis IA y enfoque sugerido', type: 'adult', subTab: 'intelligence' },
+    { id: 'informes', title: 'Informes de Progreso', icon: FileText, desc: 'Reportes de rendimiento', type: 'both', subTab: 'reports' },
     { id: 'planificacion', title: 'Planificación', icon: CalendarClock, desc: 'Planes y progresiones', type: 'adult' },
     { id: 'seguimiento', title: 'Seguimiento', icon: TrendingUp, desc: 'Gráficas de progreso', type: 'both' },
-    { id: 'tests', title: 'Pruebas Periódicas', icon: Zap, desc: 'Tests físicos y técnicos', type: 'both' },
+    { id: 'tests', title: 'Biblioteca de Pruebas', icon: Zap, desc: 'Escaneo de rendimiento y tests', type: 'both' },
     { id: 'videoAnalysis', title: 'Análisis de Video', icon: Video, desc: 'Análisis de movimiento', type: 'both' },
     { id: 'kidsModule', title: 'Módulo Niños', icon: Baby, desc: 'Desarrollo motriz y niveles', type: 'child' },
     { id: 'zonas', title: 'Zonas Cardíacas', icon: Heart, desc: 'Cálculo de FC por Karvonen', type: 'adult' },
     { id: 'entrenamientos', title: 'Entrenamientos', icon: Dumbbell, desc: 'Rutinas personalizadas', type: 'both' },
     { id: 'retos', title: 'Retos y Logros', icon: Trophy, desc: 'Logros y desafíos activos', type: 'child' },
     { id: 'historial', title: 'Historial', icon: History, desc: 'Registro de sesiones', type: 'both' },
-    { id: 'informes', title: 'Informes', icon: FileText, desc: 'Reportes de rendimiento', type: 'both' },
   ].filter(item => item.type === 'both' || item.type === (isChild ? 'child' : 'adult'));
 
   const getInitials = (name: string) => {
@@ -84,6 +87,16 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   };
 
   const themeColor = isChild ? '#3B82F6' : '#D4AF37';
+
+  if (activeSubTab === 'physical') {
+    return <ValoracionScreen userId={athleteId} isAdmin={isTrainer} onBack={() => setActiveSubTab('overview')} />;
+  }
+  if (activeSubTab === 'intelligence') {
+    return <DiagnosisScreen userId={athleteId} isAdmin={isTrainer} onBack={() => setActiveSubTab('overview')} />;
+  }
+  if (activeSubTab === 'reports') {
+    return <ReportsScreen userId={athleteId} onBack={() => setActiveSubTab('overview')} trainerId={isTrainer ? user?.uid : null} />;
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
@@ -233,10 +246,12 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => {
-                if (onNavigate) {
+                if (item.subTab) {
+                  setActiveSubTab(item.subTab as any);
+                } else if (onNavigate) {
                   onNavigate(item.id, { athleteId: athlete.id, athlete });
                 } else {
-                  navigate(item.id, { state: { athleteId: athlete.id, athlete } });
+                  navigate(`/${item.id}`, { state: { athleteId: athlete.id, athlete } });
                 }
               }}
               className="w-full bg-zinc-900/50 hover:bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4 transition-all group active:scale-[0.98]"

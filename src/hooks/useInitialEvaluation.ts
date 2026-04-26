@@ -115,6 +115,26 @@ export const useInitialEvaluation = (userId: string | undefined) => {
       const historyRef = collection(db, 'users', userId, 'evaluations');
       await addDoc(historyRef, fullResult);
 
+      // 3. Automatically generate an initial diagnosis based on evaluation results
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        const trainerId = userSnap.data()?.trainerId || null;
+        
+        const diagnosisData = {
+          userId,
+          trainerId,
+          limitations: resultPayload.flags.join(', ') || 'Ninguna detectada',
+          focus: resultPayload.strategy.m1 + ' ' + resultPayload.strategy.m2,
+          recommendations: resultPayload.strategy.m3,
+          source: 'initial_evaluation',
+          createdAt: serverTimestamp(),
+        };
+
+        await addDoc(collection(db, 'diagnoses'), diagnosisData);
+      } catch (diagError) {
+        console.error("Error creating auto-diagnosis", diagError);
+      }
+
       setEvaluationResult(fullResult);
       setFinished(true);
       return true;

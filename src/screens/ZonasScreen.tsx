@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { ArrowLeft, Calculator, Info, Heart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Calculator, Info, Heart, Save, Loader2, Check, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 
 interface ZonasScreenProps {
   onBack: () => void;
@@ -12,6 +14,29 @@ export const ZonasScreen = ({ onBack, userId, trainerId }: ZonasScreenProps) => 
   const [age, setAge] = useState<string>('');
   const [restingHR, setRestingHR] = useState<string>('');
   const [results, setResults] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists() && userDoc.data().hrZones) {
+          const data = userDoc.data();
+          setResults({
+            maxHR: data.maxHR,
+            restingNum: data.restingHR,
+            zones: data.hrZones
+          });
+          setAge(data.age?.toString() || '');
+          setRestingHR(data.restingHR?.toString() || '');
+        }
+      } catch (error) {
+        console.error("Error loading zones", error);
+      }
+    };
+    loadProfile();
+  }, [userId]);
 
   const calculateZones = () => {
     const ageNum = parseInt(age);
@@ -32,6 +57,26 @@ export const ZonasScreen = ({ onBack, userId, trainerId }: ZonasScreenProps) => 
     ];
 
     setResults({ maxHR, restingNum, zones });
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    if (!results) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        hrZones: results.zones,
+        maxHR: results.maxHR,
+        restingHR: results.restingNum,
+        age: parseInt(age)
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -118,11 +163,47 @@ export const ZonasScreen = ({ onBack, userId, trainerId }: ZonasScreenProps) => 
               </div>
             ))}
 
-            <div className="p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800/50 flex gap-3 items-start mt-8">
-              <Info className="text-zinc-600 shrink-0" size={16} />
-              <p className="text-[10px] text-zinc-600 leading-relaxed">
-                La fórmula de Karvonen es más precisa que la estándar ya que tiene en cuenta la frecuencia cardíaca basal del deportista para determinar la reserva cardíaca.
+            <div className="p-6 bg-zinc-900/50 rounded-3xl border border-zinc-800/50 space-y-4 mt-8">
+              <div className="flex gap-3 items-center text-[#D4AF37]">
+                <Info size={18} />
+                <h4 className="font-bold text-sm">¿Para qué sirven las zonas?</h4>
+              </div>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Las zonas cardíacas son brújulas de intensidad. Te permiten entrenar de forma inteligente:
               </p>
+              <ul className="space-y-2">
+                <li className="text-[10px] text-zinc-500"><strong className="text-zinc-300">Precisión:</strong> Evitas el "entrenamiento basura" (entrenar siempre a la misma intensidad media).</li>
+                <li className="text-[10px] text-zinc-500"><strong className="text-zinc-300">Adaptación:</strong> Cada zona dispara beneficios biológicos diferentes (quemar grasa vs. potencia máxima).</li>
+                <li className="text-[10px] text-zinc-500"><strong className="text-zinc-300">Seguridad:</strong> Limita el esfuerzo en días de recuperación para evitar el sobreentrenamiento.</li>
+              </ul>
+              <div className="pt-2 border-t border-zinc-800/50">
+                <p className="text-[9px] text-zinc-600 italic">
+                  * La fórmula de Karvonen es el estándar de oro en coaching élite porque usa tu "Reserva Cardíaca", adaptándose a tu nivel de condición física real.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-6">
+              <button 
+                onClick={calculateZones}
+                className="flex-1 bg-zinc-800 text-white font-bold py-4 rounded-2xl hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={20} />
+                Recalcular
+              </button>
+              <button 
+                onClick={handleSave}
+                disabled={saving}
+                className={`flex-1 ${saved ? 'bg-green-500' : 'bg-[#D4AF37]'} text-black font-bold py-4 rounded-2xl hover:opacity-90 transition-all flex items-center justify-center gap-2`}
+              >
+                {saving ? (
+                  <Loader2 className="animate-spin" size={20} />
+                ) : saved ? (
+                  <Check size={20} />
+                ) : (
+                  <Save size={20} />
+                )}
+                {saved ? 'Guardado' : 'Guardar'}
+              </button>
             </div>
           </motion.div>
         )}

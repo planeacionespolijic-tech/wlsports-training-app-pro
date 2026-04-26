@@ -65,10 +65,14 @@
 // Document ID: auto-generated
 // Fields:
 //   - userId: string (required)
-//   - type: string (required, 'physical' or 'technical')
+//   - trainerId: string (optional)
+//   - type: string (required, 'physical', 'technical' or 'custom')
+//   - category: string (optional)
 //   - name: string (required)
-//   - value: string (required)
+//   - value: number (required)
 //   - unit: string
+//   - objective: string (optional)
+//   - suggestedRange: string (optional)
 //   - notes: string
 //   - createdAt: timestamp (required)
 //
@@ -248,9 +252,11 @@ service cloud.firestore {
     }
 
     function isValidTest(data) {
-      return data.userId is string && data.type in ['physical', 'technical'] &&
-             data.name is string && data.value is string &&
-             (data.userId == request.auth.uid || isTrainer());
+      return data.userId is string && 
+             data.type in ['physical', 'technical', 'custom'] &&
+             data.name is string && 
+             data.value is number &&
+             (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
     }
 
     function isValidSession(data) {
@@ -325,6 +331,12 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    function isValidTestBattery(data) {
+      return data.trainerId is string && data.trainerId == request.auth.uid &&
+             data.name is string && data.testIds is list &&
+             isTrainer();
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isSuperAdmin() || 
                     (isAuthenticated() && resource != null && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid)) || 
@@ -378,10 +390,19 @@ service cloud.firestore {
     }
 
     match /tests/{testId} {
-      allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
+      allow read: if isAuthenticated() && (isSuperAdmin() || isDocOwner() || isDocTrainer());
+      allow list: if isAuthenticated() && (isSuperAdmin() || resource.data.get('userId', '') == request.auth.uid || resource.data.get('trainerId', '') == request.auth.uid);
       allow create: if isNotBlocked() && isValidTest(request.resource.data);
       allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
       allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
+    }
+    
+    match /testBatteries/{batteryId} {
+      allow read: if isAuthenticated();
+      allow list: if isAuthenticated() && (isSuperAdmin() || resource.data.trainerId == request.auth.uid);
+      allow create: if isNotBlocked() && isValidTestBattery(request.resource.data);
+      allow update: if isSuperAdmin() || (isNotBlocked() && resource.data.trainerId == request.auth.uid && trainerIdUnchanged());
+      allow delete: if isSuperAdmin() || (isNotBlocked() && resource.data.trainerId == request.auth.uid);
     }
 
     match /videoAnalysis/{analysisId} {
