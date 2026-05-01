@@ -197,30 +197,74 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
           )}
         </div>
 
-        {/* Atributos Section */}
+        {/* Ficha Técnica (NUEVO MÓDULO) */}
         {athlete.attributes && (
-          <section className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-[2rem] shadow-xl mb-10 max-w-md mx-auto">
-            <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Medal size={14} style={{ color: themeColor }} /> Atributos de Rendimiento
-            </h2>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-              {['ritmo', 'tecnica', 'fuerza', 'mentalidad'].map(attr => (
-                <div key={attr} className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-wider text-zinc-400">
-                    <span>{attr}</span>
-                    <span className="text-zinc-200">{athlete.attributes[attr] || 50}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-black rounded-full overflow-hidden">
-                    <div 
-                      className="h-full transition-all duration-1000" 
-                      style={{ 
-                        width: `${athlete.attributes[attr] || 50}%`,
-                        backgroundColor: themeColor
-                      }} 
-                    />
-                  </div>
+          <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+               <Shield size={80} style={{ color: themeColor }} />
+            </div>
+            
+            <div className="relative z-10">
+              <div className="flex justify-between items-center mb-6">
+                <div className="bg-black/50 px-3 py-1 rounded-full border border-zinc-800">
+                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: themeColor }}>
+                    [{getLevelFromXP(athlete.xp || 0).name}]
+                  </span>
                 </div>
-              ))}
+                <h3 className="text-sm font-black uppercase tracking-tighter">{athlete.displayName}</h3>
+              </div>
+
+              <div className="grid grid-cols-5 gap-2 mb-6 uppercase">
+                {[
+                  { key: 'TEC', label: 'TEC', icon: '⚽', oldKey: 'tecnica' },
+                  { key: 'FIS', label: 'FIS', icon: '💪', oldKey: 'fuerza' },
+                  { key: 'NEU', label: 'NEU', icon: '🧠', oldKey: 'neuro' },
+                  { key: 'AGI', label: 'AGI', icon: '🤸', oldKey: 'ritmo' },
+                  { key: 'ACT', label: 'ACT', icon: '🔥', oldKey: 'mentalidad' }
+                ].map(attr => (
+                  <div key={attr.key} className="flex flex-col items-center gap-1">
+                    <span className="text-xl">{attr.icon}</span>
+                    <span className="text-[8px] font-black text-zinc-500 uppercase">{attr.label}</span>
+                    <span className="text-sm font-black" style={{ color: themeColor }}>
+                      {athlete.attributes[attr.key] || athlete.attributes[attr.oldKey] || 10}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-zinc-800">
+                {(() => {
+                  const attrs = athlete.attributes;
+                  const mapping = [
+                    { key: 'TEC', old: 'tecnica', label: 'Técnica' },
+                    { key: 'FIS', old: 'fuerza', label: 'Físico' },
+                    { key: 'NEU', old: 'neuro', label: 'Neuro' },
+                    { key: 'AGI', old: 'ritmo', label: 'Agilidad' },
+                    { key: 'ACT', old: 'mentalidad', label: 'Actitud' }
+                  ];
+                  
+                  const values = mapping.map(m => ({ 
+                    label: m.label, 
+                    val: attrs[m.key] || attrs[m.old] || 10 
+                  }));
+                  
+                  const maxAttr = [...values].sort((a, b) => b.val - a.val)[0];
+                  const minAttr = [...values].sort((a, b) => a.val - b.val)[0];
+
+                  return (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Atributo Destacado</span>
+                        <span className="text-xs font-black text-emerald-500 uppercase italic">🚀 {maxAttr.label}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Área de Mejora</span>
+                        <span className="text-xs font-black text-amber-500 uppercase italic">🎯 {minAttr.label}</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </section>
         )}

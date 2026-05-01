@@ -6,6 +6,7 @@ import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, de
 import { suggestProgression } from '../services/intelligenceService';
 import { Exercise, TrainingBlock } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { SEED_EXERCISES, EXERCISE_CATEGORIES } from '../lib/exerciseSeed';
 import { useAuth } from '../context/AuthContext';
 
 export const WorkoutsScreen = () => {
@@ -62,14 +63,47 @@ export const WorkoutsScreen = () => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [bankTargetBlockId, setBankTargetBlockId] = useState<string | null>(null);
   const [bankTargetType, setBankTargetType] = useState<'normal' | 'circuit' | null>(null);
+  const [isSyncingBank, setIsSyncingBank] = useState(false);
 
-  const CATEGORIES = [
-    "ACTIVACIÓN BIOSENSORIAL",
-    "FASE DE ALTA INTENSIDAD - H.I.T.",
-    "DINÁMICA ESPECÍFICA DE JUEGO",
-    "EL DESAFÍO DEL COACH",
-    "PROTOCOLO DE RECUPERACIÓN"
-  ];
+  const handleSyncProBank = async () => {
+    if (!trainerId && !user?.uid) return;
+    setIsSyncingBank(true);
+    try {
+      const currentTrainerId = trainerId || user?.uid;
+      const batchSize = 10;
+      for (let i = 0; i < SEED_EXERCISES.length; i += batchSize) {
+        const chunk = SEED_EXERCISES.slice(i, i + batchSize);
+        await Promise.all(chunk.map(async (ex) => {
+          const existing = exerciseBank.find(e => e.name === ex.name);
+          const catIndex = parseInt(ex.moment?.slice(1)) - 1;
+          const muscleGroup = EXERCISE_CATEGORIES[catIndex] || EXERCISE_CATEGORIES[2];
+
+          if (!existing) {
+            await addDoc(collection(db, 'exerciseBank'), {
+              ...ex,
+              trainerId: currentTrainerId,
+              muscleGroup,
+              createdAt: serverTimestamp()
+            });
+          } else {
+            // Update description if it's different or just explicitly sync it
+            await updateDoc(doc(db, 'exerciseBank', existing.id), {
+              description: ex.description,
+              muscleGroup: muscleGroup
+            });
+          }
+        }));
+      }
+      alert('Banco Pro Sincronizado con éxito');
+    } catch (err) {
+      console.error('Error syncing bank:', err);
+      alert('Error sincronizando banco');
+    } finally {
+      setIsSyncingBank(false);
+    }
+  };
+
+  const CATEGORIES = EXERCISE_CATEGORIES;
 
   const filteredBank = useMemo(() => {
     return exerciseBank.filter(ex => {
@@ -142,7 +176,7 @@ export const WorkoutsScreen = () => {
 
   const addBlock = (name?: string) => {
     const newBlock: TrainingBlock = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: name || `Bloque ${blocks.length + 1}`,
       type: 'normal',
       exercises: [],
@@ -192,7 +226,7 @@ export const WorkoutsScreen = () => {
       setEditingExerciseId(null);
     } else {
       const newExercise: Exercise = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name: exName,
         series: exSeries,
         reps: exReps,
@@ -267,7 +301,7 @@ export const WorkoutsScreen = () => {
       }));
       setEditingItemId(null);
     } else {
-      const newItem = { id: Date.now().toString(), name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest, order: 0 };
+      const newItem = { id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest, order: 0 };
       setBlocks(blocks.map(b => {
         if (b.id === blockId && b.type === 'circuit' && b.circuit) {
           const updatedItems = [...b.circuit.items, newItem].map((item, idx) => ({ ...item, order: idx }));
@@ -355,39 +389,56 @@ export const WorkoutsScreen = () => {
       alert('Por favor agrega un nombre y al menos un bloque de ejercicios.');
       return;
     }
-    const clean = (obj: any): any => {
-      if (Array.isArray(obj)) return obj.map(clean);
-      if (obj !== null && typeof obj === 'object' && obj.constructor.name !== 'FieldValue' && obj.constructor.name !== 'Timestamp') {
-        const result: any = {};
-        for (const key in obj) if (obj[key] !== undefined) result[key] = clean(obj[key]);
-        return result;
-      }
-      return obj;
-    };
+
     setSaving(true);
     try {
-      const workoutData = clean({
-        name: newName,
+      const currentUserId = targetUserId || user?.uid;
+      const currentTrainerId = trainerId || user?.uid;
+
+      if (!currentUserId) {
+        throw new Error('No se pudo identificar al usuario/atleta.');
+      }
+
+      // Cleanup undefined values and prepare blocks
+      const cleanedBlocks = blocks.map(block => {
+        const b = { ...block };
+        if (b.type !== 'circuit') {
+          delete (b as any).circuit;
+        }
+        return b;
+      });
+
+      const workoutData: any = {
+        name: newName.trim(),
         duration: formatTime(sessionTotalTime),
         totalTime: sessionTotalTime,
-        blocks: blocks.map(block => {
-          const b: any = { ...block };
-          if (b.type !== 'circuit') delete b.circuit;
-          return b;
-        }),
-        userId: targetUserId || user?.uid || null,
-        trainerId: trainerId || user?.uid || null,
+        blocks: cleanedBlocks,
+        userId: currentUserId,
+        trainerId: currentTrainerId || null,
         updatedAt: serverTimestamp()
-      });
+      };
+
       if (editingWorkoutId) {
         await updateDoc(doc(db, 'workouts', editingWorkoutId), workoutData);
       } else {
-        await addDoc(collection(db, 'workouts'), { ...workoutData, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'workouts'), { 
+          ...workoutData, 
+          createdAt: serverTimestamp() 
+        });
       }
+
       alert(editingWorkoutId ? 'Entrenamiento actualizado' : 'Entrenamiento guardado con éxito');
       resetForm();
-    } catch (error) {
-      handleFirestoreError(error, editingWorkoutId ? OperationType.UPDATE : OperationType.CREATE, 'workouts');
+    } catch (error: any) {
+      console.error('Error saving workout:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(`No se pudo guardar: ${errorMessage}`);
+      
+      try {
+        handleFirestoreError(error, editingWorkoutId ? OperationType.UPDATE : OperationType.CREATE, 'workouts');
+      } catch (e) {
+        // Error already logged and reported to user
+      }
     } finally {
       setSaving(false);
     }
@@ -552,6 +603,14 @@ export const WorkoutsScreen = () => {
                                     <button onClick={(e) => { e.stopPropagation(); removeExerciseFromBlock(block.id, ex.id); }} className="text-zinc-700 hover:text-red-500"><X size={16} /></button>
                                   </div>
                                 ))}
+                                
+                                <button 
+                                  onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('normal'); setShowBankModal(true); }}
+                                  className="w-full py-3 border border-dashed border-[#D4AF37]/30 text-[#D4AF37] rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 flex items-center justify-center gap-2 transition-all active:scale-95"
+                                >
+                                  <Search size={14} /> Importar de Biblioteca
+                                </button>
+
                                 <div className="p-4 rounded-2xl border border-dashed border-zinc-800 space-y-4">
                                   <div className="flex gap-2">
                                     <input type="text" placeholder="Nombre" className="flex-1 bg-transparent border-b border-zinc-800 p-2 text-sm outline-none" value={exName} onChange={(e) => setExName(e.target.value)} />
@@ -632,6 +691,13 @@ export const WorkoutsScreen = () => {
                                     <h4 className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Orden de ejecución</h4>
                                     <span className="text-[10px] font-medium text-zinc-600">{block.circuit?.items.length || 0} EJERCICIOS</span>
                                   </div>
+
+                                  <button 
+                                    onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('circuit'); setShowBankModal(true); }}
+                                    className="w-full py-3 border border-dashed border-orange-500/30 text-orange-500 rounded-xl text-[10px] font-black uppercase tracking-widest bg-orange-500/5 hover:bg-orange-500/10 flex items-center justify-center gap-2 transition-all active:scale-95"
+                                  >
+                                    <Search size={14} /> Importar de Biblioteca
+                                  </button>
 
                                   <div className="space-y-2">
                                     {block.circuit?.items.map((item, idx) => (
@@ -754,24 +820,123 @@ export const WorkoutsScreen = () => {
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6 text-white">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-zinc-900 w-full max-w-lg rounded-3xl p-6 flex flex-col max-h-[80vh]">
               <div className="flex justify-between mb-4">
-                <h2 className="font-black uppercase text-sm tracking-widest text-zinc-500">Biblioteca</h2>
-                <button onClick={() => setShowBankModal(false)}><X size={20}/></button>
+                <div className="flex flex-col">
+                  <h2 className="font-black uppercase text-sm tracking-widest text-[#D4AF37]">Biblioteca Elite ({exerciseBank.length})</h2>
+                  <p className="text-[9px] text-zinc-500 uppercase font-bold">100 Ejercicios Gamificados</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {(userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') && (
+                    <button 
+                      onClick={handleSyncProBank} 
+                      disabled={isSyncingBank}
+                      className="text-[8px] font-black uppercase bg-[#D4AF37] text-black px-2 py-1 rounded-full flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {isSyncingBank ? <Loader2 className="animate-spin" size={10} /> : <Zap size={10} />}
+                      Sync Pro
+                    </button>
+                  )}
+                  <button onClick={() => setShowBankModal(false)} className="p-2 bg-black rounded-full"><X size={20}/></button>
+                </div>
               </div>
-              <input type="text" placeholder="Buscar..." className="w-full bg-black border border-zinc-800 p-3 rounded-xl mb-4 outline-none" value={bankSearchQuery} onChange={(e) => setBankSearchQuery(e.target.value)} />
-              <div className="overflow-y-auto space-y-2">
+              <input type="text" placeholder="Buscar ejercicio o momento..." className="w-full bg-black border border-zinc-800 p-3 rounded-xl mb-3 outline-none focus:border-[#D4AF37] transition-all" value={bankSearchQuery} onChange={(e) => setBankSearchQuery(e.target.value)} />
+              
+              <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar mb-2">
+                <button 
+                  onClick={() => setBankSelectedCategory('all')}
+                  className={`whitespace-nowrap px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-tighter border transition-all ${bankSelectedCategory === 'all' ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-zinc-800 text-zinc-500'}`}
+                >
+                  TODOS
+                </button>
+                {CATEGORIES.map(cat => (
+                  <button 
+                    key={cat}
+                    onClick={() => setBankSelectedCategory(cat)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-tighter border transition-all ${bankSelectedCategory === cat ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-zinc-800 text-zinc-500'}`}
+                  >
+                    {cat.split(':')[0]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="overflow-y-auto space-y-2 flex-1 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                {exerciseBank.length === 0 && !isSyncingBank && (
+                   <div className="text-center py-10 border border-dashed border-zinc-800 rounded-3xl bg-black/20">
+                      <Zap size={32} className="mx-auto mb-3 text-[#D4AF37]" strokeWidth={1} />
+                      <p className="text-xs font-bold text-zinc-400 mb-4 px-6">Tu banco de ejercicios está vacío. ¿Deseas cargar los 100 ejercicios del sistema gamificado?</p>
+                      <button 
+                        onClick={handleSyncProBank}
+                        className="bg-[#D4AF37] text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                      >
+                        Sincronizar Banco Élite
+                      </button>
+                   </div>
+                )}
                 {filteredBank.map(ex => (
-                  <div key={ex.id} className="p-4 bg-black border border-zinc-800 rounded-xl flex justify-between items-center group cursor-pointer hover:border-[#D4AF37]" onClick={() => {
+                  <div key={ex.id} className="p-4 bg-black border border-zinc-800 rounded-2xl flex justify-between items-center group cursor-pointer hover:border-[#D4AF37] transition-all" onClick={() => {
                     if (bankTargetType === 'normal') {
-                      setExName(ex.name); setExNotes(ex.description || ''); setExSeries(ex.series || 3);
+                      const newEx: Exercise = {
+                        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        name: ex.name,
+                        series: 3,
+                        reps: '',
+                        timePerSeries: ex.time || 0,
+                        load: '',
+                        rpe: 0,
+                        rest: ex.rest || 60,
+                        notes: ex.desc || ex.description || '',
+                        totalTime: calculateExerciseTotalTime(3, ex.time || 0)
+                      };
+                      setBlocks(blocks.map(b => {
+                        if (b.id === bankTargetBlockId) {
+                          const updatedExercises = [...b.exercises, newEx];
+                          return { ...b, exercises: updatedExercises, totalTime: updatedExercises.reduce((acc, e) => acc + (e.totalTime || 0), 0) };
+                        }
+                        return b;
+                      }));
                     } else {
-                      setCircExName(ex.name); setCircExTime(ex.time || 30);
+                      const newItem = { 
+                        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
+                        name: ex.name, 
+                        time: ex.time || 30, 
+                        reps: '', 
+                        load: '', 
+                        rpe: 0, 
+                        rest: ex.rest || 30, 
+                        order: 0 
+                      };
+                      setBlocks(blocks.map(b => {
+                        if (b.id === bankTargetBlockId && b.type === 'circuit' && b.circuit) {
+                          const updatedItems = [...b.circuit.items, newItem].map((item, idx) => ({ ...item, order: idx }));
+                          const workTime = updatedItems.reduce((acc, item) => acc + (item.time || 0), 0);
+                          const restExTime = Math.max(0, updatedItems.length - 1) * b.circuit.restBetweenExercises;
+                          const roundTime = workTime + restExTime;
+                          const totalTime = (roundTime * b.circuit.rounds) + (b.circuit.restBetweenRounds * (b.circuit.rounds - 1));
+                          return { ...b, circuit: { ...b.circuit, items: updatedItems }, totalTime };
+                        }
+                        return b;
+                      }));
                     }
                     setShowBankModal(false);
                   }}>
-                    <span className="font-bold">{ex.name}</span>
-                    <Plus size={16} className="text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        {ex.env === 'field' || ex.env === 'all' ? <span className="text-[10px]">🟢</span> : ex.env === 'restricted' ? <span className="text-[10px]">🟡</span> : <span className="text-[10px]">🔴</span>}
+                        <span className="font-bold text-sm">{ex.name}</span>
+                      </div>
+                      <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tighter mt-1">{ex.muscleGroup}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[7px] font-black bg-zinc-900 text-zinc-400 px-1.5 py-0.5 rounded uppercase">{ex.moment || 'M3'}</span>
+                       <Plus size={16} className="text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </div>
                 ))}
+                {filteredBank.length === 0 && (
+                  <div className="text-center py-10 opacity-30">
+                    <Search size={40} className="mx-auto mb-2" />
+                    <p className="text-xs font-bold uppercase tracking-widest">No se encontraron resultados</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

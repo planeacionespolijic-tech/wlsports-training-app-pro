@@ -177,7 +177,7 @@ export const PlanningScreen = () => {
                   <label className="text-[10px] text-zinc-500 uppercase font-bold">Bloques de Entrenamiento</label>
                   <div className="flex flex-wrap gap-2">
                     {blocks.map((block, i) => (
-                      <div key={i} className="bg-black border border-zinc-800 px-3 py-1 rounded-lg text-xs flex items-center gap-2">
+                      <div key={`block-${block}-${i}`} className="bg-black border border-zinc-800 px-3 py-1 rounded-lg text-xs flex items-center gap-2">
                         {block}
                         <button type="button" onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))} className="text-red-500">×</button>
                       </div>
@@ -249,7 +249,7 @@ export const PlanningScreen = () => {
                       <h4 className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Estructura de Bloques</h4>
                       <div className="grid grid-cols-1 gap-2">
                         {item.blocks?.map((block, i) => (
-                          <div key={i} className="flex items-center gap-3 bg-black/50 p-3 rounded-xl border border-zinc-800">
+                          <div key={`plan-block-${block}-${i}`} className="flex items-center gap-3 bg-black/50 p-3 rounded-xl border border-zinc-800">
                             <div className="w-6 h-6 bg-zinc-800 rounded-full flex items-center justify-center text-[10px] font-bold text-zinc-500">
                               {i + 1}
                             </div>

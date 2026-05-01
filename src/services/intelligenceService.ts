@@ -20,16 +20,81 @@ export interface BiometricAnalysis {
 }
 
 export interface ChallengeCard {
+  id?: number;
   title: string;
   description: string;
-  userBuff: string;
-  coachHandicap: string;
-  suggestedPenalty: string;
+  userBuff?: string;
+  coachHandicap?: string;
+  suggestedPenalty?: string;
+  category?: 'nerf' | 'buff' | 'duelo' | 'torneo';
 }
 
 /**
- * SISTEMA GAME MASTER DE DESAFÍOS
+ * SISTEMA GAME MASTER DE DESAFÍOS - POOL DE TARJETAS
  */
+export const ALL_CHALLENGES: ChallengeCard[] = [
+  // 1-50 (Existing or placeholder for the first 50)
+  { id: 1, title: 'El Travesaño', description: 'Golpear el poste o travesaño desde la distancia acordada.', category: 'duelo' },
+  { id: 2, title: 'Bowling Humano', description: 'Derribar 5 conos con el balón rodando en el menor tiempo.', category: 'duelo' },
+  { id: 3, title: 'Slalom Ciego', description: 'Completar circuito de conos siguiendo solo la voz del compañero.', category: 'duelo' },
+  { id: 4, title: 'Reacción de Colores', description: 'Tocar el cono del color indicado en menos de 1 seg.', category: 'duelo' },
+  { id: 5, title: 'Puntería Láser', description: 'Meter el balón en un objetivo pequeño o aro.', category: 'duelo' },
+  { id: 6, title: 'Duelo de Toques', description: 'Mantener el balón en el aire sin usar las manos.', category: 'duelo' },
+
+  // 51-65: TARJETAS DE NERF (Hándicap Coach)
+  { id: 51, title: 'Ancla Humana', description: 'Coach con Cinturón Pro anclado a poste con tensión.', category: 'nerf' },
+  { id: 52, title: 'Visión de Túnel', description: 'Tapar un ojo para perder profundidad.', category: 'nerf' },
+  { id: 53, title: 'Pierna de Cristal', description: 'Prohibido usar pierna dominante.', category: 'nerf' },
+  { id: 54, title: 'El Escudero', description: 'Sostener Disco de 5kg o Caja con brazos extendidos.', category: 'nerf' },
+  { id: 55, title: 'Sin Salto', description: 'Prohibido despegar ambos pies del suelo (No correr/saltar).', category: 'nerf' },
+  { id: 56, title: 'Mano en Espalda', description: 'Manos entrelazadas atrás durante todo el reto.', category: 'nerf' },
+  { id: 57, title: 'Estatua de Sal', description: 'Al silbato, el Coach se congela 3s; el alumno sigue.', category: 'nerf' },
+  { id: 58, title: 'Balón Pesado', description: 'Coach usa Kettlebell o MedBall en manos; alumno usa balón.', category: 'nerf' },
+  { id: 59, title: 'Respiración Yoga', description: 'Solo inhalar/exhalar por la nariz en el duelo.', category: 'nerf' },
+  { id: 60, title: 'El Pirata', description: 'Coach se desplaza saltando en un solo pie.', category: 'nerf' },
+  { id: 61, title: 'Carga Extra', description: 'Coach usa morral con peso durante el circuito.', category: 'nerf' },
+  { id: 62, title: 'Toque Único', description: 'El Coach solo tiene 1 toque de balón permitido.', category: 'nerf' },
+  { id: 63, title: 'Silencio Total', description: 'Coach no puede hablar ni dar instrucciones.', category: 'nerf' },
+  { id: 64, title: 'Vértigo', description: '3 giros sobre el eje antes de cada acción técnica.', category: 'nerf' },
+  { id: 65, title: 'Exclusión', description: 'Coach no puede pisar el área central (12x8m).', category: 'nerf' },
+
+  // 66-75: TARJETAS DE BUFF (Ventaja Alumno)
+  { id: 66, title: 'Balón Teledirigido', description: 'Uso libre de Rebotadores para apoyo infinito.', category: 'buff' },
+  { id: 67, title: 'Escudo de Reacción', description: 'Alumno elige el color inicial en la App de Reacción.', category: 'buff' },
+  { id: 68, title: 'Replay', description: 'Repetir la peor ejecución sin penalización.', category: 'buff' },
+  { id: 69, title: 'Zona VIP', description: 'Alumno remata/pasa 2 metros más cerca del objetivo.', category: 'buff' },
+  { id: 70, title: 'Combo Neuro', description: 'Si acierta App de Reacción, puntos valen doble.', category: 'buff' },
+  { id: 71, title: 'Cronomago', description: '+10 segundos adicionales en retos de tiempo.', category: 'buff' },
+  { id: 72, title: 'Escudo de Error', description: 'El primer fallo técnico no cuenta.', category: 'buff' },
+  { id: 73, title: 'El Consultor', description: 'Pedir consejo técnico al Coach antes de iniciar.', category: 'buff' },
+  { id: 74, title: 'Salto Cuántico', description: 'Saltar un obstáculo del circuito a elección.', category: 'buff' },
+  { id: 75, title: 'Gravedad Cero', description: 'Uso de Pelota Plástica ligera para toques.', category: 'buff' },
+
+  // 76-85: DUELOS TÉCNICOS & RETOS
+  { id: 76, title: 'Raquetas 12x8', description: 'Mantener pelota de tenis en aire con raquetas.', category: 'duelo' },
+  { id: 77, title: 'Muro de Precisión', description: 'Pases 1ra intención contra pared; pierde quien falle.', category: 'duelo' },
+  { id: 78, title: 'Caza-Estacas', description: 'Tocar 5 estacas en orden de la App de Reacción.', category: 'duelo' },
+  { id: 79, title: 'Tenis-Fútbol Pro', description: 'Duelo sobre red con pierna no dominante (2:1).', category: 'duelo' },
+  { id: 80, title: 'Slalom Ciego Pro', description: 'Alumno vendado guiado por voz del Coach.', category: 'duelo' },
+  { id: 81, title: 'Intocable 2x2', description: 'Mantener posesión en cuadro reducido contra Coach.', category: 'duelo' },
+  { id: 82, title: 'Caja Mágica', description: 'Meter balón en tacho o Caja de Madera a 10m.', category: 'duelo' },
+  { id: 83, title: 'Duelo BOSU', description: 'Más tiempo en equilibrio haciendo pases.', category: 'duelo' },
+  { id: 84, title: 'Remolque', description: 'Duelo de tracción con Cinturón Pro.', category: 'duelo' },
+  { id: 85, title: 'Penal Mareado', description: '5 vueltas y remate a mini-portería.', category: 'duelo' },
+
+  // 86-95: RETOS DE TORNEO
+  { id: 86, title: 'Especialista TRX', description: 'Max repeticiones remo 45s (40 pts).', category: 'torneo' },
+  { id: 87, title: 'Dominio Plástico', description: '20 toques seguidos pelota ligera (30 pts).', category: 'torneo' },
+  { id: 88, title: 'Equilibrio Fitball', description: '10 pases cabeza sentado en Fitball (40 pts).', category: 'torneo' },
+  { id: 89, title: 'Resistencia Pro', description: '1 min sprint contra banda elástica (50 pts).', category: 'torneo' },
+  { id: 90, title: 'Diana Kettlebell', description: 'Derribar platillo sobre Pesa Rusa a 8m (60 pts).', category: 'torneo' },
+  { id: 91, title: 'Muro de Haaland', description: '30 pases pared zurda/derecha sin error (50 pts).', category: 'torneo' },
+  { id: 92, title: 'Salto Tigre', description: 'Tocar marca alta tras salto desde Step (30 pts).', category: 'torneo' },
+  { id: 93, title: 'Neuro-Tenis', description: '15 toques pelota tenis sin manos (70 pts).', category: 'torneo' },
+  { id: 94, title: 'Flash Circuit', description: 'Slalom+Valla+Gol en < 12s (100 pts).', category: 'torneo' },
+  { id: 95, title: 'El Embajador', description: 'Ganar duelo al Coach sin usar BUFFS (150 pts).', category: 'torneo' },
+];
+
 export const generateChallenge = async (userId: string): Promise<ChallengeCard> => {
   try {
     const userSnap = await getDoc(doc(db, 'users', userId));
@@ -37,6 +102,32 @@ export const generateChallenge = async (userId: string): Promise<ChallengeCard> 
     const birthDate = userData?.birthDate ? new Date(userData.birthDate) : new Date();
     const age = new Date().getFullYear() - birthDate.getFullYear();
     const profile = userData?.profile || 'bienestar';
+
+    const random = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+
+    // We can either pick a specific challenge (76-95) or generate one (existing logic)
+    // Or just pick from the whole pool if we want to include the new ones.
+    const usePool = Math.random() > 0.3; // 70% chance to use the specific new pool
+    
+    if (usePool) {
+      const challenge = random(ALL_CHALLENGES.filter(c => c.id && c.id >= 51));
+      
+      const penalties = [
+        'hace 10 saltos de rana',
+        'recoge todo el material del campo',
+        'invita el hidratante al final de la sesión',
+        'hace un baile gracioso de 15 segundos',
+        'hace 5 burpees explosivos',
+        'carga los balones hasta el depósito'
+      ];
+
+      return {
+        ...challenge,
+        suggestedPenalty: random(penalties),
+        userBuff: challenge.category === 'buff' ? challenge.description : "Duelo Estándar",
+        coachHandicap: challenge.category === 'nerf' ? challenge.description : "Duelo Estándar"
+      };
+    }
 
     const challenges = [
       { title: 'El Travesaño', description: 'Golpear el poste o travesaño desde la distancia acordada.' },
@@ -71,8 +162,6 @@ export const generateChallenge = async (userId: string): Promise<ChallengeCard> 
       'hace 5 burpees explosivos',
       'carga los balones hasta el depósito'
     ];
-
-    const random = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
 
     const challenge = random(challenges);
     let userBuff = "Duelo Puro (Sin Ventajas)";

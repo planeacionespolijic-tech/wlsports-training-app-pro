@@ -430,10 +430,10 @@ export const TournamentsScreen = () => {
                   </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Resultados por Jugador</label>
-                    {selectedTournament.players.map(player => {
+                    {selectedTournament.players.map((player, pIdx) => {
                       const result = newMatchDay.results.find(r => r.playerName === player);
                       return (
-                        <div key={player} className="flex items-center justify-between bg-black/50 p-4 rounded-xl border border-zinc-800">
+                        <div key={`${player}-${pIdx}`} className="flex items-center justify-between bg-black/50 p-4 rounded-xl border border-zinc-800">
                           <span className="font-bold text-sm">{player}</span>
                           <div className="flex gap-2">
                             {[
@@ -481,7 +481,7 @@ export const TournamentsScreen = () => {
                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Jugador</label>
                     <select required value={newBonus.playerName} onChange={(e) => setNewBonus({ ...newBonus, playerId: e.target.value, playerName: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-sm outline-none focus:border-[#D4AF37]">
                       <option value="">Seleccionar jugador...</option>
-                      {selectedTournament.players.map(p => <option key={p} value={p}>{p}</option>)}
+                      {selectedTournament.players.map((p, pIdx) => <option key={`${p}-${pIdx}`} value={p}>{p}</option>)}
                     </select>
                   </div>
                   <div>
