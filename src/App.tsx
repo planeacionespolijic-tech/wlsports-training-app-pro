@@ -30,6 +30,7 @@ const ChallengesScreen = lazy(() => import('./screens/ChallengesScreen').then(m 
 const TournamentsScreen = lazy(() => import('./screens/TournamentsScreen').then(m => ({ default: m.TournamentsScreen })));
 const ProgressionScreen = lazy(() => import('./screens/ProgressionScreen').then(m => ({ default: m.ProgressionScreen })));
 const TabataScreen = lazy(() => import('./screens/TabataScreen').then(m => ({ default: m.TabataScreen })));
+const CircuitExecutionScreen = lazy(() => import('./screens/CircuitExecutionScreen').then(m => ({ default: m.CircuitExecutionScreen })));
 const ReactionScreen = lazy(() => import('./screens/ReactionScreen').then(m => ({ default: m.ReactionScreen })));
 const InitialEvaluationScreen = lazy(() => import('./screens/evaluation/InitialEvaluationScreen').then(m => ({ default: m.InitialEvaluationScreen })));
 
@@ -156,6 +157,7 @@ const AppShell: React.FC = () => {
           <Route path="/torneos" element={<ProtectedRoute><TournamentsScreen /></ProtectedRoute>} />
           <Route path="/progresion" element={<ProtectedRoute><ProgressionScreen /></ProtectedRoute>} />
           <Route path="/tabata" element={<ProtectedRoute><TabataScreen /></ProtectedRoute>} />
+          <Route path="/ejecucion-circuito" element={<ProtectedRoute><CircuitExecutionScreen /></ProtectedRoute>} />
           <Route path="/reaccion" element={<ProtectedRoute><ReactionScreen /></ProtectedRoute>} />
           <Route path="/kids-module" element={<ProtectedRoute><KidsModuleScreen /></ProtectedRoute>} />
 

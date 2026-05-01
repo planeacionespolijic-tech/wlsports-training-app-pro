@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight, Shield } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight, Shield, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,14 +35,23 @@ export const SessionExecutionScreen = () => {
   const [showTabata, setShowTabata] = useState(false);
   const [showReaction, setShowReaction] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [expandedBlocks, setExpandedBlocks] = useState<string[]>([]);
   const [newExName, setNewExName] = useState('');
+  const [newExSeries, setNewExSeries] = useState(3);
+  const [newExReps, setNewExReps] = useState('');
+  const [newExRest, setNewExRest] = useState(60);
+  const [newExLoad, setNewExLoad] = useState('');
+  const [newExRpe, setNewExRpe] = useState('');
   const [extraExercises, setExtraExercises] = useState<any[]>([]);
 
   // Exercise Bank Integration
   const [bankExercises, setBankExercises] = useState<any[]>([]);
   const [loadingBank, setLoadingBank] = useState(false);
+  const [loadingGlobalRoutines, setLoadingGlobalRoutines] = useState(false);
   const [bankSearch, setBankSearch] = useState('');
-  const [showBankPicker, setShowBankPicker] = useState(false);
+  const [routineSearch, setRoutineSearch] = useState('');
+  const [showBankPicker, setShowBankPicker] = useState<'manual' | 'bank' | 'routines'>('manual');
+  const [globalRoutines, setGlobalRoutines] = useState<any[]>([]);
 
   useEffect(() => {
     if (!currentWorkout && workoutId) {
@@ -62,25 +71,37 @@ export const SessionExecutionScreen = () => {
     }
   }, [workoutId, currentWorkout]);
 
-  // Fetch Bank Exercises when Modal opens
+  // Fetch Bank Exercises and Global Routines when Modal opens
   useEffect(() => {
-    if (showAdd && trainerId) {
-      const fetchBank = async () => {
+    if (showAdd) {
+      const fetchData = async () => {
+        // Determine the relevant trainer/owner ID to fetch content
+        const targetTrainerId = userData?.role === 'coach' ? userId : (userData?.trainerId || userId);
+        
+        if (!targetTrainerId) return;
+
         setLoadingBank(true);
+        setLoadingGlobalRoutines(true);
         try {
-          const q = query(collection(db, 'exerciseBank'), where('trainerId', '==', trainerId));
-          const snap = await getDocs(q);
-          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setBankExercises(data);
+          // Fetch Bank Exercises
+          const bankQ = query(collection(db, 'exerciseBank'), where('trainerId', '==', targetTrainerId));
+          const bankSnap = await getDocs(bankQ);
+          setBankExercises(bankSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+          // Fetch Global Routines (Workouts)
+          const routinesQ = query(collection(db, 'workouts'), where('trainerId', '==', targetTrainerId));
+          const routinesSnap = await getDocs(routinesQ);
+          setGlobalRoutines(routinesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (err) {
-          console.error("Error fetching bank", err);
+          console.error("Error fetching data", err);
         } finally {
           setLoadingBank(false);
+          setLoadingGlobalRoutines(false);
         }
       };
-      fetchBank();
+      fetchData();
     }
-  }, [showAdd, trainerId]);
+  }, [showAdd, userId, userData]);
 
   // Extract blocks safely
   const workoutBlocks = React.useMemo(() => {
@@ -136,6 +157,14 @@ export const SessionExecutionScreen = () => {
     );
   };
 
+  const toggleBlock = (blockId: string) => {
+    setExpandedBlocks(prev => 
+      prev.includes(blockId) 
+        ? prev.filter(id => id !== blockId)
+        : [...prev, blockId]
+    );
+  };
+
   const handleRollChallenge = async () => {
     setIsGeneratingChallenge(true);
     try {
@@ -155,14 +184,50 @@ export const SessionExecutionScreen = () => {
     const newEx = {
       id: exerciseToUse ? `bank-${exerciseToUse.id}-${Date.now()}` : `manual-${Date.now()}`,
       name: nameToUse,
+      series: exerciseToUse ? (exerciseToUse.series || 3) : newExSeries,
+      reps: exerciseToUse ? (exerciseToUse.reps || '') : newExReps,
+      rest: exerciseToUse ? (exerciseToUse.rest || 60) : newExRest,
+      load: exerciseToUse ? (exerciseToUse.load || '') : newExLoad,
+      rpe: exerciseToUse ? (exerciseToUse.rpe || '') : newExRpe,
       isManual: true,
       fromBank: !!exerciseToUse
     };
 
     setExtraExercises(prev => [...prev, newEx]);
     setNewExName('');
+    setNewExSeries(3);
+    setNewExReps('');
+    setNewExRest(60);
+    setNewExLoad('');
+    setNewExRpe('');
     setShowAdd(false);
-    setShowBankPicker(false);
+    setShowBankPicker('manual');
+  };
+
+  const handleImportRoutine = (routine: any) => {
+    if (!routine || !routine.blocks) return;
+
+    const importedExercises: any[] = [];
+    routine.blocks.forEach((block: any, bIdx: number) => {
+      const exercises = [
+        ...(block.exercises || []),
+        ...(block.circuit?.items || [])
+      ];
+
+      exercises.forEach((ex: any, eIdx: number) => {
+        importedExercises.push({
+          ...ex,
+          id: `imported-${routine.id}-${bIdx}-${eIdx}-${Date.now()}`,
+          isManual: true,
+          fromRoutine: routine.name
+        });
+      });
+    });
+
+    setExtraExercises(prev => [...prev, ...importedExercises]);
+    setShowAdd(false);
+    setShowBankPicker('manual');
+    alert(`¡Rutina "${routine.name}" importada!`);
   };
 
   const handleFinish = async () => {
@@ -282,39 +347,106 @@ export const SessionExecutionScreen = () => {
               <h3 className="text-xl font-black italic uppercase mb-2">Añadir Ejercicio</h3>
               <div className="flex bg-black rounded-xl p-1 gap-1">
                 <button 
-                  onClick={() => setShowBankPicker(false)}
-                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${!showBankPicker ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
+                  onClick={() => setShowBankPicker('manual')}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all ${showBankPicker === 'manual' ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
                 >
                   Manual
                 </button>
                 <button 
-                  onClick={() => setShowBankPicker(true)}
-                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${showBankPicker ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
+                  onClick={() => setShowBankPicker('bank')}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all ${showBankPicker === 'bank' ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
                 >
                   Biblioteca
+                </button>
+                <button 
+                  onClick={() => setShowBankPicker('routines')}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all ${showBankPicker === 'routines' ? 'bg-zinc-800 text-[#D4AF37]' : 'text-zinc-600'}`}
+                >
+                  Rutinas
                 </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 pt-6">
-              {!showBankPicker ? (
+              {showBankPicker === 'manual' ? (
                 <div className="space-y-6">
-                  <p className="text-xs text-zinc-500">¿Quieres añadir algo rápido que no está en el plan?</p>
-                  <input 
-                    autoFocus
-                    value={newExName}
-                    onChange={(e) => setNewExName(e.target.value)}
-                    placeholder="Ej: Sprint final, Plancha..."
-                    className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white focus:border-[#D4AF37] outline-none"
-                  />
+                  <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Añadir Ejercicio Personalizado</p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nombre</label>
+                      <input 
+                        autoFocus
+                        value={newExName}
+                        onChange={(e) => setNewExName(e.target.value)}
+                        placeholder="Ej: Sprint final, Plancha..."
+                        className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white focus:border-[#D4AF37] outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Series</label>
+                        <input 
+                          type="number"
+                          value={newExSeries ?? 3}
+                          onChange={(e) => setNewExSeries(parseInt(e.target.value) || 0)}
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Reps</label>
+                        <input 
+                          type="text"
+                          value={newExReps || ''}
+                          onChange={(e) => setNewExReps(e.target.value)}
+                          placeholder="8-12"
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Descanso (s)</label>
+                        <input 
+                          type="number"
+                          value={newExRest ?? 60}
+                          onChange={(e) => setNewExRest(parseInt(e.target.value) || 0)}
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Carga</label>
+                        <input 
+                          type="text"
+                          value={newExLoad || ''}
+                          onChange={(e) => setNewExLoad(e.target.value)}
+                          placeholder="Kg"
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">RPE / %</label>
+                        <input 
+                          type="text"
+                          value={newExRpe || ''}
+                          onChange={(e) => setNewExRpe(e.target.value)}
+                          placeholder="1-10"
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <button 
                     onClick={() => handleAddManualExercise()}
-                    className="w-full bg-[#D4AF37] text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs"
+                    className="w-full bg-[#D4AF37] text-black font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     Añadir a la sesión
                   </button>
                 </div>
-              ) : (
+              ) : showBankPicker === 'bank' ? (
                 <div className="space-y-4">
                   <div className="sticky top-0 bg-zinc-900 pb-2 z-10">
                     <div className="relative">
@@ -351,6 +483,48 @@ export const SessionExecutionScreen = () => {
                           <ChevronRight size={14} className="text-zinc-700 group-hover:text-[#D4AF37]" />
                         </button>
                       ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="sticky top-0 bg-zinc-900 pb-2 z-10">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" size={14} />
+                      <input 
+                        placeholder="Buscar rutinas..."
+                        value={routineSearch}
+                        onChange={(e) => setRoutineSearch(e.target.value)}
+                        className="w-full bg-black border border-zinc-800 py-3 pl-10 pr-4 rounded-xl text-xs outline-none focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  </div>
+
+                  {loadingGlobalRoutines ? (
+                    <div className="flex justify-center p-8">
+                      <Loader2 size={24} className="text-[#D4AF37] animate-spin" />
+                    </div>
+                  ) : globalRoutines.filter(r => r.name.toLowerCase().includes(routineSearch.toLowerCase())).length === 0 ? (
+                    <p className="text-center text-xs text-zinc-600 py-8">No se encontraron rutinas</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {globalRoutines
+                        .filter(r => r.name.toLowerCase().includes(routineSearch.toLowerCase()))
+                        .map(routine => (
+                          <button
+                            key={routine.id}
+                            onClick={() => handleImportRoutine(routine)}
+                            className="w-full flex flex-col p-4 bg-black/50 border border-zinc-800 rounded-xl hover:border-[#D4AF37]/40 transition-all text-left group"
+                          >
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <span className="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors">{routine.name}</span>
+                              <ChevronRight size={14} className="text-zinc-700 group-hover:text-[#D4AF37]" />
+                            </div>
+                            <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
+                              {routine.blocks?.length || 0} Bloques
+                            </p>
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -546,54 +720,233 @@ export const SessionExecutionScreen = () => {
           ) : (
             <>
               {workoutBlocks.map((block: any, bIdx: number) => {
+                const blockId = block.id || `block-${bIdx}`;
+                const isExpanded = expandedBlocks.includes(blockId);
+
+                // Circuit Specialized Rendering
+                if (block.type === 'circuit' && block.circuit) {
+                  const circuit = block.circuit;
+                  return (
+                    <div key={blockId} className="space-y-4">
+                      <button 
+                        onClick={() => toggleBlock(blockId)}
+                        className="w-full flex items-center justify-between px-1 hover:opacity-80 transition-opacity"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 bg-orange-500 text-black rounded-lg flex items-center justify-center text-[10px] font-black">{bIdx + 1}</span>
+                          <h2 className="text-xs font-black text-orange-500 uppercase tracking-[0.15em]">{block.name} • CIRCUITO</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/ejecucion-circuito', { state: { circuit: block.circuit, workoutName: block.name } });
+                            }}
+                            className="bg-orange-500 text-black p-2 rounded-xl hover:scale-110 active:scale-95 transition-all shadow-lg"
+                          >
+                            <Play size={16} fill="black" />
+                          </button>
+                          {isExpanded ? <ChevronUp size={16} className="text-zinc-600" /> : <ChevronDown size={16} className="text-zinc-600" />}
+                        </div>
+                      </button>
+
+                      <motion.div 
+                        initial={false}
+                        animate={{ height: isExpanded ? 'auto' : 0, opacity: isExpanded ? 1 : 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden mb-3 shadow-xl">
+                          {/* Round Info Header */}
+                          <div className="bg-orange-500/5 border-b border-zinc-800 p-5 grid grid-cols-3 gap-4">
+                            <div className="text-center">
+                              <span className="block text-[8px] font-black text-zinc-500 uppercase tracking-widest leading-tight mb-1">Rondas</span>
+                              <span className="text-lg font-black text-orange-500">{circuit.rounds}</span>
+                            </div>
+                            <div className="text-center border-x border-zinc-800 px-2">
+                              <span className="block text-[8px] font-black text-zinc-500 uppercase tracking-widest leading-tight mb-1">Desc. Ej.</span>
+                              <span className="text-sm font-bold text-white">{circuit.restBetweenExercises}s</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="block text-[8px] font-black text-zinc-500 uppercase tracking-widest leading-tight mb-1">Desc. Rnd.</span>
+                              <span className="text-sm font-bold text-white">{circuit.restBetweenRounds}s</span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 space-y-2">
+                            {circuit.items?.map((item: any, idx: number) => {
+                              const itemId = item.id || `${blockId}-item-${idx}`;
+                              const isItemCompleted = completedExercises.includes(itemId);
+
+                              return (
+                                <button
+                                  key={itemId}
+                                  onClick={() => handleToggle(itemId)}
+                                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                                    isItemCompleted 
+                                      ? 'bg-emerald-500/10 border-emerald-500/30 opacity-70' 
+                                      : 'bg-black/40 border-zinc-800 hover:bg-black/60'
+                                  }`}
+                                >
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black ${
+                                    isItemCompleted ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'
+                                  }`}>
+                                    {idx + 1}
+                                  </div>
+
+                                  <div className="flex-1 text-left">
+                                    <h4 className={`text-sm font-bold ${isItemCompleted ? 'text-emerald-500 line-through' : 'text-zinc-100'}`}>
+                                      {item.name}
+                                    </h4>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                                      {item.time > 0 && (
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">Tiempo</span>
+                                          <span className="text-[10px] font-bold text-orange-500 tracking-tight">{item.time}s</span>
+                                        </div>
+                                      )}
+                                      {item.reps && (
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">Reps</span>
+                                          <span className="text-[10px] font-bold text-zinc-400 tracking-tight">{item.reps}</span>
+                                        </div>
+                                      )}
+                                      {item.load && (
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">Carga</span>
+                                          <span className="text-[10px] font-bold text-[#D4AF37] tracking-tight">{item.load}</span>
+                                        </div>
+                                      )}
+                                      {item.rpe > 0 && (
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">RPE</span>
+                                          <span className="text-[10px] font-bold text-zinc-400 tracking-tight">{item.rpe}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {isItemCompleted && (
+                                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </motion.div>
+                    </div>
+                  );
+                }
+
+                // Normal Block Rendering (Original)
                 const blockExercises = [
-                  ...(block.exercises || []),
-                  ...(block.circuit?.items || [])
+                  ...(block.exercises || [])
                 ];
                 
-                if (blockExercises.length === 0) return null;
+                if (blockExercises.length === 0 && !block.circuit) return null;
 
                 return (
-                  <div key={block.id || bIdx} className="space-y-4">
-                    <div className="flex items-center gap-3 px-1">
-                      <span className="w-6 h-6 bg-[#D4AF37] text-black rounded-lg flex items-center justify-center text-[10px] font-black">{bIdx + 1}</span>
-                      <h2 className="text-xs font-black text-[#D4AF37] uppercase tracking-[0.15em]">{block.name}</h2>
-                    </div>
+                  <div key={blockId} className="space-y-4">
+                    <button 
+                      onClick={() => toggleBlock(blockId)}
+                      className="w-full flex items-center justify-between px-1 hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 bg-[#D4AF37] text-black rounded-lg flex items-center justify-center text-[10px] font-black">{bIdx + 1}</span>
+                        <h2 className="text-xs font-black text-[#D4AF37] uppercase tracking-[0.15em]">{block.name}</h2>
+                      </div>
+                      {isExpanded ? <ChevronUp size={16} className="text-zinc-600" /> : <ChevronDown size={16} className="text-zinc-600" />}
+                    </button>
                     
-                    <div className="space-y-3">
-                      {blockExercises.map((ex: any, idx: number) => {
-                        const exId = ex.id || `block-${bIdx}-ex-${idx}`;
-                        const isCompleted = completedExercises.includes(exId);
-                        
-                        return (
-                          <button
-                            key={exId}
-                            onClick={() => handleToggle(exId)}
-                            className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all active:scale-[0.98] ${
-                              isCompleted 
-                                ? 'bg-emerald-500/10 border-emerald-500/30' 
-                                : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'
-                            }`}
-                          >
-                            <div className="flex-1 text-left pr-4">
-                              <h3 className={`font-bold text-sm ${isCompleted ? 'text-emerald-500' : 'text-white'}`}>
-                                {ex.name || 'Ejercicio'}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                {ex.series && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.series} Series</span>}
-                                {ex.reps && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.reps} Reps</span>}
-                                {ex.timePerSeries > 0 && <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{ex.timePerSeries}s</span>}
+                    <motion.div 
+                      initial={false}
+                      animate={{ height: isExpanded ? 'auto' : 0, opacity: isExpanded ? 1 : 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-3 pt-2">
+                        {blockExercises.map((ex: any, idx: number) => {
+                          const exId = ex.id || `${blockId}-ex-${idx}`;
+                          const isCompleted = completedExercises.includes(exId);
+                          
+                          return (
+                            <button
+                              key={exId}
+                              onClick={() => handleToggle(exId)}
+                              className={`w-full text-left p-5 rounded-2xl border transition-all active:scale-[0.98] ${
+                                isCompleted 
+                                  ? 'bg-emerald-500/10 border-emerald-500/30' 
+                                  : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <h3 className={`font-bold text-base mb-2 ${isCompleted ? 'text-emerald-500 line-through opacity-70' : 'text-white'}`}>
+                                    {ex.name || 'Ejercicio'}
+                                  </h3>
+                                  
+                                  <div className="grid grid-cols-2 xs:grid-cols-3 gap-y-2 gap-x-4 mb-3">
+                                    {ex.series && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Series</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.series}</span>
+                                      </div>
+                                    )}
+                                    {ex.reps && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reps</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.reps}</span>
+                                      </div>
+                                    )}
+                                    {(ex.timePerSeries > 0 || ex.time > 0) && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Tiempo</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.timePerSeries || ex.time}s</span>
+                                      </div>
+                                    )}
+                                    {ex.load && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-[#D4AF37]">Carga</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.load}</span>
+                                      </div>
+                                    )}
+                                    {ex.rpe > 0 && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-orange-500">RPE/%</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.rpe}</span>
+                                      </div>
+                                    )}
+                                    {(ex.restBetweenSeries || ex.rest) && (
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Descanso</span>
+                                        <span className="text-xs font-bold text-zinc-300">{ex.restBetweenSeries || ex.rest}s</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {(ex.description || ex.notes) && (
+                                    <div className="bg-black/40 p-3 rounded-xl border border-zinc-800/50">
+                                      <div className="flex items-center gap-1.5 mb-1">
+                                        <Zap size={10} className="text-[#D4AF37]" />
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Instrucciones</span>
+                                      </div>
+                                      <p className="text-[10px] text-zinc-400 italic leading-relaxed">
+                                        {ex.description || ex.notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className={`p-2 rounded-full mt-1 shrink-0 ${
+                                  isCompleted ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-black border border-zinc-800 text-zinc-800'
+                                }`}>
+                                  <CheckCircle2 size={24} />
+                                </div>
                               </div>
-                            </div>
-                            <div className={`p-2 rounded-full ${
-                              isCompleted ? 'bg-emerald-500 text-black' : 'bg-black border border-zinc-800 text-zinc-800'
-                            }`}>
-                              <CheckCircle2 size={24} />
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
                   </div>
                 );
               })}
