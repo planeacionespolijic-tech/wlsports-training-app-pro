@@ -5,10 +5,16 @@ export type UserRole = 'trainer' | 'client' | 'superadmin';
 export type UserStatus = 'active' | 'blocked' | 'deleted';
 
 export interface UserAttributes {
-  ritmo: number;
-  tecnica: number;
-  fuerza: number;
-  mentalidad: number;
+  TEC: number;
+  FIS: number;
+  NEU: number;
+  AGI: number;
+  ACT: number;
+  // Compatibilidad con versiones anteriores
+  ritmo?: number;
+  tecnica?: number;
+  fuerza?: number;
+  mentalidad?: number;
 }
 
 export interface InitialEvaluation {
@@ -81,22 +87,28 @@ export interface Exercise {
   name: string;
   isManual?: boolean;
   fromBank?: boolean;
-  series?: number | string;
+  series: number;
+  reps?: string | number;
   timePerSeries?: number | string;
+  loadType?: 'autocarga' | 'externa';
+  loadValue?: string | number;
+  restBetweenSeries?: string;
+  restBetweenExercises?: string;
+  notes?: string;
+  moment?: 'M1' | 'M2' | 'M3' | 'M4' | 'M5';
+  totalTime?: number | string;
+  // Deprecated but kept for safety during migration
   load?: string;
   rpe?: number | string;
-  totalTime?: number | string;
-  sets?: string | number;
-  reps?: string;
   weight?: string | number;
   rest?: string;
-  notes?: string;
 }
 
 export interface TrainingBlock {
   id: string;
-  name?: string;
+  name: string;
   type: string;
+  moment?: 'M1' | 'M2' | 'M3' | 'M4' | 'M5';
   totalTime?: number | string;
   exercises: Exercise[];
 }
@@ -110,15 +122,16 @@ export interface WorkoutBlock {
 export interface Workout {
   id: string;
   name: string;
-  description?: string;
+  objective?: string;
+  date?: string;
+  sessionNumber?: number;
   trainerId: string;
   athleteId?: string;
-  exercises?: Exercise[];
-  blocks?: (WorkoutBlock | TrainingBlock)[];
+  blocks: TrainingBlock[];
   createdAt?: Timestamp | Date | FieldValue | null;
   totalTime?: number | string;
-  duration?: string;
   updatedAt?: Timestamp | Date | FieldValue | null;
+  isGlobal?: boolean;
 }
 
 export interface Athlete {

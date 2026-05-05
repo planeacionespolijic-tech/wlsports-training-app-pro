@@ -1,5 +1,5 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -28,6 +28,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   
   const [uploading, setUploading] = useState(false);
   const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete?.photoURL || null);
+  const [showProgressionInfo, setShowProgressionInfo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isChild = athlete?.type === 'child';
 
@@ -199,7 +200,14 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
 
         {/* Ficha Técnica (NUEVO MÓDULO) */}
         {athlete.attributes && (
-          <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden">
+          <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden group">
+            <button 
+              onClick={() => setShowProgressionInfo(true)}
+              className="absolute top-4 right-4 z-20 p-2 bg-zinc-800/80 rounded-full text-amber-500 hover:bg-amber-500 hover:text-black transition-all"
+            >
+              <Zap size={16} />
+            </button>
+
             <div className="absolute top-0 right-0 p-4 opacity-10">
                <Shield size={80} style={{ color: themeColor }} />
             </div>
@@ -315,6 +323,95 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
       <footer className="p-8 text-center opacity-30">
         <p className="text-[10px] uppercase tracking-widest">WL Sports Elite Coaching</p>
       </footer>
+      <AnimatePresence>
+        {showProgressionInfo && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-lg bg-zinc-900 rounded-[2.5rem] border border-zinc-800 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            >
+              <div className="p-8 border-b border-zinc-800 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-black italic uppercase text-amber-500">Sistema de Maestría</h3>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Escalas de Nivel y Atributos</p>
+                </div>
+                <button 
+                  onClick={() => setShowProgressionInfo(false)} 
+                  className="p-2 bg-black rounded-full border border-zinc-800 text-zinc-500 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-10">
+                {/* ESCALA DE NIVELES */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-[.3em] text-zinc-500 mb-6">1. Escala de Niveles</h4>
+                  <div className="space-y-4">
+                    {LEVELS.map((level, idx) => (
+                      <div key={idx} className="flex gap-4 p-4 bg-black/40 rounded-2xl border border-zinc-800 shadow-lg">
+                        <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center font-black text-amber-500 text-xs">
+                          L{idx + 1}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center mb-1">
+                            <p className="font-black italic uppercase text-sm">{level.name}</p>
+                            <span className="text-[9px] font-black text-zinc-500 uppercase">{level.minXP}-{level.maxXP} XP</span>
+                          </div>
+                          <p className="text-[10px] text-zinc-400 font-medium leading-tight">CAP: {level.attributeCap} PTS • {level.focus}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* LOGICA DE ATRIBUTOS */}
+                <div className="space-y-6">
+                  <h4 className="text-[10px] font-black uppercase tracking-[.3em] text-zinc-500 mb-6">2. Lógica de Atributos</h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="p-5 bg-black/40 rounded-3xl border border-emerald-500/10">
+                      <p className="text-xs font-black uppercase text-emerald-500 mb-2">Neuro & Agilidad (NEU/AGI)</p>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed">Se obtienen en los Bloques M1/M2 (Activación). +0.2 por ejercicio completado.</p>
+                    </div>
+                    <div className="p-5 bg-black/40 rounded-3xl border border-blue-500/10">
+                      <p className="text-xs font-black uppercase text-blue-500 mb-2">Técnica (TEC)</p>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed">Se obtiene en el Bloque M3 Técnico. +0.5 por ejercicio completado.</p>
+                    </div>
+                    <div className="p-5 bg-black/40 rounded-3xl border border-rose-500/10">
+                      <p className="text-xs font-black uppercase text-rose-500 mb-2">Físico (FIS)</p>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed">Se obtiene en el Bloque M3 de Fuerza/Potencia. +0.5 por ejercicio completado.</p>
+                    </div>
+                    <div className="p-5 bg-black/40 rounded-3xl border border-amber-500/10">
+                      <p className="text-xs font-black uppercase text-amber-500 mb-2">Actitud (ACT)</p>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed">Se obtiene ganando el Desafío M4 (Torneo). +1.0 por victoria sobre el Coach.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/5 p-6 rounded-3xl border border-amber-500/20">
+                   <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-2 flex items-center gap-2">
+                     <Shield size={12} /> Restricción de Progresión
+                   </p>
+                   <p className="text-[10px] text-zinc-400 leading-relaxed font-medium">
+                     Tus atributos no pueden superar el <span className="text-white font-bold">Tope de Nivel (CAP)</span> actual hasta que apruebes la Sesión de Ascenso.
+                   </p>
+                </div>
+              </div>
+
+              <div className="p-8 bg-black/40 border-t border-zinc-800">
+                <button 
+                  onClick={() => setShowProgressionInfo(false)}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-[.3em] transition-all"
+                >
+                  Entendido
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

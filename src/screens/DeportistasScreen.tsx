@@ -116,9 +116,10 @@ export const DeportistasScreen = () => {
         trainerId: userId,
         xp: 0,
         level: 1,
+        unlockedLevel: 1,
         points: 0,
         streak: 0,
-        attributes: { ritmo: 50, tecnica: 50, fuerza: 50, mentalidad: 50 },
+        attributes: { TEC: 10, FIS: 10, NEU: 10, AGI: 10, ACT: 10 },
         lastLogin: serverTimestamp(),
         createdAt: serverTimestamp(),
       });

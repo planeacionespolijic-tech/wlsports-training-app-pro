@@ -93,6 +93,11 @@ export const ALL_CHALLENGES: ChallengeCard[] = [
   { id: 93, title: 'Neuro-Tenis', description: '15 toques pelota tenis sin manos (70 pts).', category: 'torneo' },
   { id: 94, title: 'Flash Circuit', description: 'Slalom+Valla+Gol en < 12s (100 pts).', category: 'torneo' },
   { id: 95, title: 'El Embajador', description: 'Ganar duelo al Coach sin usar BUFFS (150 pts).', category: 'torneo' },
+  { id: 96, title: 'Equilibrio Flamenco', description: 'Más tiempo en un pie haciendo pases que el Coach.', category: 'duelo' },
+  { id: 97, title: 'El Pase Maestro', description: 'Poner el balón en un neumático a 30m.', category: 'torneo' },
+  { id: 98, title: 'Sprint con Lastre', description: 'Correr 20m con paracaídas o trineo de carga.', category: 'torneo' },
+  { id: 99, title: 'Control en Altura', description: 'Bajar balón de un pase bombeado a 5m de altura.', category: 'duelo' },
+  { id: 100, title: 'Gol Olímpico', description: 'Anotar desde el córner con efecto.', category: 'torneo' },
 ];
 
 export const generateChallenge = async (userId: string): Promise<ChallengeCard> => {

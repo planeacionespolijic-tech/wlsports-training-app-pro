@@ -33,6 +33,8 @@ export const WorkoutsScreen = () => {
   
   // Workout form state
   const [newName, setNewName] = useState('');
+  const [newObjective, setNewObjective] = useState('');
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [blocks, setBlocks] = useState<TrainingBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
@@ -42,9 +44,10 @@ export const WorkoutsScreen = () => {
   const [exSeries, setExSeries] = useState(3);
   const [exReps, setExReps] = useState('');
   const [exTime, setExTime] = useState(0);
-  const [exLoad, setExLoad] = useState('');
-  const [exRpe, setExRpe] = useState(0);
-  const [exRest, setExRest] = useState(60);
+  const [exLoadType, setExLoadType] = useState<'autocarga' | 'externa'>('autocarga');
+  const [exLoadValue, setExLoadValue] = useState('');
+  const [exRestSeries, setExRestSeries] = useState(60);
+  const [exRestExercise, setExRestExercise] = useState(60);
   const [exNotes, setExNotes] = useState('');
 
   // Circuit form state
@@ -121,13 +124,20 @@ export const WorkoutsScreen = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setWorkouts(data);
+      
+      // Auto-set session name for new session
+      if (!editingWorkoutId && !newName) {
+        const sessionCount = data.length + 1;
+        setNewName(`Sesión #${sessionCount}`);
+      }
+      
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'workouts');
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [targetUserId]);
+  }, [targetUserId, editingWorkoutId]);
 
   useEffect(() => {
     const currentTrainerId = trainerId || targetUserId;
@@ -175,12 +185,14 @@ export const WorkoutsScreen = () => {
   };
 
   const addBlock = (name?: string) => {
+    const moment = name ? name.split(':')[0].trim() : `M${blocks.length + 1}`;
     const newBlock: TrainingBlock = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: name || `Bloque ${blocks.length + 1}`,
       type: 'normal',
       exercises: [],
-      totalTime: 0
+      totalTime: 0,
+      moment: moment as any
     };
     setBlocks([...blocks, newBlock]);
     setActiveBlockId(newBlock.id);
@@ -211,12 +223,14 @@ export const WorkoutsScreen = () => {
   const addExerciseToBlock = (blockId: string) => {
     if (!exName) return;
     const totalTime = calculateExerciseTotalTime(exSeries, exTime);
+    const blockMoment = blocks.find(b => b.id === blockId)?.moment;
+    
     if (editingExerciseId) {
       setBlocks(blocks.map(b => {
         if (b.id === blockId) {
           const updatedExercises = b.exercises.map(ex => 
             ex.id === editingExerciseId 
-              ? { ...ex, name: exName, series: exSeries, reps: exReps, timePerSeries: exTime, load: exLoad, rpe: exRpe, rest: exRest, notes: exNotes, totalTime }
+              ? { ...ex, name: exName, series: exSeries, reps: exReps, timePerSeries: exTime, loadType: exLoadType, loadValue: exLoadValue, restBetweenSeries: `${exRestSeries}s`, restBetweenExercises: `${exRestExercise}s`, notes: exNotes, totalTime, moment: blockMoment }
               : ex
           );
           return { ...b, exercises: updatedExercises, totalTime: updatedExercises.reduce((acc, ex) => acc + (ex.totalTime || 0), 0) };
@@ -231,9 +245,11 @@ export const WorkoutsScreen = () => {
         series: exSeries,
         reps: exReps,
         timePerSeries: exTime,
-        load: exLoad,
-        rpe: exRpe,
-        rest: exRest,
+        moment: blockMoment as any,
+        loadType: exLoadType,
+        loadValue: exLoadValue,
+        restBetweenSeries: `${exRestSeries}s`,
+        restBetweenExercises: `${exRestExercise}s`,
         notes: exNotes,
         totalTime
       };
@@ -249,21 +265,23 @@ export const WorkoutsScreen = () => {
     setExSeries(3);
     setExReps('');
     setExTime(0);
-    setExLoad('');
-    setExRpe(0);
-    setExRest(60);
+    setExLoadType('autocarga');
+    setExLoadValue('');
+    setExRestSeries(60);
+    setExRestExercise(60);
     setExNotes('');
   };
 
   const startEditExercise = (ex: Exercise) => {
     setEditingExerciseId(ex.id);
     setExName(ex.name);
-    setExSeries(ex.series ?? 3);
+    setExSeries(typeof ex.series === 'number' ? ex.series : parseInt(ex.series as string) || 3);
     setExReps(ex.reps || '');
-    setExTime(ex.timePerSeries ?? 0);
-    setExLoad(ex.load || '');
-    setExRpe(ex.rpe ?? 0);
-    setExRest(ex.rest ?? 60);
+    setExTime(typeof ex.timePerSeries === 'number' ? ex.timePerSeries : parseInt(ex.timePerSeries as string) || 0);
+    setExLoadType(ex.loadType || 'autocarga');
+    setExLoadValue(ex.loadValue || '');
+    setExRestSeries(parseInt(ex.restBetweenSeries || '60') || 60);
+    setExRestExercise(parseInt(ex.restBetweenExercises || '60') || 60);
     setExNotes(ex.notes || '');
   };
 
@@ -283,12 +301,14 @@ export const WorkoutsScreen = () => {
 
   const addExerciseToCircuit = (blockId: string) => {
     if (!circExName) return;
+    const blockMoment = blocks.find(b => b.id === blockId)?.moment;
+
     if (editingItemId) {
       setBlocks(blocks.map(b => {
         if (b.id === blockId && b.type === 'circuit' && b.circuit) {
           const updatedItems = b.circuit.items.map(item => 
             item.id === editingItemId 
-              ? { ...item, name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest }
+              ? { ...item, name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest, moment: blockMoment }
               : item
           );
           const workTime = updatedItems.reduce((acc, item) => acc + (item.time || 0), 0);
@@ -301,7 +321,7 @@ export const WorkoutsScreen = () => {
       }));
       setEditingItemId(null);
     } else {
-      const newItem = { id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest, order: 0 };
+      const newItem = { id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: circExName, time: circExTime, reps: circExReps, load: circExLoad, rpe: circExRpe, rest: circExRest, moment: blockMoment, order: 0 };
       setBlocks(blocks.map(b => {
         if (b.id === blockId && b.type === 'circuit' && b.circuit) {
           const updatedItems = [...b.circuit.items, newItem].map((item, idx) => ({ ...item, order: idx }));
@@ -410,6 +430,9 @@ export const WorkoutsScreen = () => {
 
       const workoutData: any = {
         name: newName.trim(),
+        objective: newObjective.trim(),
+        date: sessionDate,
+        sessionNumber: workouts.length + 1,
         duration: formatTime(sessionTotalTime),
         totalTime: sessionTotalTime,
         blocks: cleanedBlocks,
@@ -444,8 +467,18 @@ export const WorkoutsScreen = () => {
     }
   };
 
+  const loadStandardStructure = () => {
+    CATEGORIES.forEach(cat => {
+      if (!blocks.some(b => b.name === cat)) {
+        addBlock(cat);
+      }
+    });
+  };
+
   const resetForm = () => {
     setNewName('');
+    setNewObjective('');
+    setSessionDate(new Date().toISOString().split('T')[0]);
     setBlocks([]);
     setIsAdding(false);
     setEditingWorkoutId(null);
@@ -453,8 +486,25 @@ export const WorkoutsScreen = () => {
     setEditingExerciseId(null);
   };
 
+  const normalizeMoments = () => {
+    setBlocks(prev => prev.map(block => {
+      const match = block.name.match(/^M([1-5]):/);
+      if (match) {
+        const momentNum = match[1];
+        const newCat = EXERCISE_CATEGORIES.find(c => c.startsWith(`M${momentNum}:`));
+        if (newCat) {
+          return { ...block, name: newCat };
+        }
+      }
+      return block;
+    }));
+    alert('Nombres de momentos actualizados a la nueva versión.');
+  };
+
   const handleEdit = (workout: any) => {
     setNewName(workout.name);
+    setNewObjective(workout.objective || '');
+    setSessionDate(workout.date || new Date().toISOString().split('T')[0]);
     setBlocks(workout.blocks || []);
     setEditingWorkoutId(workout.id);
     setIsAdding(true);
@@ -534,7 +584,25 @@ export const WorkoutsScreen = () => {
                   <div className="flex items-center gap-2 text-[#D4AF37] font-black"><Clock size={16} /><span>{formatTime(sessionTotalTime)}</span></div>
                 </div>
               </div>
-              <input type="text" placeholder="Nombre del entrenamiento" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] uppercase text-zinc-500 ml-2">Nombre de Sesión</label>
+                  <input type="text" placeholder="Sesión #..." className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] uppercase text-zinc-500 ml-2">Fecha</label>
+                  <input type="date" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none text-white appearance-none" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase text-zinc-500 ml-2">Objetivo de la sesión</label>
+                <textarea 
+                  placeholder="Ej: Mejora de la potencia aeróbica y técnica de pase..." 
+                  className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none resize-none h-20" 
+                  value={newObjective} 
+                  onChange={(e) => setNewObjective(e.target.value)} 
+                />
+              </div>
             </div>
 
             <AnimatePresence>
@@ -560,6 +628,18 @@ export const WorkoutsScreen = () => {
               <div className="flex flex-col gap-4">
                 <h2 className="text-[#D4AF37] font-bold text-sm uppercase tracking-widest text-[10px]">Estructura</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button 
+                    onClick={loadStandardStructure} 
+                    className="sm:col-span-2 w-full bg-amber-500/10 text-amber-500 border border-amber-500/20 p-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-amber-500/20 transition-all flex items-center justify-center gap-3 mb-2"
+                  >
+                    <Zap size={16} fill="currentColor" /> Autocargar Estructura (M1-M5)
+                  </button>
+                  <button 
+                    onClick={normalizeMoments} 
+                    className="sm:col-span-2 w-full bg-zinc-800 text-zinc-400 border border-zinc-700 p-3 rounded-2xl text-[8px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 mb-2"
+                  >
+                    Normalizar Sesión Antigua
+                  </button>
                   {CATEGORIES.map((cat, idx) => {
                     const isAdded = blocks.some(b => b.name === cat);
                     return (
@@ -594,11 +674,19 @@ export const WorkoutsScreen = () => {
                             
                             {block.type === 'normal' ? (
                               <div className="space-y-4">
-                                {block.exercises?.map((ex) => (
+                                 {block.exercises?.map((ex) => (
                                   <div key={ex.id} className="flex items-center justify-between bg-black/30 p-3 rounded-xl border border-zinc-800 group" onClick={() => startEditExercise(ex)}>
                                     <div className="flex-1">
                                       <p className="font-bold text-sm group-hover:text-[#D4AF37]">{ex.name}</p>
-                                      <p className="text-[10px] text-zinc-500 font-bold uppercase">{ex.series} series • {ex.reps || ex.timePerSeries + 's'}</p>
+                                      <div className="flex gap-2 text-[9px] text-zinc-500 font-black uppercase mt-0.5">
+                                        <span>{ex.series} series</span>
+                                        <span>•</span>
+                                        <span>{ex.reps || ex.timePerSeries + 's'}</span>
+                                        <span>•</span>
+                                        <span className={ex.loadType === 'externa' ? 'text-amber-500' : ''}>
+                                          {ex.loadType === 'externa' ? `${ex.loadValue || '?'}` : 'Autocarga'}
+                                        </span>
+                                      </div>
                                     </div>
                                     <button onClick={(e) => { e.stopPropagation(); removeExerciseFromBlock(block.id, ex.id); }} className="text-zinc-700 hover:text-red-500"><X size={16} /></button>
                                   </div>
@@ -611,20 +699,50 @@ export const WorkoutsScreen = () => {
                                   <Search size={14} /> Importar de Biblioteca
                                 </button>
 
-                                <div className="p-4 rounded-2xl border border-dashed border-zinc-800 space-y-4">
+                                 <div className="p-4 rounded-2xl border border-dashed border-zinc-800 space-y-4">
                                   <div className="flex gap-2">
-                                    <input type="text" placeholder="Nombre" className="flex-1 bg-transparent border-b border-zinc-800 p-2 text-sm outline-none" value={exName} onChange={(e) => setExName(e.target.value)} />
+                                    <input type="text" placeholder="Nombre del ejercicio" className="flex-1 bg-transparent border-b border-zinc-800 p-2 text-sm outline-none" value={exName} onChange={(e) => setExName(e.target.value)} />
                                     <button onClick={() => { setBankTargetBlockId(block.id); setBankTargetType('normal'); setShowBankModal(true); }} className="p-2 text-zinc-500 hover:text-[#D4AF37]"><Search size={18} /></button>
                                   </div>
-                                  <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">Series</label><input type="number" className="bg-zinc-900 p-2 rounded-lg text-center" value={exSeries ?? 3} onChange={(e) => setExSeries(parseInt(e.target.value) || 1)} /></div>
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">Reps</label><input type="text" className="bg-zinc-900 p-2 rounded-lg text-center" value={exReps || ''} onChange={(e) => setExReps(e.target.value)} /></div>
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">T. (s)</label><input type="number" className="bg-zinc-900 p-2 rounded-lg text-center" value={exTime ?? 0} onChange={(e) => setExTime(parseInt(e.target.value) || 0)} /></div>
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">Kg</label><input type="text" className="bg-zinc-900 p-2 rounded-lg text-center" value={exLoad || ''} onChange={(e) => setExLoad(e.target.value)} /></div>
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">RPE</label><input type="text" className="bg-zinc-900 p-2 rounded-lg text-center" value={exRpe || ''} onChange={(e) => setExRpe(parseFloat(e.target.value) || 0)} /></div>
-                                    <div className="flex flex-col"><label className="text-[8px] uppercase text-zinc-500 ml-1">Des.(s)</label><input type="number" className="bg-zinc-900 p-2 rounded-lg text-center" value={exRest ?? 60} onChange={(e) => setExRest(parseInt(e.target.value) || 0)} /></div>
+                                  
+                                  <div className="flex bg-black/40 p-1 rounded-xl border border-zinc-800">
+                                    <button onClick={() => setExLoadType('autocarga')} className={`flex-1 py-1.5 text-[8px] font-black uppercase rounded-lg transition-all ${exLoadType === 'autocarga' ? 'bg-[#D4AF37] text-black' : 'text-zinc-500'}`}>Autocarga</button>
+                                    <button onClick={() => setExLoadType('externa')} className={`flex-1 py-1.5 text-[8px] font-black uppercase rounded-lg transition-all ${exLoadType === 'externa' ? 'bg-[#D4AF37] text-black' : 'text-zinc-500'}`}>Carga Externa</button>
                                   </div>
-                                  <button onClick={() => addExerciseToBlock(block.id)} className="w-full bg-[#D4AF37] text-black font-black uppercase text-[10px] py-3 rounded-xl">{editingExerciseId ? 'Actualizar' : 'Añadir'}</button>
+
+                                  <div className="grid grid-cols-2 xs:grid-cols-4 gap-3">
+                                    <div className="flex flex-col">
+                                      <label className="text-[8px] uppercase text-zinc-500 ml-1 mb-1">Series</label>
+                                      <input type="number" className="bg-zinc-950 p-2 rounded-lg text-center font-bold text-sm border border-zinc-900" value={exSeries ?? 3} onChange={(e) => setExSeries(parseInt(e.target.value) || 1)} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <label className="text-[8px] uppercase text-zinc-500 ml-1 mb-1">Reps/Tiempo</label>
+                                      <input type="text" placeholder="10 ó 30s" className="bg-zinc-950 p-2 rounded-lg text-center font-bold text-sm border border-zinc-900" value={exReps || ''} onChange={(e) => setExReps(e.target.value)} />
+                                    </div>
+                                    {exLoadType === 'externa' && (
+                                      <div className="flex flex-col">
+                                        <label className="text-[8px] uppercase text-zinc-500 ml-1 mb-1">Kg / Lbs</label>
+                                        <input type="text" placeholder="Ej: 20kg" className="bg-zinc-950 p-2 rounded-lg text-center font-bold text-[#D4AF37] text-sm border border-zinc-900" value={exLoadValue || ''} onChange={(e) => setExLoadValue(e.target.value)} />
+                                      </div>
+                                    )}
+                                    <div className="flex flex-col">
+                                      <label className="text-[8px] uppercase text-zinc-500 ml-1 mb-1">D. Serie (s)</label>
+                                      <input type="number" className="bg-zinc-950 p-2 rounded-lg text-center font-bold text-sm border border-zinc-900" value={exRestSeries ?? 60} onChange={(e) => setExRestSeries(parseInt(e.target.value) || 0)} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <label className="text-[8px] uppercase text-zinc-500 ml-1 mb-1">D. Ejerc. (s)</label>
+                                      <input type="number" className="bg-zinc-950 p-2 rounded-lg text-center font-bold text-sm border border-zinc-900" value={exRestExercise ?? 60} onChange={(e) => setExRestExercise(parseInt(e.target.value) || 0)} />
+                                    </div>
+                                  </div>
+                                  
+                                  <textarea 
+                                    placeholder="Observación opcional..." 
+                                    className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-xl text-[10px] outline-none focus:border-[#D4AF37] resize-none h-16" 
+                                    value={exNotes} 
+                                    onChange={(e) => setExNotes(e.target.value)} 
+                                  />
+                                  
+                                  <button onClick={() => addExerciseToBlock(block.id)} className="w-full bg-[#D4AF37] text-black font-black uppercase text-[10px] py-3.5 rounded-xl hover:shadow-[0_0_20px_-5px_rgba(212,175,55,0.4)] transition-all active:scale-95">{editingExerciseId ? 'Actualizar Ejercicio' : 'Añadir Ejercicio'}</button>
                                 </div>
                               </div>
                             ) : (

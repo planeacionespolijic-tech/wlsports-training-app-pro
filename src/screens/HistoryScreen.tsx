@@ -253,14 +253,14 @@ export const HistoryScreen = () => {
                             <div className="pl-2 border-l border-zinc-800 space-y-1">
                               {block.exercises?.map((ex: any, eIdx: number) => (
                                 <div key={eIdx} className="flex justify-between text-[11px] text-zinc-500">
-                                  <span>{ex.name}</span>
-                                  <span>{ex.series} series {ex.reps ? `x ${ex.reps}` : ''}</span>
+                                  <span>{ex.name} {ex.loadType === 'externa' ? `(${ex.loadValue || ex.load})` : ex.loadType === 'autocarga' ? '(Autocarga)' : ''}</span>
+                                  <span>{ex.series || 1} series x {ex.reps || (ex.timePerSeries ? ex.timePerSeries + 's' : '-')}</span>
                                 </div>
                               ))}
                               {block.circuit?.items?.map((item: any, iIdx: number) => (
                                 <div key={iIdx} className="flex justify-between text-[11px] text-zinc-500">
                                   <span>{item.name}</span>
-                                  <span>{item.time}s {item.reps ? `x ${item.reps}` : ''}</span>
+                                  <span>{item.time || item.timePerSeries}s {item.reps ? `x ${item.reps}` : ''}</span>
                                 </div>
                               ))}
                             </div>

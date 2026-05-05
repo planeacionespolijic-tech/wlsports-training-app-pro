@@ -36,6 +36,7 @@ export const SessionExecutionScreen = () => {
   // Game Logic States
   const [m4Winner, setM4Winner] = useState<'pupil' | 'coach' | null>(null);
   const [m5Points, setM5Points] = useState(0);
+  const [recoveryStatus, setRecoveryStatus] = useState<'Óptimo' | 'Cansado' | 'Fatiga'>('Óptimo');
   const [showSummary, setShowSummary] = useState(false);
 
   const currentXPTotal = userData?.xp || 0;
@@ -53,8 +54,8 @@ export const SessionExecutionScreen = () => {
   const [newExSeries, setNewExSeries] = useState(3);
   const [newExReps, setNewExReps] = useState('');
   const [newExRest, setNewExRest] = useState(60);
-  const [newExLoad, setNewExLoad] = useState('');
-  const [newExRpe, setNewExRpe] = useState('');
+  const [newExLoadType, setNewExLoadType] = useState<'autocarga' | 'externa'>('autocarga');
+  const [newExLoadValue, setNewExLoadValue] = useState('');
   const [extraExercises, setExtraExercises] = useState<any[]>([]);
 
   // Exercise Bank Integration
@@ -150,7 +151,7 @@ export const SessionExecutionScreen = () => {
           if (uDoc.exists()) {
             const data = uDoc.data();
             if (!data.attributes) {
-              data.attributes = { ritmo: 50, tecnica: 50, fuerza: 50, mentalidad: 50 };
+              data.attributes = { TEC: 10, FIS: 10, NEU: 10, AGI: 10, ACT: 10 };
             }
             setUserData(data);
           }
@@ -200,8 +201,8 @@ export const SessionExecutionScreen = () => {
       series: exerciseToUse ? (exerciseToUse.series || 3) : newExSeries,
       reps: exerciseToUse ? (exerciseToUse.reps || '') : newExReps,
       rest: exerciseToUse ? (exerciseToUse.rest || 60) : newExRest,
-      load: exerciseToUse ? (exerciseToUse.load || '') : newExLoad,
-      rpe: exerciseToUse ? (exerciseToUse.rpe || '') : newExRpe,
+      loadType: exerciseToUse ? (exerciseToUse.loadType || 'autocarga') : newExLoadType,
+      loadValue: exerciseToUse ? (exerciseToUse.loadValue || '') : newExLoadValue,
       isManual: true,
       fromBank: !!exerciseToUse
     };
@@ -211,8 +212,8 @@ export const SessionExecutionScreen = () => {
     setNewExSeries(3);
     setNewExReps('');
     setNewExRest(60);
-    setNewExLoad('');
-    setNewExRpe('');
+    setNewExLoadType('autocarga');
+    setNewExLoadValue('');
     setShowAdd(false);
     setShowBankPicker('manual');
   };
@@ -327,7 +328,16 @@ export const SessionExecutionScreen = () => {
           }
           
           let newAttributes = { ...currentAttributes };
-          const levelCap = newLevel.attributeCap || 100;
+          
+          // REGLA DE BLOQUEO POR NIVEL: El cap depende del nivel desbloqueado oficialmente
+          let newUnlockedLevel = data.unlockedLevel || 1;
+          
+          // Si es una sesión de ascenso y se aprueba, aumentamos el nivel desbloqueado
+          if (approvedAscension) {
+            newUnlockedLevel = Math.min(LEVELS.length, newUnlockedLevel + 1);
+          }
+          
+          const levelCap = LEVELS[newUnlockedLevel - 1]?.attributeCap || 100;
 
           completedExercises.forEach(exId => {
             const exercise = allExercises.find(e => e.id === exId);
@@ -354,17 +364,14 @@ export const SessionExecutionScreen = () => {
             newAttributes.ACT = (newAttributes.ACT || 0) + 1.0;
           }
 
-          // Apply Bonus from Coach Selection (Existing feature)
+          // Apply Bonus from Coach Selection (Ficha Técnica Core)
           bonusAttributes.forEach(attr => {
-            if (attr === 'tecnica') newAttributes.TEC = (newAttributes.TEC || 0) + 1;
-            if (attr === 'fuerza') newAttributes.FIS = (newAttributes.FIS || 0) + 1;
-            if (attr === 'ritmo') newAttributes.AGI = (newAttributes.AGI || 0) + 1;
-            if (attr === 'mentalidad') newAttributes.ACT = (newAttributes.ACT || 0) + 1;
+            newAttributes[attr as keyof typeof newAttributes] = (newAttributes[attr as keyof typeof newAttributes] || 0) + 1.0;
           });
 
           // Apply Level Cap and Round to 1 decimal
-          const keys = ['TEC', 'FIS', 'NEU', 'AGI', 'ACT'];
-          keys.forEach(key => {
+          const attrKeys = ['TEC', 'FIS', 'NEU', 'AGI', 'ACT'] as const;
+          attrKeys.forEach(key => {
             newAttributes[key] = Math.min(levelCap, Math.round((newAttributes[key] || 10) * 10) / 10);
           });
 
@@ -373,6 +380,7 @@ export const SessionExecutionScreen = () => {
             points: increment(xpGained),
             levelName: newLevel.name,
             levelMinXP: newLevel.minXP,
+            unlockedLevel: newUnlockedLevel,
             streak: currentStreak,
             lastSessionDate: serverTimestamp(),
             attributes: newAttributes
@@ -448,72 +456,85 @@ export const SessionExecutionScreen = () => {
                 <div className="space-y-6">
                   <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Añadir Ejercicio Personalizado</p>
                   
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nombre</label>
-                      <input 
-                        autoFocus
-                        value={newExName}
-                        onChange={(e) => setNewExName(e.target.value)}
-                        placeholder="Ej: Sprint final, Plancha..."
-                        className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white focus:border-[#D4AF37] outline-none"
-                      />
-                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nombre</label>
+                        <input 
+                          autoFocus
+                          value={newExName}
+                          onChange={(e) => setNewExName(e.target.value)}
+                          placeholder="Ej: Sprint final, Plancha..."
+                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Series</label>
-                        <input 
-                          type="number"
-                          value={newExSeries ?? 3}
-                          onChange={(e) => setNewExSeries(parseInt(e.target.value) || 0)}
-                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
+                      <div className="flex bg-black rounded-xl p-1 border border-zinc-800">
+                        <button 
+                          type="button"
+                          onClick={() => setNewExLoadType('autocarga')}
+                          className={`flex-1 py-1.5 text-[8px] font-black uppercase rounded-lg transition-all ${newExLoadType === 'autocarga' ? 'bg-[#D4AF37] text-black' : 'text-zinc-600'}`}
+                        >
+                          Autocarga
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setNewExLoadType('externa')}
+                          className={`flex-1 py-1.5 text-[8px] font-black uppercase rounded-lg transition-all ${newExLoadType === 'externa' ? 'bg-[#D4AF37] text-black' : 'text-zinc-600'}`}
+                        >
+                          Externa
+                        </button>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Reps</label>
-                        <input 
-                          type="text"
-                          value={newExReps || ''}
-                          onChange={(e) => setNewExReps(e.target.value)}
-                          placeholder="8-12"
-                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Descanso (s)</label>
-                        <input 
-                          type="number"
-                          value={newExRest ?? 60}
-                          onChange={(e) => setNewExRest(parseInt(e.target.value) || 0)}
-                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Series</label>
+                          <input 
+                            type="number"
+                            value={newExSeries ?? 3}
+                            onChange={(e) => setNewExSeries(parseInt(e.target.value) || 0)}
+                            className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Reps/Tiempo</label>
+                          <input 
+                            type="text"
+                            value={newExReps || ''}
+                            onChange={(e) => setNewExReps(e.target.value)}
+                            placeholder="Ej: 15 ó 45s"
+                            className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Carga</label>
-                        <input 
-                          type="text"
-                          value={newExLoad || ''}
-                          onChange={(e) => setNewExLoad(e.target.value)}
-                          placeholder="Kg"
-                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">RPE / %</label>
-                        <input 
-                          type="text"
-                          value={newExRpe || ''}
-                          onChange={(e) => setNewExRpe(e.target.value)}
-                          placeholder="1-10"
-                          className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Descanso (s)</label>
+                          <input 
+                            type="number"
+                            value={newExRest ?? 60}
+                            onChange={(e) => setNewExRest(parseInt(e.target.value) || 0)}
+                            className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none"
+                          />
+                        </div>
+                        {newExLoadType === 'externa' ? (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Carga</label>
+                            <input 
+                              type="text"
+                              value={newExLoadValue || ''}
+                              onChange={(e) => setNewExLoadValue(e.target.value)}
+                              placeholder="Kg / Lbs"
+                              className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white text-center focus:border-[#D4AF37] outline-none border-amber-500/50"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center bg-zinc-800/20 rounded-xl border border-zinc-800 italic text-[10px] text-zinc-600">
+                            Peso corporal
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
 
                   <button 
                     onClick={() => handleAddManualExercise()}
@@ -767,7 +788,7 @@ export const SessionExecutionScreen = () => {
                       <div key={cat.id} className="space-y-3">
                         <h4 className={`text-[10px] font-black uppercase tracking-widest ${cat.color} ml-2`}>{cat.label}</h4>
                         <div className="grid grid-cols-1 gap-2">
-                          {ALL_CHALLENGES.filter(c => c.category === cat.id && c.id && c.id >= 51).map(card => (
+                          {ALL_CHALLENGES.filter(c => c.category === cat.id).map(card => (
                             <button 
                               key={card.id}
                               onClick={() => {
@@ -1084,43 +1105,25 @@ export const SessionExecutionScreen = () => {
                                     {ex.name || 'Ejercicio'}
                                   </h3>
                                   
-                                  <div className="grid grid-cols-2 xs:grid-cols-3 gap-y-2 gap-x-4 mb-3">
-                                    {ex.series && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Series</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.series}</span>
-                                      </div>
-                                    )}
-                                    {ex.reps && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reps</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.reps}</span>
-                                      </div>
-                                    )}
-                                    {(ex.timePerSeries > 0 || ex.time > 0) && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Tiempo</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.timePerSeries || ex.time}s</span>
-                                      </div>
-                                    )}
-                                    {ex.load && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-[#D4AF37]">Carga</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.load}</span>
-                                      </div>
-                                    )}
-                                    {ex.rpe > 0 && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-orange-500">RPE/%</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.rpe}</span>
-                                      </div>
-                                    )}
-                                    {(ex.restBetweenSeries || ex.rest) && (
-                                      <div className="flex flex-col">
-                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Descanso</span>
-                                        <span className="text-xs font-bold text-zinc-300">{ex.restBetweenSeries || ex.rest}s</span>
-                                      </div>
-                                    )}
+                                  <div className="grid grid-cols-2 xs:grid-cols-4 gap-y-2 gap-x-4 mb-3">
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Series</span>
+                                      <span className="text-xs font-bold text-zinc-300">{ex.series || 3}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Reps/Tiempo</span>
+                                      <span className="text-xs font-bold text-zinc-300">{ex.reps || (ex.timePerSeries || ex.time ? (ex.timePerSeries || ex.time) + 's' : '-')}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black uppercase tracking-widest text-[#D4AF37]">Carga</span>
+                                      <span className="text-xs font-bold text-[#D4AF37]">
+                                        {ex.loadType === 'autocarga' ? 'Bodyweight' : (ex.loadValue || ex.load || 'Autocarga')}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Descanso</span>
+                                      <span className="text-xs font-bold text-zinc-300">{(ex.restBetweenSeries || ex.rest || 60)}s</span>
+                                    </div>
                                   </div>
 
                                   {(ex.description || ex.notes) && (
@@ -1197,24 +1200,25 @@ export const SessionExecutionScreen = () => {
             </h2>
             
             <div className="space-y-8">
-              {/* MOMENTO 4: DUELO */}
-              <div className="space-y-3">
+              {/* MOMENTO 4: DESAFÍO TORNEO */}
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">M4: Duelo Coach vs Alumno</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">M4: Desafío Coach vs Alumno (Torneo/Reto)</p>
                   {isAscensionSession && (
                     <span className="text-[8px] text-amber-500 font-bold uppercase ring-1 ring-amber-500/50 px-2 py-0.5 rounded-full">Examen obligatorio</span>
                   )}
                 </div>
+                
                 <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={() => setM4Winner('pupil')}
                     className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all ${
-                      m4Winner === 'pupil' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'bg-black border-zinc-800 text-zinc-500'
+                      m4Winner === 'pupil' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500 shadow-[0_0_15px_-5px_#10b981]' : 'bg-black border-zinc-800 text-zinc-500'
                     }`}
                   >
-                    <Star size={20} />
-                    <span className="text-[10px] font-black uppercase">Ganó Alumno</span>
-                    <span className="text-[8px] font-bold">+100 XP</span>
+                    <Trophy size={20} />
+                    <span className="text-[10px] font-black uppercase">Marcador: Alumno</span>
+                    <span className="text-[8px] font-bold">+100 XP / +1.0 ACT</span>
                   </button>
                   <button 
                     onClick={() => setM4Winner('coach')}
@@ -1223,28 +1227,53 @@ export const SessionExecutionScreen = () => {
                     }`}
                   >
                     <Shield size={20} />
-                    <span className="text-[10px] font-black uppercase">Ganó Coach</span>
-                    <span className="text-[8px] font-bold">+0 XP</span>
+                    <span className="text-[10px] font-black uppercase">Marcador: Coach</span>
+                    <span className="text-[8px] font-bold">Sin Bonus</span>
                   </button>
                 </div>
-              </div>
 
-              {/* MOMENTO 5: RETO PUNTUABLE */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">M5: Reto de Torneo (Pts Ranking)</p>
-                <div className="flex items-center gap-4 bg-black p-4 rounded-2xl border border-zinc-800">
-                  <div className="flex-1">
-                    <p className="text-[8px] font-black text-zinc-600 uppercase mb-1">Puntos Obtenidos (81-100)</p>
+                <div className="bg-black p-4 rounded-2xl border border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <p className="text-[8px] font-black text-zinc-500 uppercase mb-1">Puntos de Reto (Ranking 81-100)</p>
+                    <p className="text-[7px] text-zinc-600 uppercase">Suma directa al XP total de la sesión</p>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <input 
                       type="number" 
                       value={m5Points}
                       onChange={(e) => setM5Points(parseInt(e.target.value) || 0)}
-                      className="bg-transparent text-xl font-black text-white w-full outline-none"
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-lg font-black text-white w-24 outline-none focus:border-amber-500 text-center"
                       placeholder="0"
                     />
+                    <span className="text-[10px] font-bold text-zinc-600 uppercase">Pts</span>
                   </div>
-                  <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500 font-black">
-                    XP
+                </div>
+              </div>
+
+              {/* MOMENTO 5: RECUPERACIÓN Y FEEDBACK */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">M5: Recuperación y Feedback</p>
+                </div>
+                
+                <div className="bg-black p-5 rounded-2xl border border-zinc-800 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[8px] font-black text-zinc-500 uppercase">Estado de Recuperación (Hrv/Feelings)</p>
+                    <div className="flex gap-2">
+                       {['Óptimo', 'Cansado', 'Fatiga'].map(status => (
+                         <button 
+                           key={status} 
+                           onClick={() => setRecoveryStatus(status as any)}
+                           className={`flex-1 py-2 rounded-lg border text-[8px] font-black uppercase transition-all ${
+                             recoveryStatus === status 
+                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500 shadow-[0_0_10px_-2px_rgba(16,185,129,0.3)]' 
+                               : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'
+                           }`}
+                         >
+                           {status}
+                         </button>
+                       ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1252,19 +1281,27 @@ export const SessionExecutionScreen = () => {
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-[2.5rem]">
-            <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Evaluación de Atributos</h2>
-            <div className="grid grid-cols-2 gap-2">
-              {['ritmo', 'tecnica', 'fuerza', 'mentalidad'].map(attr => (
+            <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Evaluación (Ficha Técnica)</h2>
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { key: 'TEC', icon: '⚽' },
+                { key: 'FIS', icon: '💪' },
+                { key: 'NEU', icon: '🧠' },
+                { key: 'AGI', icon: '🤸' },
+                { key: 'ACT', icon: '🔥' }
+              ].map(attr => (
                 <button 
-                  key={attr}
-                  onClick={() => setBonusAttributes(prev => prev.includes(attr) ? prev.filter(a => a !== attr) : [...prev, attr])}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] font-black transition-all active:scale-95 ${
-                    bonusAttributes.includes(attr) 
-                      ? 'bg-[#D4AF37] border-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.3)]' 
-                      : 'bg-black border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                  key={attr.key}
+                  onClick={() => setBonusAttributes(prev => prev.includes(attr.key) ? prev.filter(a => a !== attr.key) : [...prev, attr.key])}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-2xl border transition-all active:scale-95 ${
+                    bonusAttributes.includes(attr.key) 
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-500' 
+                      : 'bg-black border-zinc-800 text-zinc-600 hover:border-zinc-700'
                   }`}
                 >
-                  + {attr}
+                  <span className="text-sm">{attr.icon}</span>
+                  <span className="text-[8px] font-black uppercase">{attr.key}</span>
+                  <span className="text-[8px] font-bold">+1.0</span>
                 </button>
               ))}
             </div>
@@ -1320,7 +1357,7 @@ export const SessionExecutionScreen = () => {
                 )}
                 {m5Points > 0 && (
                   <div className="flex justify-between items-center p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-                    <span className="text-[10px] font-black uppercase text-blue-400">Puntos M5</span>
+                    <span className="text-[10px] font-black uppercase text-blue-400">Puntos Reto (M4)</span>
                     <span className="text-sm font-black text-white">+{m5Points} XP</span>
                   </div>
                 )}

@@ -3,8 +3,8 @@ export const EXERCISE_CATEGORIES = [
   "M1: ACTIVACIÓN BIOSENSORIAL",
   "M2: ACTIVACIÓN REACTIVA / NEURO-FÚTBOL",
   "M3: DINÁMICA ESPECÍFICA",
-  "M4: EL DESAFÍO COACH vs ALUMNO",
-  "M5: RECUPERACIÓN Y RETO DE TORNEO"
+  "M4: EL DESAFÍO COACH vs ALUMNO (TORNEO/RETO)",
+  "M5: RECUPERACIÓN Y FEEDBACK"
 ];
 
 export const SEED_EXERCISES = [
@@ -64,7 +64,7 @@ export const SEED_EXERCISES = [
   { name: "Skipping con Banda en Cintura", moment: "M3", env: "all", description: "Frecuencia gestual bajo tensión. Ejecución: Banda tirando hacia atrás, realizar skipping alto y rápido en el sitio buscando máxima frecuencia de apoyos." },
   { name: "Control y Pase contra Pared", moment: "M3", env: "restricted", description: "Volumen de toques técnicos solo. Ejecución: A 2 metros de una pared, realizar pases continuos: alternar pie derecho e izquierdo, un toque de control y uno de pase." },
 
-  // M4: EL DESAFÍO COACH VS ALUMNO
+  // M4: EL DESAFÍO COACH vs ALUMNO (TORNEO/RETO)
   { name: "El Francotirador (Derribar Conos)", moment: "M4", env: "field", description: "Puntería de remate competitivo. Ejecución: A linear 5 conos en la línea de meta; el atleta tiene 5 disparos para derribar la mayor cantidad posible." },
   { name: "Bowling de Fútbol", moment: "M4", env: "all", description: "Precisión de pase largo por suelo. Ejecución: Poner botellas o conos a 15m; el atleta debe rodar el balón con el borde interno para tumbar los 'pines'." },
   { name: "El Aro de Fuego (Pasar Balón)", moment: "M4", env: "field", description: "Pase elevado de precisión. Ejecución: El coach sostiene un aro a 1.5m de altura; el atleta debe intentar que el balón pase por dentro haciendo una vaselina." },
@@ -95,16 +95,18 @@ export const SEED_EXERCISES = [
   { name: "El Circuito Mortal (Habilidades)", moment: "M4", env: "all", description: "Integración de obstáculos diversos. Ejecución: Circuito de zig-zag, salto de valla, conducción y remate final, todo en menos de 15 segundos." },
   { name: "Equilibrio Flamenco (Duelo)", moment: "M4", env: "gym", description: "Estabilidad monopodal competitiva. Ejecución: Parado en un pie con manos en cintura; el atleta debe aguantar sin apoyar el otro pie más tiempo que el coach." },
   { name: "El Pase Maestro (Distancia)", moment: "M4", env: "field", description: "Precisión de pase largo quirúrgico. Ejecución: Intentar poner el balón dentro de un neumático o zona marcada a 30 metros de distancia." },
+  { name: "Salto de Caja de Oro", moment: "M4", env: "gym", description: "Máximo nivel de potencia registrado. Ejecución: Realizar un único salto a la caja más alta alcanzada en el programa, buscando superar el récord histórico." },
+  { name: "Control en Pared 1min (Récord)", moment: "M4", env: "restricted", description: "Test de volumen técnico de pases. Ejecución: Máximo número de pases contra pared a un toque en 60 segundos, manteniendo la precisión." },
+  { name: "Sentadilla Búlgara Isométrica (Reto)", moment: "M4", env: "gym", description: "Resistencia muscular final. Ejecución: Mantener la posición baja de la sentadilla búlgara por 45 segundos por pierna, aguantando la quemazón." },
+  { name: "Récord de Flexiones (AMRAP)", moment: "M4", description: "Test de fatiga de tren superior. Ejecución: Tantas flexiones de pecho como sea posible con buena técnica hasta que no pueda completar una repetición más." },
+  { name: "15 Cabeceos seguidos", moment: "M4", env: "field", description: "Habilidad técnica aérea registrada. Ejecución: Mantener el balón en el aire usando solo la cabeza por 15 toques consecutivos sin que caiga." },
+  { name: "Zig-Zag Sin Mirar el Balón", moment: "M4", env: "all", description: "Maestría de conducción periférica. Ejecución: Rodear cones en slalom manteniendo la mirada fija al frente, confiando en el tacto del pie con el balón." },
+  { name: "Toque al Punto Más Alto", moment: "M4", env: "gym", description: "Test de alcance vertical máximo. Ejecución: Saltar e intentar tocar una marca en la pared o techo lo más alto posible." },
+  { name: "El Desafío de la Tabla (Core)", moment: "M4", description: "Ranking de resistencia abdominal. Realizar una plancha abdominal perfecta y registrar el tiempo máximo para la tabla de líderes del mes." },
+  { name: "Test de Cooper Adaptado 3min", moment: "M4", description: "Capacidad aeróbica final. Correr la máxima distancia posible durante 3 minutos en un recorrido marcado para evaluar el fondo físico." },
 
-  // M5: RECUPERACIÓN Y RETO DE TORNEO
-  { name: "Salto de Caja de Oro", moment: "M5", env: "gym", description: "Máximo nivel de potencia registrado. Ejecución: Realizar un único salto a la caja más alta alcanzada en el programa, buscando superar el récord histórico." },
-  { name: "Control en Pared 1min (Récord)", moment: "M5", env: "restricted", description: "Test de volumen técnico de pases. Ejecución: Máximo número de pases contra pared a un toque en 60 segundos, manteniendo la precisión." },
-  { name: "Sentadilla Búlgara Isométrica", moment: "M5", env: "gym", description: "Resistencia muscular final. Ejecución: Mantener la posición baja de la sentadilla búlgara por 45 segundos por pierna, aguantando la quemazón." },
-  { name: "Récord de Flexiones (AMRAP)", moment: "M5", description: "Test de fatiga de tren superior. Ejecución: Tantas flexiones de pecho como sea posible con buena técnica hasta que no pueda completar una repetición más." },
-  { name: "15 Cabeceos seguidos", moment: "M5", env: "field", description: "Habilidad técnica aérea registrada. Ejecución: Mantener el balón en el aire usando solo la cabeza por 15 toques consecutivos sin que caiga." },
-  { name: "Zig-Zag Sin Mirar el Balón", moment: "M5", env: "all", description: "Maestría de conducción periférica. Ejecución: Rodear cones en slalom manteniendo la mirada fija al frente, confiando en el tacto del pie con el balón." },
+  // M5: RECUPERACIÓN Y FEEDBACK
   { name: "Serie TRX de Enfriamiento", moment: "M5", env: "gym", description: "Vuelta a la calma asistida. Ejecución: Estiramientos dinámicos suaves usando el TRX para mayor rango de movimiento y relajación." },
-  { name: "Toque al Punto Más Alto", moment: "M5", env: "gym", description: "Test de alcance vertical máximo. Ejecución: Saltar e intentar tocar una marca en la pared o techo lo más alto posible." },
   { name: "Victoria del Coach (Feedback)", moment: "M5", description: "Evaluación cualitativa de la sesión. Diálogo sobre lo aprendido, puntos de mejora y establecimiento de objetivos para la próxima sesión." },
   { name: "Estiramiento Estático de Cadenas", moment: "M5", description: "Recuperación de longitud muscular. Mantener estiramientos de isquios, cuádriceps, psoas y espalda por 30 segundos cada uno de forma relajada." },
   { name: "Rodillo de Espuma (Foam Roller)", moment: "M5", description: "Liberación miofascial. Rodar sobre las zonas con mayor tensión (piernas, espalda) para masajear y oxigenar el tejido muscular." },
@@ -113,8 +115,6 @@ export const SEED_EXERCISES = [
   { name: "Yoga para Futbolistas (Poses)", moment: "M5", description: "Flexibilidad y equilibrio estático. Practicar posturas como 'el perro boca abajo' o 'el guerrero' para estirar integralmente el cuerpo." },
   { name: "Repaso Táctico con Pizarra", moment: "M5", description: "Asimilación cognitiva del entrenamiento. Revisar en una pizarra o tablet las jugadas y conceptos trabajados durante la sesión dinámica." },
   { name: "Check-list de Hidratación", moment: "M5", description: "Hábitos de nutrición deportiva. Consumir agua y electrolitos de forma pautada para asegurar la recuperación líquida tras el esfuerzo." },
-  { name: "Medición de Salto Final", moment: "M5", description: "Registro de fatiga neuromuscular. Repetir un salto vertical al final para comparar con el inicio y medir el impacto de la sesión en el sistema." },
-  { name: "El Desafío de la Tabla (Core)", moment: "M5", description: "Ranking de resistencia abdominal. Realizar una plancha abdominal perfecta y registrar el tiempo máximo para la tabla de líderes del mes." },
-  { name: "Test de Cooper Adaptado 3min", moment: "M5", description: "Capacidad aeróbica final. Correr la máxima distancia posible durante 3 minutos en un recorrido marcado para evaluar el fondo físico." },
+  { name: "Medición de Salto Final (Post-Sesión)", moment: "M5", description: "Registro de fatiga neuromuscular. Repetir un salto vertical al final para comparar con el inicio y medir el impacto de la sesión en el sistema." },
   { name: "Selfie del Triunfo (Equipo)", moment: "M5", description: "Fortalecimiento de vínculo Coach-Atleta. Capturar el momento de éxito de la sesión para documentar el progreso y la motivación en redes o app." }
 ];
