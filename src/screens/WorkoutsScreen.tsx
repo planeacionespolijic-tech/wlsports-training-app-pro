@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap } from 'lucide-react';
+import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
@@ -106,8 +106,6 @@ export const WorkoutsScreen = () => {
     }
   };
 
-  const CATEGORIES = EXERCISE_CATEGORIES;
-
   const filteredBank = useMemo(() => {
     return exerciseBank.filter(ex => {
       const matchesSearch = ex.name.toLowerCase().includes(bankSearchQuery.toLowerCase()) ||
@@ -116,6 +114,47 @@ export const WorkoutsScreen = () => {
       return matchesSearch && matchesCategory;
     });
   }, [exerciseBank, bankSearchQuery, bankSelectedCategory]);
+
+  const CATEGORIES = EXERCISE_CATEGORIES;
+
+  // Group workouts by Month and Year
+  const groupedWorkouts = useMemo<Record<string, any[]>>(() => {
+    const sorted = [...workouts].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA; // Newest first
+    });
+
+    const groups: Record<string, any[]> = {};
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    sorted.forEach(workout => {
+      const dateStr = workout.date || (workout.createdAt?.toDate ? workout.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+      const date = new Date(dateStr);
+      const key = `${monthNames[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(workout);
+    });
+
+    return groups;
+  }, [workouts]);
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  // Auto-expand newest group when workouts load
+  useEffect(() => {
+    const keys = Object.keys(groupedWorkouts);
+    if (keys.length > 0 && Object.keys(expandedGroups).length === 0) {
+      setExpandedGroups({ [keys[0]]: true });
+    }
+  }, [groupedWorkouts]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -910,26 +949,70 @@ export const WorkoutsScreen = () => {
         ) : (
           <div className="space-y-4">
             {loading ? <div className="flex justify-center py-20"><Loader2 className="text-[#D4AF37] animate-spin" size={32} /></div> :
-            workouts.length === 0 ? <p className="text-center py-20 text-zinc-600 italic">No hay rutinas</p> :
-            workouts.map((item) => (
-              <div key={item.id} className="p-5 bg-zinc-900 rounded-2xl border border-zinc-800">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-zinc-800 p-3 rounded-xl text-[#D4AF37]"><Dumbbell size={24} /></div>
-                    <div>
-                      <h3 className="font-bold text-lg">{item.name}</h3>
-                      <p className="text-xs text-zinc-500 font-bold">{item.duration} • {item.blocks?.length || 0} Fases</p>
-                    </div>
+            (Object.entries(groupedWorkouts) as [string, any[]][]).length === 0 ? <p className="text-center py-20 text-zinc-600 italic">No hay rutinas</p> :
+            (Object.entries(groupedWorkouts) as [string, any[]][]).map(([monthYear, monthWorkouts]) => {
+              const isExpanded = expandedGroups[monthYear];
+              return (
+                <div key={monthYear} className="space-y-4">
+                  <div 
+                    className="flex items-center gap-3 px-2 cursor-pointer group select-none"
+                    onClick={() => toggleGroup(monthYear)}
+                  >
+                    <Calendar size={14} className={isExpanded ? "text-[#D4AF37]" : "text-zinc-600 group-hover:text-zinc-400"} />
+                    <h2 className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isExpanded ? 'text-zinc-100' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
+                      {monthYear} <span className="text-zinc-700 ml-2">({monthWorkouts.length})</span>
+                    </h2>
+                    <div className="h-[1px] flex-1 bg-zinc-800/50"></div>
+                    {isExpanded ? <ChevronUp size={14} className="text-zinc-600" /> : <ChevronDown size={14} className="text-zinc-600" />}
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleEdit(item)} className="p-2 text-zinc-600 hover:text-[#D4AF37]"><Edit2 size={18} /></button>
-                    <button onClick={() => handleDelete(item.id)} className="p-2 text-zinc-600 hover:text-red-500"><Trash2 size={18} /></button>
-                  </div>
+                  
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: "circOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-6">
+                          {monthWorkouts.map((item) => (
+                            <div key={item.id} className="p-5 bg-zinc-900 rounded-2xl border border-zinc-800 hover:border-[#D4AF37]/30 transition-all group overflow-hidden relative">
+                              <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="bg-zinc-800 p-3 rounded-xl text-[#D4AF37] group-hover:bg-[#D4AF37] group-hover:text-black transition-all"><Dumbbell size={20} /></div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
+                                      <span className="text-[8px] font-black text-zinc-600 bg-black px-1.5 py-0.5 rounded border border-zinc-800 uppercase group-hover:border-zinc-700">
+                                        {item.sessionNumber ? `#${item.sessionNumber}` : '-'}
+                                      </span>
+                                    </div>
+                                    <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">{item.duration} • {item.blocks?.length || 0} Fases • {item.date || 'S/F'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button onClick={(e) => { e.stopPropagation(); handleEdit(item); }} className="p-2 text-zinc-600 hover:text-[#D4AF37] transition-colors"><Edit2 size={16} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="p-2 text-zinc-600 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                                </div>
+                              </div>
+                              
+                              {item.objective && (
+                                <p className="text-[10px] text-zinc-500 line-clamp-1 mb-4 italic px-2">"{item.objective}"</p>
+                              )}
+
+                              <button onClick={(e) => { e.stopPropagation(); handleStartSession(item); }} className="w-full bg-zinc-800 hover:bg-[#D4AF37] hover:text-black text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-xs"><Play size={14} /> Iniciar Sesión</button>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <button onClick={() => handleStartSession(item)} className="w-full bg-zinc-800 hover:bg-[#D4AF37] hover:text-black text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"><Play size={18} /> Iniciar</button>
-              </div>
-            ))}
-          </div>
+              );
+            })
+          }
+        </div>
         )}
       </main>
 

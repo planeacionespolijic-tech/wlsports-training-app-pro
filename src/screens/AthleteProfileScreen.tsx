@@ -1,16 +1,18 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield, X, Trash2, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { uploadProfilePhoto } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import { LEVELS, getLevelFromXP } from '../constants';
 import { ValoracionScreen } from './ValoracionScreen';
 import { DiagnosisScreen } from './DiagnosisScreen';
 import { ReportsScreen } from './ReportsScreen';
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import { logAuditEvent, AuditAction } from '../services/auditService';
 
 export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: isTrainerProp, onNavigate }: any) => {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   
   const isTrainer = isTrainerProp !== undefined ? isTrainerProp : authIsTrainer;
   const athleteId = userId || id || '';
+  const trainerId = user?.uid || '';
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'physical' | 'intelligence' | 'reports'>('overview');
   
@@ -29,8 +32,19 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   const [uploading, setUploading] = useState(false);
   const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete?.photoURL || null);
   const [showProgressionInfo, setShowProgressionInfo] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isChild = athlete?.type === 'child';
+
+  useEffect(() => {
+    if (feedback) {
+      const timer = setTimeout(() => setFeedback(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [feedback]);
 
   useEffect(() => {
     const fetchAthlete = async () => {
@@ -64,6 +78,40 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
       handleFirestoreError(error, OperationType.UPDATE, `users/${athlete.id}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDeleteAthlete = async () => {
+    if (!isTrainer) return;
+    
+    setIsDeleting(true);
+    try {
+      const restoreUntil = new Date();
+      restoreUntil.setDate(restoreUntil.getDate() + 60);
+
+      await updateDoc(doc(db, 'users', athleteId), {
+        status: 'deleted',
+        deletedAt: serverTimestamp(),
+        restoreUntil: Timestamp.fromDate(restoreUntil)
+      });
+
+      await logAuditEvent(
+        AuditAction.DELETE_USER,
+        trainerId,
+        'trainer',
+        athleteId,
+        athlete.displayName,
+        'Eliminado (soft delete) desde el perfil'
+      );
+
+      setFeedback({ message: 'Atleta eliminado correctamente', type: 'success' });
+      setTimeout(() => navigate('/deportistas'), 1500);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${athleteId}`);
+      setFeedback({ message: 'Error al eliminar el atleta', type: 'error' });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
   
@@ -101,12 +149,41 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      <header className="p-4 border-b border-zinc-800 flex items-center gap-4 sticky top-0 bg-black z-10">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
-          <ArrowLeft size={24} />
-        </button>
-        <h1 className="text-xl font-bold">Perfil del {isChild ? 'Niño' : 'Deportista'}</h1>
+      <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
+            <ArrowLeft size={24} />
+          </button>
+          <h1 className="text-xl font-bold">Perfil del {isChild ? 'Niño' : 'Deportista'}</h1>
+        </div>
+        
+        {isTrainer && (
+          <button 
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all"
+            title="Eliminar Atleta"
+          >
+            <Trash2 size={20} />
+          </button>
+        )}
       </header>
+
+      {/* Feedback Toast */}
+      <AnimatePresence>
+        {feedback && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-20 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${
+              feedback.type === 'success' ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-red-500/10 border-red-500/50 text-red-500'
+            }`}
+          >
+            {feedback.type === 'success' ? <Shield size={18} /> : <AlertTriangle size={18} />}
+            <span className="font-bold text-sm">{feedback.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 p-6 overflow-y-auto">
         <div className="flex flex-col items-center mb-10">
@@ -198,84 +275,88 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
           )}
         </div>
 
-        {/* Ficha Técnica (NUEVO MÓDULO) */}
-        {athlete.attributes && (
-          <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden group">
-            <button 
-              onClick={() => setShowProgressionInfo(true)}
-              className="absolute top-4 right-4 z-20 p-2 bg-zinc-800/80 rounded-full text-amber-500 hover:bg-amber-500 hover:text-black transition-all"
-            >
-              <Zap size={16} />
-            </button>
-
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-               <Shield size={80} style={{ color: themeColor }} />
-            </div>
-            
-            <div className="relative z-10">
-              <div className="flex justify-between items-center mb-6">
-                <div className="bg-black/50 px-3 py-1 rounded-full border border-zinc-800">
-                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: themeColor }}>
-                    [{getLevelFromXP(athlete.xp || 0).name}]
-                  </span>
-                </div>
-                <h3 className="text-sm font-black uppercase tracking-tighter">{athlete.displayName}</h3>
+        {/* Ficha Técnica (UNIFICADA) */}
+        {(() => {
+          const attributes = athlete.attributes || {};
+          const themeColor = isChild ? '#3B82F6' : '#D4AF37';
+          
+          return (
+            <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden group">
+              <button 
+                onClick={() => setShowProgressionInfo(true)}
+                className="absolute top-4 right-4 z-20 p-2 bg-zinc-800/80 rounded-full text-amber-500 hover:bg-amber-500 hover:text-black transition-all"
+              >
+                <Zap size={16} />
+              </button>
+  
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                 <Shield size={80} style={{ color: themeColor }} />
               </div>
-
-              <div className="grid grid-cols-5 gap-2 mb-6 uppercase">
-                {[
-                  { key: 'TEC', label: 'TEC', icon: '⚽', oldKey: 'tecnica' },
-                  { key: 'FIS', label: 'FIS', icon: '💪', oldKey: 'fuerza' },
-                  { key: 'NEU', label: 'NEU', icon: '🧠', oldKey: 'neuro' },
-                  { key: 'AGI', label: 'AGI', icon: '🤸', oldKey: 'ritmo' },
-                  { key: 'ACT', label: 'ACT', icon: '🔥', oldKey: 'mentalidad' }
-                ].map(attr => (
-                  <div key={attr.key} className="flex flex-col items-center gap-1">
-                    <span className="text-xl">{attr.icon}</span>
-                    <span className="text-[8px] font-black text-zinc-500 uppercase">{attr.label}</span>
-                    <span className="text-sm font-black" style={{ color: themeColor }}>
-                      {athlete.attributes[attr.key] || athlete.attributes[attr.oldKey] || 10}
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="bg-black/50 px-3 py-1 rounded-full border border-zinc-800">
+                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: themeColor }}>
+                      [{getLevelFromXP(athlete.xp || 0).name}]
                     </span>
                   </div>
-                ))}
+                  <h3 className="text-sm font-black uppercase tracking-tighter">{athlete.displayName}</h3>
+                </div>
+  
+                <div className="grid grid-cols-5 gap-2 mb-6 uppercase">
+                  {[
+                    { key: 'TEC', label: 'TEC', icon: '⚽', oldKey: 'tecnica' },
+                    { key: 'FIS', label: 'FIS', icon: '💪', oldKey: 'fuerza' },
+                    { key: 'NEU', label: 'NEU', icon: '🧠', oldKey: 'neuro' },
+                    { key: 'AGI', label: 'AGI', icon: '🤸', oldKey: 'ritmo' },
+                    { key: 'ACT', label: 'ACT', icon: '🔥', oldKey: 'mentalidad' }
+                  ].map(attr => (
+                    <div key={attr.key} className="flex flex-col items-center gap-1">
+                      <span className="text-xl">{attr.icon}</span>
+                      <span className="text-[8px] font-black text-zinc-500 uppercase">{attr.label}</span>
+                      <span className="text-sm font-black" style={{ color: themeColor }}>
+                        {attributes[attr.key] || attributes[attr.oldKey] || 10}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+  
+                <div className="space-y-4 pt-4 border-t border-zinc-800">
+                  {(() => {
+                    const mapping = [
+                      { key: 'TEC', old: 'tecnica', label: 'Técnica' },
+                      { key: 'FIS', old: 'fuerza', label: 'Físico' },
+                      { key: 'NEU', old: 'neuro', label: 'Neuro' },
+                      { key: 'AGI', old: 'ritmo', label: 'Agilidad' },
+                      { key: 'ACT', old: 'mentalidad', label: 'Actitud' }
+                    ];
+                    
+                    const values = mapping.map(m => ({ 
+                      label: m.label, 
+                      val: attributes[m.key] || attributes[m.old] || 10 
+                    }));
+                    
+                    const maxAttr = [...values].sort((a, b) => b.val - a.val)[0];
+                    const minAttr = [...values].sort((a, b) => a.val - b.val)[0];
+  
+                    return (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Atributo Destacado</span>
+                          <span className="text-xs font-black text-emerald-500 uppercase italic">🚀 {maxAttr.label}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Área de Mejora</span>
+                          <span className="text-xs font-black text-amber-500 uppercase italic">🎯 {minAttr.label}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-
-              <div className="space-y-4 pt-4 border-t border-zinc-800">
-                {(() => {
-                  const attrs = athlete.attributes;
-                  const mapping = [
-                    { key: 'TEC', old: 'tecnica', label: 'Técnica' },
-                    { key: 'FIS', old: 'fuerza', label: 'Físico' },
-                    { key: 'NEU', old: 'neuro', label: 'Neuro' },
-                    { key: 'AGI', old: 'ritmo', label: 'Agilidad' },
-                    { key: 'ACT', old: 'mentalidad', label: 'Actitud' }
-                  ];
-                  
-                  const values = mapping.map(m => ({ 
-                    label: m.label, 
-                    val: attrs[m.key] || attrs[m.old] || 10 
-                  }));
-                  
-                  const maxAttr = [...values].sort((a, b) => b.val - a.val)[0];
-                  const minAttr = [...values].sort((a, b) => a.val - b.val)[0];
-
-                  return (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Atributo Destacado</span>
-                        <span className="text-xs font-black text-emerald-500 uppercase italic">🚀 {maxAttr.label}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Área de Mejora</span>
-                        <span className="text-xs font-black text-amber-500 uppercase italic">🎯 {minAttr.label}</span>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          </section>
-        )}
+            </section>
+          );
+        })()}
 
         {isTrainer && (
           <div className="mb-10">
@@ -323,6 +404,16 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
       <footer className="p-8 text-center opacity-30">
         <p className="text-[10px] uppercase tracking-widest">WL Sports Elite Coaching</p>
       </footer>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteAthlete}
+        title="Eliminar Atleta"
+        message={`¿Estás seguro de que deseas eliminar permanentemente a ${athlete.displayName}? Esta acción lo marcará como inactivo y se eliminará definitivamente en 60 días.`}
+        variant="danger"
+        confirmText={isDeleting ? "Eliminando..." : "Eliminar Permanentemente"}
+      />
       <AnimatePresence>
         {showProgressionInfo && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
