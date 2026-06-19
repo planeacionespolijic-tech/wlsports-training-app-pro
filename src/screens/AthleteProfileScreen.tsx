@@ -144,7 +144,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
     return <DiagnosisScreen userId={athleteId} isAdmin={isTrainer} onBack={() => setActiveSubTab('overview')} />;
   }
   if (activeSubTab === 'reports') {
-    return <ReportsScreen userId={athleteId} onBack={() => setActiveSubTab('overview')} trainerId={isTrainer ? user?.uid : null} />;
+    return <ReportsScreen userId={athleteId} athlete={athlete} onBack={() => setActiveSubTab('overview')} trainerId={isTrainer ? user?.uid : null} />;
   }
 
   return (

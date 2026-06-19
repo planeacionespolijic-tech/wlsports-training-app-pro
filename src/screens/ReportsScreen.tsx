@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, FileText, Loader2, Download, Zap, BarChart3, Activity } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Loader2, Download, Zap, BarChart3, Activity, Bot } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
-import { generateAthleteReport, AthleteReport } from '../services/reportService';
+import { generateAthleteReport, AthleteReport, generateAIPrompt } from '../services/reportService';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -10,15 +10,35 @@ interface ReportsScreenProps {
   onBack: () => void;
   userId: string;
   trainerId: string | null;
+  athlete?: any;
 }
 
-export const ReportsScreen = ({ onBack, userId, trainerId }: ReportsScreenProps) => {
+export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScreenProps) => {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+
+  const handleGenerateAIPrompt = async () => {
+    setGeneratingPrompt(true);
+    try {
+      const promptText = await generateAIPrompt(
+        userId, 
+        athlete?.displayName || 'el atleta', 
+        athlete
+      );
+      await navigator.clipboard.writeText(promptText);
+      alert('¡Prompt copiado al portapapeles! Abre ChatGPT o Gemini y pégalo para generar el informe.');
+    } catch (error) {
+      console.error(error);
+      alert('Error al generar el prompt.');
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  };
 
   useEffect(() => {
     const q = query(
@@ -162,6 +182,14 @@ export const ReportsScreen = ({ onBack, userId, trainerId }: ReportsScreenProps)
           <h1 className="text-xl font-bold">Informes</h1>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={handleGenerateAIPrompt}
+            disabled={generatingPrompt}
+            className="bg-zinc-800 text-blue-400 p-2 rounded-full hover:bg-zinc-700 transition-colors disabled:opacity-50"
+            title="Copiar Prompt para IA (ChatGPT/Gemini)"
+          >
+            {generatingPrompt ? <Loader2 className="animate-spin" size={24} /> : <Bot size={24} />}
+          </button>
           <button 
             onClick={handleAutoGenerate}
             disabled={generating}
