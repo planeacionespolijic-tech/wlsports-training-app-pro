@@ -183,14 +183,6 @@ export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScr
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={handleGenerateAIPrompt}
-            disabled={generatingPrompt}
-            className="bg-zinc-800 text-blue-400 p-2 rounded-full hover:bg-zinc-700 transition-colors disabled:opacity-50"
-            title="Copiar Prompt para IA (ChatGPT/Gemini)"
-          >
-            {generatingPrompt ? <Loader2 className="animate-spin" size={24} /> : <Bot size={24} />}
-          </button>
-          <button 
             onClick={handleAutoGenerate}
             disabled={generating}
             className="bg-zinc-800 text-[#D4AF37] p-2 rounded-full hover:bg-zinc-700 transition-colors disabled:opacity-50"
@@ -208,6 +200,15 @@ export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScr
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
+        <button 
+          onClick={handleGenerateAIPrompt}
+          disabled={generatingPrompt}
+          className="w-full mb-6 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/30 text-blue-400 p-4 rounded-2xl hover:from-blue-800/50 hover:to-indigo-800/50 transition-all disabled:opacity-50 flex items-center justify-center gap-3 font-bold shadow-lg"
+        >
+          {generatingPrompt ? <Loader2 className="animate-spin" size={24} /> : <Bot size={24} />}
+          <span>Copiar Prompt para Informe IA</span>
+        </button>
+
         {isAdding && (
           <div className="mb-6 p-4 bg-zinc-900 rounded-xl border border-[#D4AF37]/30 space-y-4">
             <input

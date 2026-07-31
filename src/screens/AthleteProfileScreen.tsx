@@ -1,4 +1,4 @@
-import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield, X, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Activity, Heart, Dumbbell, History, FileText, Mail, TrendingUp, Zap, Video, Brain, CalendarClock, Baby, Trophy, Camera, Loader2, Edit2, Medal, Shield, X, Trash2, AlertTriangle, ChevronsUp, ChevronsDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CoachAthleteDashboard } from '../components/CoachAthleteDashboard';
 import { useState, useRef, ChangeEvent, useEffect } from 'react';
@@ -33,7 +33,11 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   const [currentPhotoURL, setCurrentPhotoURL] = useState(athlete?.photoURL || null);
   const [showProgressionInfo, setShowProgressionInfo] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
+  const [showDemoteConfirm, setShowDemoteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
+  const [isDemoting, setIsDemoting] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +82,69 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
       handleFirestoreError(error, OperationType.UPDATE, `users/${athlete.id}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handlePromoteLevel = async () => {
+    if (!isTrainer) return;
+    
+    const currentXP = athlete.xp || 0;
+    const currentLevel = getLevelFromXP(currentXP);
+    const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+    const nextLevel = LEVELS[currentIndex + 1];
+    
+    if (!nextLevel) {
+      setFeedback({ message: 'El atleta ya está en el nivel máximo', type: 'error' });
+      setShowPromoteConfirm(false);
+      return;
+    }
+
+    setIsPromoting(true);
+    try {
+      await updateDoc(doc(db, 'users', athleteId), {
+        xp: nextLevel.minXP,
+        previousLevelXP: currentXP // Guardar para poder regresar
+      });
+      setAthlete({ ...athlete, xp: nextLevel.minXP, previousLevelXP: currentXP });
+      setFeedback({ message: `¡${athlete.displayName} ha ascendido a ${nextLevel.name}!`, type: 'success' });
+    } catch (error) {
+      console.error(error);
+      setFeedback({ message: 'Error al promover nivel', type: 'error' });
+    } finally {
+      setIsPromoting(false);
+      setShowPromoteConfirm(false);
+    }
+  };
+
+  const handleDemoteLevel = async () => {
+    if (!isTrainer) return;
+    
+    const currentXP = athlete.xp || 0;
+    const currentLevel = getLevelFromXP(currentXP);
+    const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+    const prevLevel = LEVELS[currentIndex - 1];
+    
+    if (!prevLevel) {
+      setFeedback({ message: 'El atleta ya está en el nivel mínimo', type: 'error' });
+      setShowDemoteConfirm(false);
+      return;
+    }
+
+    setIsDemoting(true);
+    try {
+      // Usar XP guardada o en su defecto el maximo del nivel anterior
+      const newXP = athlete.previousLevelXP !== undefined ? athlete.previousLevelXP : prevLevel.maxXP;
+      await updateDoc(doc(db, 'users', athleteId), {
+        xp: newXP
+      });
+      setAthlete({ ...athlete, xp: newXP });
+      setFeedback({ message: `¡${athlete.displayName} ha regresado a ${prevLevel.name}!`, type: 'success' });
+    } catch (error) {
+      console.error(error);
+      setFeedback({ message: 'Error al regresar de nivel', type: 'error' });
+    } finally {
+      setIsDemoting(false);
+      setShowDemoteConfirm(false);
     }
   };
 
@@ -240,11 +307,49 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
             <div className="mt-4"><Loader2 className="animate-spin text-zinc-500" size={24} /></div>
           ) : (
             <div className="mt-4 flex flex-col items-center gap-2">
-              <div className={`${isChild ? 'bg-blue-500/10 border-blue-500/20' : 'bg-[#D4AF37]/10 border-[#D4AF37]/20'} px-4 py-2 rounded-full flex items-center gap-2`}>
-                <Trophy size={16} className={isChild ? 'text-blue-500' : 'text-[#D4AF37]'} />
-                <span className={`text-xs font-bold uppercase tracking-widest ${isChild ? 'text-blue-500' : 'text-[#D4AF37]'}`}>
-                  {getLevelFromXP(athlete.xp || 0).name} • {athlete.xp || 0} XP
-                </span>
+              <div className="flex items-center gap-2">
+                {isTrainer && (() => {
+                  const currentXP = athlete.xp || 0;
+                  const currentLevel = getLevelFromXP(currentXP);
+                  const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+                  const prevLevel = LEVELS[currentIndex - 1];
+                  
+                  if (!prevLevel) return null;
+                  
+                  return (
+                    <button 
+                      onClick={() => setShowDemoteConfirm(true)}
+                      className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-rose-400 transition-colors border border-zinc-700"
+                      title={`Regresar a ${prevLevel.name}`}
+                    >
+                      <ChevronsDown size={16} />
+                    </button>
+                  );
+                })()}
+                <div className={`${isChild ? 'bg-blue-500/10 border-blue-500/20' : 'bg-[#D4AF37]/10 border-[#D4AF37]/20'} px-4 py-2 rounded-full flex items-center gap-2`}>
+                  <Trophy size={16} className={isChild ? 'text-blue-500' : 'text-[#D4AF37]'} />
+                  <span className={`text-xs font-bold uppercase tracking-widest ${isChild ? 'text-blue-500' : 'text-[#D4AF37]'}`}>
+                    {getLevelFromXP(athlete.xp || 0).name} • {athlete.xp || 0} XP
+                  </span>
+                </div>
+                {isTrainer && (() => {
+                  const currentXP = athlete.xp || 0;
+                  const currentLevel = getLevelFromXP(currentXP);
+                  const currentIndex = LEVELS.findIndex(l => l.name === currentLevel.name);
+                  const nextLevel = LEVELS[currentIndex + 1];
+                  
+                  if (!nextLevel) return null;
+                  
+                  return (
+                    <button 
+                      onClick={() => setShowPromoteConfirm(true)}
+                      className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-emerald-400 transition-colors border border-zinc-700"
+                      title={`Promover a ${nextLevel.name}`}
+                    >
+                      <ChevronsUp size={16} />
+                    </button>
+                  );
+                })()}
               </div>
               
               {/* Level Progress Bar */}
@@ -413,6 +518,24 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
         message={`¿Estás seguro de que deseas eliminar permanentemente a ${athlete.displayName}? Esta acción lo marcará como inactivo y se eliminará definitivamente en 60 días.`}
         variant="danger"
         confirmText={isDeleting ? "Eliminando..." : "Eliminar Permanentemente"}
+      />
+      <ConfirmationModal
+        isOpen={showPromoteConfirm}
+        onClose={() => setShowPromoteConfirm(false)}
+        onConfirm={handlePromoteLevel}
+        title="Promover Atleta"
+        message={`¿Estás seguro de que deseas ascender a ${athlete.displayName} al siguiente nivel? Esto actualizará su XP al mínimo requerido para el próximo nivel.`}
+        variant="primary"
+        confirmText={isPromoting ? "Promoviendo..." : "Promover Nivel"}
+      />
+      <ConfirmationModal
+        isOpen={showDemoteConfirm}
+        onClose={() => setShowDemoteConfirm(false)}
+        onConfirm={handleDemoteLevel}
+        title="Regresar Nivel"
+        message={`¿Estás seguro de que deseas regresar a ${athlete.displayName} al nivel anterior? Esto restaurará su XP anterior o al máximo del nivel previo.`}
+        variant="danger"
+        confirmText={isDemoting ? "Regresando..." : "Regresar Nivel"}
       />
       <AnimatePresence>
         {showProgressionInfo && (
