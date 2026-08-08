@@ -434,7 +434,7 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
                 { id: 'reaccion', title: 'Reacción Visual', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/10' },
                 { id: 'video-analysis', title: 'Análisis Video', icon: Video, color: 'text-red-500', bg: 'bg-red-500/10' },
                 { id: 'entrenamientos', title: 'Rutinas Globales', icon: Dumbbell, color: 'text-green-500', bg: 'bg-green-500/10' },
-                { id: 'exercise-bank', title: 'Banco Ejercicios', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                { id: 'exercise-bank', title: 'Biblioteca ELITE', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               ].map((tool) => (
                 <button 
                   key={tool.id}

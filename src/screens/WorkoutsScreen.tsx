@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target, Trophy } from 'lucide-react';
+import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target, Trophy, CheckCircle2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
@@ -49,6 +49,7 @@ export const WorkoutsScreen = () => {
   const [exRestSeries, setExRestSeries] = useState(60);
   const [exRestExercise, setExRestExercise] = useState(60);
   const [exNotes, setExNotes] = useState('');
+  const [saveToLibrary, setSaveToLibrary] = useState(false);
 
   // Circuit form state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -259,7 +260,7 @@ export const WorkoutsScreen = () => {
     setBlocks(blocks.map(b => b.id === id ? { ...b, name } : b));
   };
 
-  const addExerciseToBlock = (blockId: string) => {
+  const addExerciseToBlock = async (blockId: string) => {
     if (!exName) return;
     const totalTime = calculateExerciseTotalTime(exSeries, exTime);
     const blockMoment = blocks.find(b => b.id === blockId)?.moment;
@@ -300,6 +301,24 @@ export const WorkoutsScreen = () => {
         return b;
       }));
     }
+
+    if (saveToLibrary && !editingExerciseId) {
+      try {
+        await addDoc(collection(db, 'exerciseBank'), {
+          name: exName,
+          moment: blockMoment || 'M2',
+          env: 'all',
+          muscleGroup: 'Fuerza', // Default category
+          description: exNotes || '',
+          trainerId: userProfile?.role === 'superadmin' ? undefined : user?.uid,
+          createdAt: serverTimestamp()
+        });
+        alert('Ejercicio guardado en Biblioteca ELITE');
+      } catch (err) {
+        console.error("Error saving to library", err);
+      }
+    }
+
     setExName('');
     setExSeries(3);
     setExReps('');
@@ -309,6 +328,7 @@ export const WorkoutsScreen = () => {
     setExRestSeries(60);
     setExRestExercise(60);
     setExNotes('');
+    setSaveToLibrary(false);
   };
 
   const startEditExercise = (ex: Exercise) => {
@@ -851,8 +871,25 @@ export const WorkoutsScreen = () => {
                                     value={exNotes} 
                                     onChange={(e) => setExNotes(e.target.value)} 
                                   />
+
+                                  {!editingExerciseId && (
+                                    <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${saveToLibrary ? 'bg-[#D4AF37] border-[#D4AF37]' : 'bg-transparent border-zinc-700 group-hover:border-zinc-500'}`}>
+                                        {saveToLibrary && <CheckCircle2 size={12} className="text-black" />}
+                                      </div>
+                                      <span className="text-[10px] uppercase font-bold text-zinc-400 group-hover:text-zinc-300">
+                                        Guardar en Biblioteca ELITE (Banco de Ejercicios)
+                                      </span>
+                                      <input 
+                                        type="checkbox" 
+                                        className="hidden" 
+                                        checked={saveToLibrary}
+                                        onChange={(e) => setSaveToLibrary(e.target.checked)}
+                                      />
+                                    </label>
+                                  )}
                                   
-                                  <button onClick={() => addExerciseToBlock(block.id)} className="w-full bg-[#D4AF37] text-black font-black uppercase text-[10px] py-3.5 rounded-xl hover:shadow-[0_0_20px_-5px_rgba(212,175,55,0.4)] transition-all active:scale-95">{editingExerciseId ? 'Actualizar Ejercicio' : 'Añadir Ejercicio'}</button>
+                                  <button onClick={() => addExerciseToBlock(block.id)} className="w-full bg-[#D4AF37] text-black font-black uppercase text-[10px] py-3.5 mt-2 rounded-xl hover:shadow-[0_0_20px_-5px_rgba(212,175,55,0.4)] transition-all active:scale-95">{editingExerciseId ? 'Actualizar Ejercicio' : 'Añadir Ejercicio'}</button>
                                 </div>
                               </div>
                             ) : (
@@ -1093,7 +1130,7 @@ export const WorkoutsScreen = () => {
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-zinc-900 w-full max-w-lg rounded-3xl p-6 flex flex-col max-h-[80vh]">
               <div className="flex justify-between mb-4">
                 <div className="flex flex-col">
-                  <h2 className="font-black uppercase text-sm tracking-widest text-[#D4AF37]">Biblioteca Elite ({exerciseBank.length})</h2>
+                  <h2 className="font-black uppercase text-sm tracking-widest text-[#D4AF37]">Biblioteca ELITE ({exerciseBank.length})</h2>
                   <p className="text-[9px] text-zinc-500 uppercase font-bold">100 Ejercicios Gamificados</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1134,7 +1171,7 @@ export const WorkoutsScreen = () => {
                 {exerciseBank.length === 0 && !isSyncingBank && (
                    <div className="text-center py-10 border border-dashed border-zinc-800 rounded-3xl bg-black/20">
                       <Zap size={32} className="mx-auto mb-3 text-[#D4AF37]" strokeWidth={1} />
-                      <p className="text-xs font-bold text-zinc-400 mb-4 px-6">Tu banco de ejercicios está vacío. ¿Deseas cargar los 100 ejercicios del sistema gamificado?</p>
+                      <p className="text-xs font-bold text-zinc-400 mb-4 px-6">Tu Biblioteca ELITE está vacía. ¿Deseas cargar los 100 ejercicios del sistema gamificado?</p>
                       <button 
                         onClick={handleSyncProBank}
                         className="bg-[#D4AF37] text-black px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"

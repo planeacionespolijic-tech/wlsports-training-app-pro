@@ -190,7 +190,7 @@ export const ExerciseBankScreen = ({ onBack }: ExerciseBankScreenProps) => {
           </button>
           <div>
             <h1 className="text-xl font-bold flex items-center gap-3">
-              Banco de Ejercicios
+              Biblioteca ELITE (Banco de Ejercicios)
               {!loading && exercises.length > 0 && (
                 <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full font-black">
                   {exercises.length}
