@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target } from 'lucide-react';
+import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target, Trophy } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
@@ -540,6 +540,16 @@ export const WorkoutsScreen = () => {
     alert('Nombres de momentos actualizados a la nueva versión.');
   };
 
+  const updateBlockTournamentConfig = (blockId: string, field: string, value: string) => {
+    setBlocks(prev => prev.map(b => b.id === blockId ? {
+      ...b,
+      tournamentConfig: {
+        ...(b.tournamentConfig || {}),
+        [field]: value
+      }
+    } : b));
+  };
+
   const handleEdit = (workout: any) => {
     setNewName(workout.name);
     setNewObjective(workout.objective || '');
@@ -571,6 +581,19 @@ export const WorkoutsScreen = () => {
   const [showAthletePicker, setShowAthletePicker] = useState(false);
   const [selectedWorkoutForSession, setSelectedWorkoutForSession] = useState<any>(null);
   const [athletes, setAthletes] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTournaments = async () => {
+      try {
+        const tSnap = await getDocs(query(collection(db, 'tournaments'), orderBy('createdAt', 'desc')));
+        setTournaments(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching tournaments:", err);
+      }
+    };
+    fetchTournaments();
+  }, []);
 
   useEffect(() => {
     if (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') {
@@ -710,6 +733,54 @@ export const WorkoutsScreen = () => {
                               <button onClick={() => toggleBlockType(block.id, 'normal')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${block.type === 'normal' ? 'bg-[#D4AF37] text-black' : 'text-zinc-500'}`}>Normal</button>
                               <button onClick={() => toggleBlockType(block.id, 'circuit')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${block.type === 'circuit' ? 'bg-[#D4AF37] text-black' : 'text-zinc-500'}`}>Circuito</button>
                             </div>
+
+                            {block.name.toUpperCase().includes('M4') && (
+                              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mt-4 space-y-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Trophy size={14} className="text-amber-500" />
+                                  <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500">Vincular a Torneo Oficial (Opcional)</h4>
+                                </div>
+                                
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[8px] uppercase text-zinc-500 font-bold">Seleccionar Torneo</label>
+                                  <select
+                                    value={block.tournamentConfig?.tournamentId || ''}
+                                    onChange={(e) => updateBlockTournamentConfig(block.id, 'tournamentId', e.target.value)}
+                                    className="bg-black border border-zinc-800 p-3 rounded-lg text-xs outline-none focus:border-amber-500 text-white font-bold"
+                                  >
+                                    <option value="">Sin Torneo</option>
+                                    {tournaments.map(t => (
+                                      <option key={t.id} value={t.id}>{t.title}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                
+                                {block.tournamentConfig?.tournamentId && (
+                                  <>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[8px] uppercase text-zinc-500 font-bold">Nombre de la Fecha (Ej: Fecha 1)</label>
+                                      <input
+                                        type="text"
+                                        value={block.tournamentConfig?.matchName || ''}
+                                        onChange={(e) => updateBlockTournamentConfig(block.id, 'matchName', e.target.value)}
+                                        className="bg-black border border-zinc-800 p-3 rounded-lg text-xs outline-none focus:border-amber-500 text-white font-bold"
+                                        placeholder="Ej: Fecha 1"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[8px] uppercase text-zinc-500 font-bold">Motivo de Bono (Reto M4)</label>
+                                      <input
+                                        type="text"
+                                        value={block.tournamentConfig?.bonusReason || ''}
+                                        onChange={(e) => updateBlockTournamentConfig(block.id, 'bonusReason', e.target.value)}
+                                        className="bg-black border border-zinc-800 p-3 rounded-lg text-xs outline-none focus:border-amber-500 text-white font-bold"
+                                        placeholder="Ej: Si completa reto técnico"
+                                      />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
                             
                             {block.type === 'normal' ? (
                               <div className="space-y-4">

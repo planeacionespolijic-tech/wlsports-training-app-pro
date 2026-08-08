@@ -5,6 +5,7 @@ import { Loader2, Home, Users } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useWakeLock } from './hooks/useWakeLock';
 
 // Lazy load all screens for optimal performance
 const LoginScreen = lazy(() => import('./screens/LoginScreen').then(m => ({ default: m.LoginScreen })));
@@ -43,6 +44,7 @@ const PageLoader = () => (
 );
 
 const AppShell: React.FC = () => {
+  useWakeLock();
   const { user, userProfile, isTrainer, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Dice5, Timer, Zap, Plus, Save, Loader2, Trophy, Flame, Medal, X, Search, Dumbbell, ChevronRight, Shield, ChevronDown, ChevronUp, Play, Star } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { TabataScreen } from './TabataScreen';
 import { ReactionScreen } from './ReactionScreen';
@@ -67,6 +67,11 @@ export const SessionExecutionScreen = () => {
   const [showBankPicker, setShowBankPicker] = useState<'manual' | 'bank' | 'routines'>('manual');
   const [globalRoutines, setGlobalRoutines] = useState<any[]>([]);
 
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>('');
+  const [tournamentMatchName, setTournamentMatchName] = useState<string>('');
+  const [tournamentBonusReason, setTournamentBonusReason] = useState<string>('');
+
   useEffect(() => {
     if (!currentWorkout && workoutId) {
       const fetchWorkout = async () => {
@@ -84,6 +89,19 @@ export const SessionExecutionScreen = () => {
       fetchWorkout();
     }
   }, [workoutId, currentWorkout]);
+
+  // Fetch tournaments
+  useEffect(() => {
+    const fetchTournaments = async () => {
+      try {
+        const tSnap = await getDocs(query(collection(db, 'tournaments'), orderBy('createdAt', 'desc')));
+        setTournaments(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching tournaments:", err);
+      }
+    };
+    fetchTournaments();
+  }, []);
 
   // Fetch Bank Exercises and Global Routines when Modal opens
   useEffect(() => {
@@ -142,6 +160,17 @@ export const SessionExecutionScreen = () => {
     ]);
     return [...fromBlocks, ...extraExercises];
   }, [workoutBlocks, extraExercises]);
+
+  useEffect(() => {
+    if (workoutBlocks && workoutBlocks.length > 0) {
+      const m4Block = workoutBlocks.find((b: any) => b.name?.toUpperCase().includes('M4'));
+      if (m4Block && m4Block.tournamentConfig) {
+        if (!selectedTournamentId && m4Block.tournamentConfig.tournamentId) setSelectedTournamentId(m4Block.tournamentConfig.tournamentId);
+        if (!tournamentMatchName && m4Block.tournamentConfig.matchName) setTournamentMatchName(m4Block.tournamentConfig.matchName);
+        if (!tournamentBonusReason && m4Block.tournamentConfig.bonusReason) setTournamentBonusReason(m4Block.tournamentConfig.bonusReason);
+      }
+    }
+  }, [workoutBlocks]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -255,6 +284,39 @@ export const SessionExecutionScreen = () => {
       
       // Bonus from exercises
       xpGained += completedExercises.length * 5;
+
+      // Tournament integrations
+      if (selectedTournamentId) {
+        if (tournamentMatchName) {
+          const playerName = userData?.displayName || 'Atleta';
+          const outcome = m4Winner === 'pupil' ? 'win' : (m4Winner === 'coach' ? 'loss' : 'draw');
+          const points = m4Winner === 'pupil' ? 3 : (m4Winner === 'coach' ? 0 : 1);
+          
+          await addDoc(collection(db, 'tournamentMatches'), {
+            tournamentId: selectedTournamentId,
+            dateName: tournamentMatchName,
+            results: [{
+              playerId: playerName,
+              playerName: playerName,
+              outcome,
+              points
+            }],
+            createdAt: serverTimestamp()
+          });
+        }
+        
+        if (m5Points > 0 && tournamentBonusReason) {
+          const playerName = userData?.displayName || 'Atleta';
+          await addDoc(collection(db, 'tournamentBonuses'), {
+            tournamentId: selectedTournamentId,
+            playerId: playerName,
+            playerName: playerName,
+            points: m5Points,
+            reason: tournamentBonusReason,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
 
       await addDoc(collection(db, 'sessions'), {
         athleteId: userId,
@@ -1247,6 +1309,46 @@ export const SessionExecutionScreen = () => {
                     />
                     <span className="text-[10px] font-bold text-zinc-600 uppercase">Pts</span>
                   </div>
+                </div>
+
+                <div className="bg-black p-4 rounded-2xl border border-zinc-800 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Vincular a Torneo Oficial</label>
+                    <select
+                      value={selectedTournamentId}
+                      onChange={(e) => setSelectedTournamentId(e.target.value)}
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white w-full outline-none focus:border-[#D4AF37]"
+                    >
+                      <option value="">Sin Torneo</option>
+                      {tournaments.map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedTournamentId && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Nombre de la Fecha (Ej: Fecha 1)</label>
+                      <input
+                        type="text"
+                        value={tournamentMatchName}
+                        onChange={(e) => setTournamentMatchName(e.target.value)}
+                        placeholder="Fecha del torneo"
+                        className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white w-full outline-none focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  )}
+                  {selectedTournamentId && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Motivo del Reto / Bono Especial</label>
+                      <input
+                        type="text"
+                        value={tournamentBonusReason}
+                        onChange={(e) => setTournamentBonusReason(e.target.value)}
+                        placeholder="Ej: Bono por completar reto técnico"
+                        className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white w-full outline-none focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
