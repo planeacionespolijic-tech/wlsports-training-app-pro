@@ -17,7 +17,9 @@ export const useWakeLock = () => {
           console.log('Wake lock API not supported');
         }
       } catch (err: any) {
-        console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+        if (err.name !== 'NotAllowedError') {
+          console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+        }
       }
     };
 
