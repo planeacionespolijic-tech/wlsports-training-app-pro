@@ -28,19 +28,75 @@ export const HistoryScreen = () => {
     // Load History
     const qHistory = query(
       collection(db, 'history'),
-      where('userId', '==', targetUserId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', targetUserId)
+    );
+    const qSessions = query(
+      collection(db, 'sessions'),
+      where('athleteId', '==', targetUserId)
     );
 
-    const unsubscribeHistory = onSnapshot(qHistory, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setHistory(data);
+    let historyData = [];
+    let sessionsData = [];
+
+    const updateCombined = () => {
+      const combined = [...historyData, ...sessionsData];
+      combined.sort((a, b) => {
+         const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+         const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+         return timeB - timeA;
+      });
+      setHistory(combined);
       setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'history');
+    };
+
+    const unsubHistory = onSnapshot(qHistory, (snap) => {
+      historyData = snap.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = '';
+        if (d.date?.toDate) {
+           const dt = d.date.toDate();
+           dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        } else if (d.date) {
+           // Might be a string or something else
+           if (typeof d.date === 'string') {
+               dateStr = d.date.split('T')[0];
+           } else {
+               dateStr = String(d.date);
+           }
+        }
+        return { 
+          id: doc.id, 
+          collection: 'history', 
+          ...d,
+          date: dateStr 
+        };
+      });
+      updateCombined();
+    });
+
+    const unsubSessions = onSnapshot(qSessions, (snap) => {
+      sessionsData = snap.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = '';
+        if (d.date?.toDate) {
+           const dt = d.date.toDate();
+           dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        } else if (d.date) {
+           dateStr = d.date.toString().split('T')[0];
+        }
+        return { 
+          id: doc.id, 
+          collection: 'sessions', 
+          workoutName: d.workoutName || 'Sesión',
+          status: d.status,
+          notes: d.notes,
+          xpGained: d.xpGained,
+          createdAt: d.createdAt,
+          ...d,
+          date: dateStr
+        };
+      });
+      updateCombined();
     });
 
     // Load Available Workouts for selection
@@ -54,7 +110,10 @@ export const HistoryScreen = () => {
     };
     loadWorkouts();
 
-    return () => unsubscribeHistory();
+    return () => {
+      unsubHistory();
+      unsubSessions();
+    };
   }, [targetUserId]);
 
   const handleAdd = async () => {
@@ -89,13 +148,13 @@ export const HistoryScreen = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, collectionName: string = 'history') => {
     if (window.confirm('¿Eliminar este registro del historial?')) {
       try {
-        await deleteDoc(doc(db, 'history', id));
+        await deleteDoc(doc(db, collectionName, id));
         alert('Registro eliminado correctamente');
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, 'history');
+        handleFirestoreError(error, OperationType.DELETE, collectionName);
       }
     }
   };
@@ -175,7 +234,7 @@ export const HistoryScreen = () => {
                 <label className="text-xs text-zinc-500 ml-1">Fecha</label>
                 <input
                   type="date"
-                  className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none [color-scheme:dark]"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                 />
@@ -215,12 +274,16 @@ export const HistoryScreen = () => {
                     onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="bg-zinc-800 p-3 rounded-xl text-zinc-400">
+                      <div className="bg-zinc-800 p-3 rounded-xl text-[#D4AF37]">
                         <Calendar size={20} />
                       </div>
                       <div>
-                        <h3 className="font-bold">{item.workoutName}</h3>
-                        <p className="text-zinc-500 text-xs">{item.date}</p>
+                        <div className="flex items-center gap-2">
+                           <h3 className="font-bold text-sm">{item.workoutName}</h3>
+                           {item.status === 'Realizada' && <span className="bg-green-500/10 text-green-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✓ OK</span>}
+                           {item.status === 'No realizada' && <span className="bg-red-500/10 text-red-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✕ Novedad</span>}
+                        </div>
+                        <p className="text-zinc-400 text-xs mt-0.5">{item.date} {item.xpGained ? `• +${item.xpGained} XP` : ''}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -228,14 +291,14 @@ export const HistoryScreen = () => {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(item.id);
+                            handleDelete(item.id, item.collection);
                           }}
                           className="p-2 text-zinc-700 hover:text-red-500 transition-colors"
                         >
                           <Trash2 size={18} />
                         </button>
                       )}
-                      {item.workoutDetails?.blocks?.length > 0 && (
+                      {(item.workoutDetails?.blocks?.length > 0 || item.notes) && (
                         <div className="text-zinc-600">
                           {expandedId === item.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                         </div>
@@ -243,9 +306,17 @@ export const HistoryScreen = () => {
                     </div>
                   </div>
 
-                  {expandedId === item.id && item.workoutDetails?.blocks?.length > 0 && (
+                  {expandedId === item.id && (
                     <div className="px-4 pb-4 border-t border-zinc-800 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <h4 className="text-[10px] uppercase tracking-widest text-[#D4AF37] mb-2 font-bold">Detalles de la sesión</h4>
+                      {item.notes && (
+                        <div className="mb-4 bg-black/50 p-3 rounded-xl border border-zinc-800">
+                           <p className="text-[10px] font-black tracking-widest uppercase text-zinc-500 mb-1">Novedades / Notas</p>
+                           <p className="text-xs text-zinc-300 italic">"{item.notes}"</p>
+                        </div>
+                      )}
+                      {item.workoutDetails?.blocks?.length > 0 && (
+                       <>
+                        <h4 className="text-[10px] uppercase tracking-widest text-[#D4AF37] mb-2 font-bold">Fases de la sesión</h4>
                       <div className="space-y-3">
                         {item.workoutDetails.blocks.map((block: any, idx: number) => (
                           <div key={idx} className="space-y-1">
@@ -267,6 +338,8 @@ export const HistoryScreen = () => {
                           </div>
                         ))}
                       </div>
+                       </>
+                      )}
                     </div>
                   )}
                 </div>

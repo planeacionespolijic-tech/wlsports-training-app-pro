@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { LEVELS, getLevelFromXP } from '../constants';
 import { ValoracionScreen } from './ValoracionScreen';
 import { DiagnosisScreen } from './DiagnosisScreen';
+import { ReportesWLSportsScreen } from './ReportesWLSportsScreen';
 import { ReportsScreen } from './ReportsScreen';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { logAuditEvent, AuditAction } from '../services/auditService';
@@ -212,6 +213,9 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   }
   if (activeSubTab === 'reports') {
     return <ReportsScreen userId={athleteId} athlete={athlete} onBack={() => setActiveSubTab('overview')} trainerId={isTrainer ? user?.uid : null} />;
+  }
+  if (activeSubTab === 'reportes-wlsports') {
+    return <ReportesWLSportsScreen userId={athleteId} athlete={athlete} onBack={() => setActiveSubTab('overview')} trainerId={isTrainer ? user?.uid : null} />;
   }
 
   return (

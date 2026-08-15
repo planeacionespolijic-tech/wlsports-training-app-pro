@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, Dumbbell, Loader2, Trash2, X, Play, Clock, ChevronDown, ChevronUp, Edit2, Copy, Share2, Search, Zap, Calendar, Target, Trophy, CheckCircle2 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import { suggestProgression } from '../services/intelligenceService';
 import { Exercise, TrainingBlock } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,6 +30,10 @@ export const WorkoutsScreen = () => {
   const [globalRoutines, setGlobalRoutines] = useState<any[]>([]);
   const [loadingGlobalRoutines, setLoadingGlobalRoutines] = useState(false);
   const [routineSearch, setRoutineSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'programados' | 'historial'>('programados');
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   
   // Workout form state
   const [newName, setNewName] = useState('');
@@ -120,11 +124,20 @@ export const WorkoutsScreen = () => {
 
   // Group workouts by Month and Year
   const groupedWorkouts = useMemo<Record<string, any[]>>(() => {
-    const sorted = [...workouts].sort((a, b) => {
+    // 1. Order oldest to newest to assign chronological numbers
+    const ascendingSorted = [...workouts].sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
       const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA; // Newest first
+      return dateA - dateB; // Oldest first
     });
+
+    // 2. Assign computed session numbers
+    ascendingSorted.forEach((w, idx) => {
+      w.computedSessionNumber = idx + 1;
+    });
+
+    // 3. Sort newest to oldest for display
+    const sorted = [...ascendingSorted].reverse();
 
     const groups: Record<string, any[]> = {};
     const monthNames = [
@@ -134,14 +147,59 @@ export const WorkoutsScreen = () => {
 
     sorted.forEach(workout => {
       const dateStr = workout.date || (workout.createdAt?.toDate ? workout.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-      const date = new Date(dateStr);
-      const key = `${monthNames[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+      // Avoid timezone shifting by appending T12:00:00 if it's a raw YYYY-MM-DD string
+      const dateObj = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+      const key = `${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(workout);
     });
 
     return groups;
   }, [workouts]);
+
+  // Group history by Month and Year
+  const groupedHistory = useMemo<Record<string, any[]>>(() => {
+    const sorted = [...historyData].sort((a, b) => {
+      const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return timeB - timeA; // Newest first
+    });
+
+    const groups: Record<string, any[]> = {};
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    sorted.forEach(item => {
+      let dateStr = item.date;
+      if (!dateStr && item.createdAt?.toDate) {
+          dateStr = item.createdAt.toDate().toISOString().split('T')[0];
+      }
+      if (!dateStr) dateStr = new Date().toISOString().split('T')[0];
+      
+      const dateObj = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+      const key = `${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+      
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [historyData]);
+
+  const [expandedHistoryGroups, setExpandedHistoryGroups] = useState<Record<string, boolean>>({});
+  
+  const toggleHistoryGroup = (key: string) => {
+    setExpandedHistoryGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  useEffect(() => {
+    const keys = Object.keys(groupedHistory);
+    if (keys.length > 0 && Object.keys(expandedHistoryGroups).length === 0) {
+      setExpandedHistoryGroups({ [keys[0]]: true });
+    }
+  }, [groupedHistory]);
+
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -156,6 +214,69 @@ export const WorkoutsScreen = () => {
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  useEffect(() => {
+    if (!targetUserId) return;
+    setLoadingHistory(true);
+
+    const qHistory = query(collection(db, 'history'), where('userId', '==', targetUserId));
+    const qSessions = query(collection(db, 'sessions'), where('athleteId', '==', targetUserId));
+
+    let histRaw = [];
+    let sessRaw = [];
+
+    const updateCombined = () => {
+      setHistoryData([...histRaw, ...sessRaw]);
+      setLoadingHistory(false);
+    };
+
+    const unsubHistory = onSnapshot(qHistory, (snap) => {
+      histRaw = snap.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = '';
+        if (d.date?.toDate) {
+           const dt = d.date.toDate();
+           dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        } else if (d.date) {
+           if (typeof d.date === 'string') dateStr = d.date.split('T')[0];
+           else dateStr = String(d.date);
+        }
+        return { id: doc.id, collection: 'history', ...d, date: dateStr };
+      });
+      updateCombined();
+    });
+
+    const unsubSessions = onSnapshot(qSessions, (snap) => {
+      sessRaw = snap.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = '';
+        if (d.date?.toDate) {
+           const dt = d.date.toDate();
+           dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        } else if (d.date) {
+           if (typeof d.date === 'string') dateStr = d.date.split('T')[0];
+           else dateStr = String(d.date);
+        }
+        return { 
+          id: doc.id, 
+          collection: 'sessions', 
+          workoutName: d.workoutName || 'Sesión',
+          status: d.status,
+          notes: d.notes,
+          xpGained: d.xpGained,
+          createdAt: d.createdAt,
+          ...d,
+          date: dateStr
+        };
+      });
+      updateCombined();
+    });
+
+    return () => {
+      unsubHistory();
+      unsubSessions();
+    };
+  }, [targetUserId]);
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -587,6 +708,16 @@ export const WorkoutsScreen = () => {
     setShowGlobalRoutinesModal(false);
   };
 
+  const handleDeleteHistory = async (id: string, collectionName: string = 'history') => {
+    if (window.confirm('¿Eliminar este registro del historial?')) {
+      try {
+        await deleteDoc(doc(db, collectionName, id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, collectionName);
+      }
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro?')) {
       try {
@@ -615,6 +746,8 @@ export const WorkoutsScreen = () => {
     fetchTournaments();
   }, []);
 
+  const [athletePickerAction, setAthletePickerAction] = useState<'start' | 'quick-complete'>('start');
+
   useEffect(() => {
     if (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') {
       const q = query(collection(db, 'users'), where('role', '==', 'client'), orderBy('displayName', 'asc'));
@@ -623,9 +756,73 @@ export const WorkoutsScreen = () => {
     }
   }, [userProfile]);
 
+  // Manage Session State
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [manageSessionData, setManageSessionData] = useState<{workout: any, athleteId: string} | null>(null);
+  const [manageStatus, setManageStatus] = useState<'Realizada' | 'No realizada'>('Realizada');
+  const [manageNotes, setManageNotes] = useState('');
+
+  const executeManageSession = async () => {
+    if (!manageSessionData) return;
+    const { workout, athleteId } = manageSessionData;
+    
+    setLoading(true);
+    try {
+      const exercisesCount = workout.blocks?.reduce((acc: number, b: any) => acc + (b.exercises?.length || b.circuit?.items?.length || 0), 0) || 0;
+      const xpGained = manageStatus === 'Realizada' ? (exercisesCount * 5 || 25) : 0;
+
+      await addDoc(collection(db, 'sessions'), {
+        athleteId: athleteId,
+        trainerId: trainerId || null,
+        date: workout.date ? new Date(workout.date + "T12:00:00") : serverTimestamp(),
+        createdAt: serverTimestamp(),
+        exercisesCompleted: manageStatus === 'Realizada' ? exercisesCount : 0,
+        xpGained: xpGained,
+        isAscensionSession: false,
+        approvedAscension: false,
+        workoutName: workout.name || 'Entrenamiento',
+        status: manageStatus,
+        notes: manageNotes || (manageStatus === 'Realizada' ? 'Completada' : 'Sin novedad registrada')
+      });
+
+      if (athleteId && manageStatus === 'Realizada') {
+        const userRef = doc(db, 'users', athleteId);
+        await updateDoc(userRef, {
+          xp: increment(xpGained),
+          points: increment(xpGained),
+          lastSessionDate: serverTimestamp()
+        });
+      }
+      
+      await deleteDoc(doc(db, 'workouts', workout.id));
+      
+      alert(`Sesión "${workout.name}" registrada como ${manageStatus}.`);
+    } catch (error) {
+      console.error("Error al gestionar la sesión", error);
+      alert('Error al guardar la sesión.');
+    } finally {
+      setLoading(false);
+      setShowManageModal(false);
+    }
+  };
+
+  const handleOpenManage = (workout: any) => {
+    if (!isViewingAthlete && (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin')) {
+      setSelectedWorkoutForSession(workout);
+      setAthletePickerAction('manage');
+      setShowAthletePicker(true);
+      return;
+    }
+    setManageSessionData({ workout, athleteId: targetUserId });
+    setManageStatus('Realizada');
+    setManageNotes('');
+    setShowManageModal(true);
+  };
+
   const handleStartSession = async (workout: any) => {
     if (!isViewingAthlete && (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin')) {
       setSelectedWorkoutForSession(workout);
+      setAthletePickerAction('start');
       setShowAthletePicker(true);
       return;
     }
@@ -636,7 +833,14 @@ export const WorkoutsScreen = () => {
   const handlePickAthleteAndStart = (athleteId: string) => {
     if (!selectedWorkoutForSession) return;
     setShowAthletePicker(false);
-    navigate(`/ejecucion-sesion`, { state: { ...selectedWorkoutForSession, athleteId } });
+    if (athletePickerAction === 'start') {
+      navigate(`/ejecucion-sesion`, { state: { ...selectedWorkoutForSession, athleteId } });
+    } else if (athletePickerAction === 'manage') {
+      setManageSessionData({ workout: selectedWorkoutForSession, athleteId });
+      setManageStatus('Realizada');
+      setManageNotes('');
+      setShowManageModal(true);
+    }
   };
 
   return (
@@ -673,7 +877,7 @@ export const WorkoutsScreen = () => {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[8px] uppercase text-zinc-500 ml-2">Fecha</label>
-                  <input type="date" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none text-white appearance-none" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} />
+                  <input type="date" className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none text-white [color-scheme:dark]" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -1056,10 +1260,27 @@ export const WorkoutsScreen = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {loading ? <div className="flex justify-center py-20"><Loader2 className="text-[#D4AF37] animate-spin" size={32} /></div> :
-            (Object.entries(groupedWorkouts) as [string, any[]][]).length === 0 ? <p className="text-center py-20 text-zinc-600 italic">No hay rutinas</p> :
-            (Object.entries(groupedWorkouts) as [string, any[]][]).map(([monthYear, monthWorkouts]) => {
-              const isExpanded = expandedGroups[monthYear];
+            <div className="flex gap-2 p-1.5 bg-zinc-900 border border-zinc-800 rounded-xl mb-2">
+              <button
+                onClick={() => setActiveTab('programados')}
+                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'programados' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                Programados
+              </button>
+              <button
+                onClick={() => setActiveTab('historial')}
+                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'historial' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                Historial
+              </button>
+            </div>
+
+            {activeTab === 'programados' && (
+               <>
+                 {loading ? <div className="flex justify-center py-20"><Loader2 className="text-[#D4AF37] animate-spin" size={32} /></div> :
+                 (Object.entries(groupedWorkouts) as [string, any[]][]).length === 0 ? <p className="text-center py-20 text-zinc-600 italic">No hay rutinas programadas</p> :
+                 (Object.entries(groupedWorkouts) as [string, any[]][]).map(([monthYear, monthWorkouts]) => {
+                   const isExpanded = expandedGroups[monthYear];
               return (
                 <div key={monthYear} className="space-y-4">
                   <div 
@@ -1093,7 +1314,7 @@ export const WorkoutsScreen = () => {
                                     <div className="flex items-center gap-2">
                                       <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
                                       <span className="text-[8px] font-black text-zinc-600 bg-black px-1.5 py-0.5 rounded border border-zinc-800 uppercase group-hover:border-zinc-700">
-                                        {item.sessionNumber ? `#${item.sessionNumber}` : '-'}
+                                        {item.computedSessionNumber ? `#${item.computedSessionNumber}` : '-'}
                                       </span>
                                     </div>
                                     <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">{item.duration} • {item.blocks?.length || 0} Fases • {item.date || 'S/F'}</p>
@@ -1109,7 +1330,10 @@ export const WorkoutsScreen = () => {
                                 <p className="text-[10px] text-zinc-500 line-clamp-1 mb-4 italic px-2">"{item.objective}"</p>
                               )}
 
-                              <button onClick={(e) => { e.stopPropagation(); handleStartSession(item); }} className="w-full bg-zinc-800 hover:bg-[#D4AF37] hover:text-black text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-xs"><Play size={14} /> Iniciar Sesión</button>
+                              <div className="flex gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); handleStartSession(item); }} className="flex-1 bg-zinc-800 hover:bg-[#D4AF37] hover:text-black text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-xs"><Play size={14} /> Iniciar</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleOpenManage(item); }} className="bg-zinc-800 hover:bg-green-500 hover:text-white text-white font-bold px-4 rounded-xl flex items-center justify-center transition-all active:scale-95" title="Marcar como realizada"><CheckCircle2 size={18} /></button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1120,7 +1344,126 @@ export const WorkoutsScreen = () => {
               );
             })
           }
-        </div>
+               </>
+            )}
+
+            {activeTab === 'historial' && (
+               <>
+                 {loadingHistory ? <div className="flex justify-center py-20"><Loader2 className="text-[#D4AF37] animate-spin" size={32} /></div> :
+                 (Object.entries(groupedHistory) as [string, any[]][]).length === 0 ? <p className="text-center py-20 text-zinc-600 italic">No hay registros en el historial</p> :
+                 (Object.entries(groupedHistory) as [string, any[]][]).map(([monthYear, monthHistory]) => {
+                   const isExpanded = expandedHistoryGroups[monthYear];
+                   return (
+                     <div key={monthYear} className="space-y-4">
+                       <div 
+                         className="flex items-center gap-3 px-2 cursor-pointer group select-none"
+                         onClick={() => toggleHistoryGroup(monthYear)}
+                       >
+                         <Calendar size={14} className={isExpanded ? "text-[#D4AF37]" : "text-zinc-600 group-hover:text-zinc-400"} />
+                         <h2 className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isExpanded ? 'text-zinc-100' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
+                           {monthYear} <span className="text-zinc-700 ml-2">({monthHistory.length})</span>
+                         </h2>
+                         <div className="h-[1px] flex-1 bg-zinc-800/50"></div>
+                         {isExpanded ? <ChevronUp size={14} className="text-zinc-600" /> : <ChevronDown size={14} className="text-zinc-600" />}
+                       </div>
+                       
+                       <AnimatePresence>
+                         {isExpanded && (
+                           <motion.div 
+                             initial={{ opacity: 0, height: 0 }}
+                             animate={{ opacity: 1, height: 'auto' }}
+                             exit={{ opacity: 0, height: 0 }}
+                             transition={{ duration: 0.3, ease: "circOut" }}
+                             className="overflow-hidden"
+                           >
+                             <div className="grid grid-cols-1 gap-4 pb-6">
+                               {monthHistory.map((item) => (
+                                 <div key={item.id} className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+                                   <div 
+                                     className="p-4 flex items-center justify-between cursor-pointer"
+                                     onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
+                                   >
+                                     <div className="flex items-center gap-4">
+                                       <div className="bg-zinc-800 p-3 rounded-xl text-[#D4AF37]">
+                                         <Calendar size={20} />
+                                       </div>
+                                       <div>
+                                         <div className="flex items-center gap-2">
+                                            <h3 className="font-bold text-sm">{item.workoutName}</h3>
+                                            {item.status === 'Realizada' && <span className="bg-green-500/10 text-green-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✓ OK</span>}
+                                            {item.status === 'No realizada' && <span className="bg-red-500/10 text-red-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✕ Novedad</span>}
+                                         </div>
+                                         <p className="text-zinc-400 text-xs mt-0.5">{item.date} {item.xpGained ? `• +${item.xpGained} XP` : ''}</p>
+                                       </div>
+                                     </div>
+                                     <div className="flex items-center gap-3">
+                                       {(userProfile?.role === 'trainer' || userProfile?.role === 'superadmin' || targetUserId === user?.uid) && (
+                                         <button 
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             handleDeleteHistory(item.id, item.collection);
+                                           }}
+                                           className="p-2 text-zinc-700 hover:text-red-500 transition-colors"
+                                         >
+                                           <Trash2 size={18} />
+                                         </button>
+                                       )}
+                                       {(item.workoutDetails?.blocks?.length > 0 || item.notes) && (
+                                         <div className="text-zinc-600">
+                                           {expandedHistoryId === item.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                         </div>
+                                       )}
+                                     </div>
+                                   </div>
+                                   {expandedHistoryId === item.id && (
+                                     <div className="px-4 pb-4 border-t border-zinc-800 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                       {item.notes && (
+                                         <div className="mb-4 bg-black/50 p-3 rounded-xl border border-zinc-800">
+                                            <p className="text-[10px] font-black tracking-widest uppercase text-zinc-500 mb-1">Novedades / Notas</p>
+                                            <p className="text-xs text-zinc-300 italic">"{item.notes}"</p>
+                                         </div>
+                                       )}
+                                       {item.workoutDetails?.blocks?.length > 0 && (
+                                        <>
+                                         <h4 className="text-[10px] uppercase tracking-widest text-[#D4AF37] mb-2 font-bold">Fases de la sesión</h4>
+                                         <div className="space-y-3">
+                                           {item.workoutDetails.blocks.map((block: any, idx: number) => (
+                                             <div key={idx} className="space-y-1">
+                                               <p className="text-xs font-bold text-zinc-400">{block.name}</p>
+                                               <div className="pl-2 border-l border-zinc-800 space-y-1">
+                                                 {block.exercises?.map((ex: any, eIdx: number) => (
+                                                   <div key={eIdx} className="flex justify-between text-[11px] text-zinc-500">
+                                                     <span>{ex.name} {ex.loadType === 'externa' ? `(${ex.loadValue || ex.load})` : ex.loadType === 'autocarga' ? '(Autocarga)' : ''}</span>
+                                                     <span>{ex.series || 1} series x {ex.reps || (ex.timePerSeries ? ex.timePerSeries + 's' : '-')}</span>
+                                                   </div>
+                                                 ))}
+                                                 {block.circuit?.items?.map((item: any, iIdx: number) => (
+                                                   <div key={iIdx} className="flex justify-between text-[11px] text-zinc-500">
+                                                     <span>{item.name}</span>
+                                                     <span>{item.time || item.timePerSeries}s {item.reps ? `x ${item.reps}` : ''}</span>
+                                                   </div>
+                                                 ))}
+                                               </div>
+                                             </div>
+                                           ))}
+                                         </div>
+                                        </>
+                                       )}
+                                     </div>
+                                   )}
+                                 </div>
+                               ))}
+                             </div>
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+                     </div>
+                   );
+                 })
+                 }
+               </>
+            )}
+          </div>
         )}
       </main>
 
@@ -1246,6 +1589,57 @@ export const WorkoutsScreen = () => {
                     <p className="text-xs font-bold uppercase tracking-widest">No se encontraron resultados</p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      
+      <AnimatePresence>
+        {showManageModal && manageSessionData && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-6 text-white">
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-zinc-900 w-full max-w-sm rounded-3xl p-6 border border-zinc-800">
+              <h2 className="text-xl font-black uppercase text-[#D4AF37] mb-4">Gestionar Sesión</h2>
+              <p className="text-sm text-zinc-400 mb-6 line-clamp-1">{manageSessionData.workout?.name}</p>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-zinc-500">Estado de la sesión</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setManageStatus('Realizada')}
+                      className={`py-3 px-4 rounded-xl font-bold text-xs uppercase transition-all ${manageStatus === 'Realizada' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                    >
+                      Realizada
+                    </button>
+                    <button 
+                      onClick={() => setManageStatus('No realizada')}
+                      className={`py-3 px-4 rounded-xl font-bold text-xs uppercase transition-all ${manageStatus === 'No realizada' ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                    >
+                      No realizada
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-zinc-500">Novedad / Nota (Opcional)</label>
+                  <textarea
+                    value={manageNotes}
+                    onChange={(e) => setManageNotes(e.target.value)}
+                    placeholder={manageStatus === 'Realizada' ? '¿Alguna observación?' : '¿Por qué no se realizó?'}
+                    className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-sm min-h-[80px] outline-none focus:border-[#D4AF37] resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button onClick={() => setShowManageModal(false)} className="flex-1 py-4 font-bold text-xs uppercase bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={executeManageSession} disabled={loading} className="flex-1 py-4 font-black text-xs uppercase bg-[#D4AF37] text-black rounded-xl hover:bg-yellow-500 transition-colors shadow-lg disabled:opacity-50 flex justify-center items-center gap-2">
+                  {loading ? 'Guardando...' : 'Confirmar'}
+                </button>
               </div>
             </motion.div>
           </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, FileText, Loader2, Download, Zap, BarChart3, Activity, Bot } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
+import { ReportesWLSportsScreen } from './ReportesWLSportsScreen';
 import { generateAthleteReport, AthleteReport, generateAIPrompt } from '../services/reportService';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -19,6 +20,7 @@ export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScr
   const [isAdding, setIsAdding] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [activeTab, setActiveTab] = useState<'informes' | 'visual'>('informes');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
@@ -165,41 +167,67 @@ export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScr
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      <header className="p-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-black z-10">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => {
-              if (isAdding) {
-                setIsAdding(false);
-              } else {
-                onBack();
-              }
-            }} 
-            className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
-          >
-            <ArrowLeft size={24} />
-          </button>
-          <h1 className="text-xl font-bold">Informes</h1>
+            <header className="p-4 border-b border-zinc-800 flex flex-col gap-4 sticky top-0 bg-black z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => {
+                if (isAdding) {
+                  setIsAdding(false);
+                } else {
+                  onBack();
+                }
+              }} 
+              className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-xl font-bold">Informes y Reportes</h1>
+          </div>
+          {activeTab === 'informes' && (
+            <div className="flex gap-2">
+              <button 
+                onClick={handleAutoGenerate}
+                disabled={generating}
+                className="bg-zinc-800 text-[#D4AF37] p-2 rounded-full hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                title="Generar Automáticamente"
+              >
+                {generating ? <Loader2 className="animate-spin" size={24} /> : <Zap size={24} />}
+              </button>
+              <button 
+                onClick={() => setIsAdding(true)}
+                className="bg-[#D4AF37] text-black p-2 rounded-full hover:bg-[#B8962E] transition-colors"
+              >
+                <Plus size={24} />
+              </button>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={handleAutoGenerate}
-            disabled={generating}
-            className="bg-zinc-800 text-[#D4AF37] p-2 rounded-full hover:bg-zinc-700 transition-colors disabled:opacity-50"
-            title="Generar Automáticamente"
-          >
-            {generating ? <Loader2 className="animate-spin" size={24} /> : <Zap size={24} />}
-          </button>
-          <button 
-            onClick={() => setIsAdding(true)}
-            className="bg-[#D4AF37] text-black p-2 rounded-full hover:bg-[#B8962E] transition-colors"
-          >
-            <Plus size={24} />
-          </button>
-        </div>
+        
+        {!isAdding && (
+          <div className="flex bg-zinc-900 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab('informes')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'informes' ? 'bg-[#D4AF37] text-black' : 'text-zinc-400'}`}
+            >
+              Informes de Progreso
+            </button>
+            <button
+              onClick={() => setActiveTab('visual')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'visual' ? 'bg-black text-[#D4AF37]' : 'text-zinc-400'}`}
+            >
+              Prompts Visuales
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
+        {activeTab === 'visual' ? (
+          <ReportesWLSportsScreen userId={userId} trainerId={trainerId} athlete={athlete} onBack={onBack} />
+        ) : (
+          <>
+
         <button 
           onClick={handleGenerateAIPrompt}
           disabled={generatingPrompt}
@@ -294,6 +322,8 @@ export const ReportsScreen = ({ onBack, userId, trainerId, athlete }: ReportsScr
               ))
             )}
           </div>
+        )}
+                </>
         )}
       </main>
     </div>

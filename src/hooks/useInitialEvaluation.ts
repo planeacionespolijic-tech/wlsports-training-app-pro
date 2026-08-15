@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { 
   EvaluationFormData, 
   EvaluationResult, 
@@ -107,9 +107,9 @@ export const useInitialEvaluation = (userId: string | undefined) => {
 
     try {
       // 1. Update user profile (summary)
-      await updateDoc(doc(db, 'users', userId), {
+      await setDoc(doc(db, 'users', userId), {
         initialEvaluation: fullResult
-      });
+      }, { merge: true });
 
       // 2. Save to history subcollection
       const historyRef = collection(db, 'users', userId, 'evaluations');

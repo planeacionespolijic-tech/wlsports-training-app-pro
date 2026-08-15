@@ -43,6 +43,28 @@ const PageLoader = () => (
   </div>
 );
 
+
+const ScreenWrapper = ({ children }: { children: React.ReactNode }) => {
+  const { user, userProfile } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const userId = location.state?.athleteId || user?.uid || '';
+  const isTrainer = userProfile?.role === 'trainer' || userProfile?.role === 'superadmin';
+  const trainerId = isTrainer && location.state?.athleteId ? user?.uid : null;
+  const onBack = () => navigate(-1);
+
+  if (!React.isValidElement(children)) return <>{children}</>;
+
+  return React.cloneElement(children, {
+    userId,
+    trainerId,
+    isAdmin: isTrainer,
+    onBack,
+    userProfile
+  } as any);
+};
+
 const AppShell: React.FC = () => {
   useWakeLock();
   const { user, userProfile, isTrainer, loading } = useAuth();
@@ -137,31 +159,31 @@ const AppShell: React.FC = () => {
           } />
 
           {/* Evaluation & Planning Tools */}
-          <Route path="/valoracion" element={<ProtectedRoute><ValoracionScreen /></ProtectedRoute>} />
-          <Route path="/zonas" element={<ProtectedRoute><ZonasScreen /></ProtectedRoute>} />
-          <Route path="/seguimiento" element={<ProtectedRoute><SeguimientoScreen /></ProtectedRoute>} />
-          <Route path="/tests" element={<ProtectedRoute><TestsScreen /></ProtectedRoute>} />
-          <Route path="/video-analysis" element={<ProtectedRoute><VideoAnalysisScreen /></ProtectedRoute>} />
-          <Route path="/diagnostico" element={<ProtectedRoute><DiagnosisScreen /></ProtectedRoute>} />
-          <Route path="/planificacion" element={<ProtectedRoute><PlanningScreen /></ProtectedRoute>} />
+          <Route path="/valoracion" element={<ProtectedRoute><ScreenWrapper><ValoracionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/zonas" element={<ProtectedRoute><ScreenWrapper><ZonasScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/seguimiento" element={<ProtectedRoute><ScreenWrapper><SeguimientoScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/tests" element={<ProtectedRoute><ScreenWrapper><TestsScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/video-analysis" element={<ProtectedRoute><ScreenWrapper><VideoAnalysisScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/diagnostico" element={<ProtectedRoute><ScreenWrapper><DiagnosisScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/planificacion" element={<ProtectedRoute><ScreenWrapper><PlanningScreen /></ScreenWrapper></ProtectedRoute>} />
           
           {/* Execution & Tracking */}
-          <Route path="/ejecucion-sesion" element={<ProtectedRoute><SessionExecutionScreen /></ProtectedRoute>} />
-          <Route path="/ejecucion-sesion/:workoutId" element={<ProtectedRoute><SessionExecutionScreen /></ProtectedRoute>} />
-          <Route path="/entrenamientos" element={<ProtectedRoute><WorkoutsScreen /></ProtectedRoute>} />
-          <Route path="/atleta/:id/entrenamientos" element={<ProtectedRoute allowedRoles={['trainer', 'superadmin']}><WorkoutsScreen /></ProtectedRoute>} />
-          <Route path="/historial" element={<ProtectedRoute><HistoryScreen /></ProtectedRoute>} />
-          <Route path="/atleta/:id/historial" element={<ProtectedRoute allowedRoles={['trainer', 'superadmin']}><HistoryScreen /></ProtectedRoute>} />
-          <Route path="/informes" element={<ProtectedRoute><ReportsScreen /></ProtectedRoute>} />
+          <Route path="/ejecucion-sesion" element={<ProtectedRoute><ScreenWrapper><SessionExecutionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/ejecucion-sesion/:workoutId" element={<ProtectedRoute><ScreenWrapper><SessionExecutionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/entrenamientos" element={<ProtectedRoute><ScreenWrapper><WorkoutsScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/atleta/:id/entrenamientos" element={<ProtectedRoute allowedRoles={['trainer', 'superadmin']}><ScreenWrapper><WorkoutsScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/historial" element={<ProtectedRoute><ScreenWrapper><HistoryScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/atleta/:id/historial" element={<ProtectedRoute allowedRoles={['trainer', 'superadmin']}><ScreenWrapper><HistoryScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/informes" element={<ProtectedRoute><ScreenWrapper><ReportsScreen /></ScreenWrapper></ProtectedRoute>} />
 
           {/* Gamification & Tools */}
-          <Route path="/retos" element={<ProtectedRoute><ChallengesScreen /></ProtectedRoute>} />
-          <Route path="/torneos" element={<ProtectedRoute><TournamentsScreen /></ProtectedRoute>} />
-          <Route path="/progresion" element={<ProtectedRoute><ProgressionScreen /></ProtectedRoute>} />
-          <Route path="/tabata" element={<ProtectedRoute><TabataScreen /></ProtectedRoute>} />
-          <Route path="/ejecucion-circuito" element={<ProtectedRoute><CircuitExecutionScreen /></ProtectedRoute>} />
-          <Route path="/reaccion" element={<ProtectedRoute><ReactionScreen /></ProtectedRoute>} />
-          <Route path="/kids-module" element={<ProtectedRoute><KidsModuleScreen /></ProtectedRoute>} />
+          <Route path="/retos" element={<ProtectedRoute><ScreenWrapper><ChallengesScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/torneos" element={<ProtectedRoute><ScreenWrapper><TournamentsScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/progresion" element={<ProtectedRoute><ScreenWrapper><ProgressionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/tabata" element={<ProtectedRoute><ScreenWrapper><TabataScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/ejecucion-circuito" element={<ProtectedRoute><ScreenWrapper><CircuitExecutionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/reaccion" element={<ProtectedRoute><ScreenWrapper><ReactionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/kids-module" element={<ProtectedRoute><ScreenWrapper><KidsModuleScreen /></ScreenWrapper></ProtectedRoute>} />
 
           {/* Root Redirects */}
           <Route path="/" element={

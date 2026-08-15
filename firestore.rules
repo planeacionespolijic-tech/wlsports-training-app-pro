@@ -270,7 +270,7 @@ service cloud.firestore {
     }
 
     function isValidDiagnosis(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isTrainer());
+      return data.userId is string && (data.userId == request.auth.uid || isTrainer() || isSuperAdmin());
     }
 
     function isValidTrainingPlan(data) {
@@ -352,6 +352,12 @@ service cloud.firestore {
       allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.get('role', 'client') == resource.data.get('role', 'client') || (resource.data.get('role', 'client') == 'superadmin' && request.resource.data.get('role', 'client') == 'trainer') || (request.auth.token.email != null && request.auth.token.email == 'planeacionespolijic@gmail.com' && request.resource.data.get('role', 'client') == 'superadmin'))) || 
                     (isAuthenticated() && (resource.data.get('trainerId', '') == request.auth.uid || resource.data.get('createdBy', '') == request.auth.uid) && isNotBlocked()) ||
                     isSuperAdmin();
+
+      match /evaluations/{evaluationId} {
+        allow read: if isOwner(userId) || isSuperAdmin() || isTrainer();
+        allow create, update: if (isOwner(userId) || isSuperAdmin() || isTrainer()) && isNotBlocked();
+        allow delete: if isSuperAdmin();
+      }
     }
 
     match /workouts/{workoutId} {
@@ -366,6 +372,18 @@ service cloud.firestore {
       allow create: if isNotBlocked() && isValidHistory(request.resource.data);
       allow update: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()) && userIdUnchanged());
       allow delete: if isSuperAdmin() || (isNotBlocked() && (isDocOwner() || isDocTrainer()));
+    }
+
+    function isValidReportHistory(data) {
+      return data.athleteId is string &&
+             (data.athleteId == request.auth.uid || isTrainer());
+    }
+
+    match /reportsHistory/{reportId} {
+      allow read: if isSuperAdmin() || (isAuthenticated() && (resource.data.athleteId == request.auth.uid || isTrainer()));
+      allow create: if isNotBlocked() && isValidReportHistory(request.resource.data);
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }
 
     match /reports/{reportId} {
@@ -414,7 +432,7 @@ service cloud.firestore {
 
     match /diagnoses/{diagnosisId} {
       allow read: if isSuperAdmin() || isDocOwner() || isDocTrainer();
-      allow create: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
+      allow create: if (isTrainer() || isSuperAdmin() || isDocOwner()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
       allow update: if (isTrainer() || isSuperAdmin()) && isNotBlocked() && isValidDiagnosis(request.resource.data);
       allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
     }

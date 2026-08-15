@@ -161,14 +161,14 @@ export const PlanningScreen = () => {
                     <label className="text-[10px] text-zinc-500 uppercase font-bold">Fecha Inicio</label>
                     <input 
                       type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                      className="w-full bg-black border border-zinc-800 rounded-xl p-3 focus:border-[#D4AF37] outline-none"
+                      className="w-full bg-black border border-zinc-800 rounded-xl p-3 focus:border-[#D4AF37] outline-none [color-scheme:dark]"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] text-zinc-500 uppercase font-bold">Fecha Fin</label>
                     <input 
                       type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                      className="w-full bg-black border border-zinc-800 rounded-xl p-3 focus:border-[#D4AF37] outline-none"
+                      className="w-full bg-black border border-zinc-800 rounded-xl p-3 focus:border-[#D4AF37] outline-none [color-scheme:dark]"
                     />
                   </div>
                 </div>
