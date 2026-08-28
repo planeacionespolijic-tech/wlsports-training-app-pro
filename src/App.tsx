@@ -24,7 +24,7 @@ const SeguimientoScreen = lazy(() => import('./screens/SeguimientoScreen').then(
 const TestsScreen = lazy(() => import('./screens/TestsScreen').then(m => ({ default: m.TestsScreen })));
 const VideoAnalysisScreen = lazy(() => import('./screens/VideoAnalysisScreen').then(m => ({ default: m.VideoAnalysisScreen })));
 const DiagnosisScreen = lazy(() => import('./screens/DiagnosisScreen').then(m => ({ default: m.DiagnosisScreen })));
-const PlanningScreen = lazy(() => import('./screens/PlanningScreen').then(m => ({ default: m.PlanningScreen })));
+
 const KidsModuleScreen = lazy(() => import('./screens/KidsModuleScreen').then(m => ({ default: m.KidsModuleScreen })));
 const SessionExecutionScreen = lazy(() => import('./screens/SessionExecutionScreen').then(m => ({ default: m.SessionExecutionScreen })));
 const ChallengesScreen = lazy(() => import('./screens/ChallengesScreen').then(m => ({ default: m.ChallengesScreen })));
@@ -165,7 +165,7 @@ const AppShell: React.FC = () => {
           <Route path="/tests" element={<ProtectedRoute><ScreenWrapper><TestsScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/video-analysis" element={<ProtectedRoute><ScreenWrapper><VideoAnalysisScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/diagnostico" element={<ProtectedRoute><ScreenWrapper><DiagnosisScreen /></ScreenWrapper></ProtectedRoute>} />
-          <Route path="/planificacion" element={<ProtectedRoute><ScreenWrapper><PlanningScreen /></ScreenWrapper></ProtectedRoute>} />
+          
           
           {/* Execution & Tracking */}
           <Route path="/ejecucion-sesion" element={<ProtectedRoute><ScreenWrapper><SessionExecutionScreen /></ScreenWrapper></ProtectedRoute>} />

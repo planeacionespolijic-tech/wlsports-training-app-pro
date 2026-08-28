@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, BookOpen, Trophy, Copy, CheckCircle2, FileText, Award, UserSquare } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { getLevelFromXP } from '../constants';
+import { getLevelFromXP, LEVELS } from '../constants';
 
 interface ReportesWLSportsScreenProps {
   userId: string;
@@ -14,6 +14,7 @@ interface ReportesWLSportsScreenProps {
 export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ userId, athlete, onBack, trainerId }) => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [trainingPlans, setTrainingPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [activeFlow, setActiveFlow] = useState<'none' | 'mensual' | 'nivel' | 'tarjeta'>('none');
@@ -41,6 +42,10 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
       const workoutsQ = query(collection(db, 'workouts'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
       const workoutsSnap = await getDocs(workoutsQ);
       setWorkouts(workoutsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      
+      const plansQ = query(collection(db, 'trainingPlans'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+      const plansSnap = await getDocs(plansQ);
+      setTrainingPlans(plansSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -227,6 +232,7 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
       athlete: {
         name: cleanUndefined(athlete.displayName, 'text'),
         age: cleanUndefined(athlete.age || athlete.initialEvaluation?.profile?.age || athlete.profile?.age, 'text'),
+        nationality: cleanUndefined(athlete.nationality || athlete.initialEvaluation?.profile?.nationality || athlete.profile?.nationality, 'text'),
         category: cleanUndefined(athlete.category || athlete.initialEvaluation?.profile?.category || athlete.profile?.category, 'text'),
         position: cleanUndefined(athlete.position || athlete.initialEvaluation?.profile?.position || athlete.profile?.position, 'text'),
         sport: cleanUndefined(athlete.sport || athlete.deporte || athlete.initialEvaluation?.profile?.sport || athlete.profile?.sport, 'text'),
@@ -254,6 +260,7 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
     let stageSessionsList: any[] = [];
     let stageMedalsList: any[] = [];
     let stageWorkoutsList: any[] = [];
+    let stagePlansList: any[] = [];
     
     if (hasStageStart && stageStart) {
       stageSessionsList = sessions.filter(s => {
@@ -268,11 +275,18 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
         const d = getRealDate(m);
         return d && d >= stageStart;
       });
+      stagePlansList = trainingPlans.filter(p => {
+        const d = getRealDate(p);
+        return d && d >= stageStart;
+      });
+    } else {
+      stagePlansList = [...trainingPlans];
     }
 
     // Remove duplicates
     stageSessionsList = stageSessionsList.filter((s, index, self) => index === self.findIndex((t) => t.id === s.id));
     stageWorkoutsList = stageWorkoutsList.filter((w, index, self) => index === self.findIndex((t) => t.id === w.id));
+    stagePlansList = stagePlansList.filter((p, index, self) => index === self.findIndex((t) => t.id === p.id));
 
     const stageCompliance = stageWorkoutsList.length > 0 
       ? Math.round((stageSessionsList.length / stageWorkoutsList.length) * 100) 
@@ -291,15 +305,21 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
         sport: cleanUndefined(athlete.sport || athlete.deporte || athlete.initialEvaluation?.profile?.sport || athlete.profile?.sport, 'text'),
         profile: cleanUndefined(athlete.dominantSide || athlete.perfil || athlete.initialEvaluation?.profile?.laterality || athlete.profile?.laterality, 'text'),
       },
-      previousLevel: "No registrado", 
+      previousLevel: (() => {
+        const idx = LEVELS.findIndex(l => l.name.toUpperCase() === selectedLevel.toUpperCase());
+        return idx > 0 ? LEVELS[idx - 1].name : "Ninguno";
+      })(), 
       newLevel: selectedLevel,
+      unlockedDate: new Date().toLocaleDateString('es-ES'),
       endingXP: cleanUndefined(athlete.xp, 'text'),
       stageDuration: hasStageStart && stageStart ? `${Math.max(1, Math.round((new Date().getTime() - stageStart.getTime()) / (1000 * 3600 * 24)))} días` : 'No registrado',
       sessions: hasStageStart ? stageSessionsList.length : 'No registrado',
       compliance: hasStageStart ? stageCompliance : 'No registrado',
       xpEarned: hasStageStart ? stageXpEarned : 'No registrado',
-      medals: hasStageStart ? stageMedalsList.length : 'No registrado',
-      challengesCompleted: 'No registrado',
+      medals: (athlete.medals || []).length > 0 ? (athlete.medals || []).length : 'No registrado',
+      challengesCompleted: (athlete.challengesCompleted || []).length > 0 ? (athlete.challengesCompleted || []).length : 'No registrado',
+      levelObjectiveGen: cleanUndefined(athlete.levelObjectiveGen, 'text'),
+      levelObjectiveSpec: cleanUndefined(athlete.levelObjectiveSpec, 'text'),
       attributeEvolution: {
         TEC: (athlete.attributes?.TEC || athlete.attributes?.tecnica) ? `${athlete.attributes.TEC || athlete.attributes.tecnica}${!isNaN(Number(athlete.attributes.TEC || athlete.attributes.tecnica)) ? '%' : ''}` : '10%',
         FIS: (athlete.attributes?.FIS || athlete.attributes?.fuerza) ? `${athlete.attributes.FIS || athlete.attributes.fuerza}${!isNaN(Number(athlete.attributes.FIS || athlete.attributes.fuerza)) ? '%' : ''}` : '10%',
@@ -310,7 +330,14 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
       developedCapabilities: 'Pendiente de evaluación',
       stageAchievements: 'Pendiente de evaluación',
       nextChallenge: 'Pendiente de evaluación',
-      levelDescription: 'No registrada'
+      levelDescription: 'No registrada',
+      plans: stagePlansList.map(p => ({
+        title: p.title || 'Plan sin título',
+        generalObjective: p.generalObjective || p.objective || 'Sin objetivo general',
+        specificObjectives: p.specificObjectives || 'No registrado',
+        startDate: p.startDate || 'No registrada',
+        endDate: p.endDate || 'No registrada',
+      }))
     };
     setReviewData(data);
     setReviewText(JSON.stringify(data, null, 2));
@@ -318,6 +345,10 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
   };
 
   const handleGenerateTarjeta = () => {
+    const currentLevelName = getLevelFromXP(athlete.xp || 0).name;
+    const currentLevelIdx = LEVELS.findIndex(l => l.name.toUpperCase() === currentLevelName.toUpperCase());
+    const previousLevelName = currentLevelIdx > 0 ? LEVELS[currentLevelIdx - 1].name : "Ninguno";
+
     const data = {
       title: `Tarjeta WLSPORTS - ${athlete.displayName || 'Atleta'}`,
       type: 'tarjeta',
@@ -329,10 +360,10 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
         sport: cleanUndefined(athlete.sport || athlete.deporte || athlete.initialEvaluation?.profile?.sport || athlete.profile?.sport, 'text'),
         profile: cleanUndefined(athlete.dominantSide || athlete.perfil || athlete.initialEvaluation?.profile?.laterality || athlete.profile?.laterality, 'text'),
       },
-      currentLevel: cleanUndefined(getLevelFromXP(athlete.xp || 0).name, 'text'),
+      currentLevel: cleanUndefined(currentLevelName, 'text'),
+      previousLevel: cleanUndefined(previousLevelName, 'text'),
       currentXP: cleanUndefined(athlete.xp || 0, 'text'),
       overallRating: cleanUndefined(athlete.ovr, 'visual'),
-      wlSportsId: athlete.id ? `WLS-${athlete.id.substring(0,6).toUpperCase()}` : 'No registrado',
       attributes: {
         TEC: cleanUndefined(athlete.attributes?.TEC || athlete.attributes?.tecnica || 10, 'visual'),
         FIS: cleanUndefined(athlete.attributes?.FIS || athlete.attributes?.fuerza || 10, 'visual'),
@@ -534,146 +565,127 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
 `;
 
     } else if (parsedData.type === 'nivel') {
-      prompt += `==============================================\nPROMPT VISUAL WLSPORTS — TARJETA DE ASCENSO\n==============================================\n\n`;
-      prompt += `DATOS DEL ASCENSO\n`;
+      prompt += `==============================================\nPROMPT VISUAL WLSPORTS — REPORTE DE ASCENSO DE NIVEL\n==============================================\n\n`;
+      prompt += `Diseñar un reporte visual, épico, premium y limpio con los siguientes elementos OBLIGATORIOS:\n`;
+      prompt += `- FOTO DEL ATLETA (Solicitar imagen antes de diseñar si es necesario)\n`;
+      prompt += `- LOGO WLSPORTS\n\n`;
+
+      prompt += `DATOS PRINCIPALES:\n`;
       prompt += `ATLETA: ${parsedData.athlete.name}\n`;
-      prompt += `NIVEL ANTERIOR: ${parsedData.previousLevel}\n`;
-      prompt += `NUEVO NIVEL: ${parsedData.newLevel}\n`;
-      prompt += `XP ALCANZADA: ${parsedData.endingXP}\n\n`;
+      prompt += `ASCENSO: ${parsedData.previousLevel} ➔ ${parsedData.newLevel}\n`;
+      prompt += `FECHA DE DESBLOQUEO: ${parsedData.unlockedDate}\n`;
+      prompt += `XP ALCANZADA: ${parsedData.endingXP} XP\n\n`;
       
-      prompt += `RESUMEN DE LA ETAPA\n`;
-      prompt += `- Duración de la etapa: ${parsedData.stageDuration}\n`;
-      prompt += `- Sesiones realizadas: ${parsedData.sessions}\n`;
-      prompt += `- Cumplimiento: ${parsedData.compliance}${typeof parsedData.compliance === 'number' ? '%' : ''}\n`;
-      prompt += `- XP obtenida durante la etapa: ${parsedData.xpEarned}\n`;
-      prompt += `- Medallas obtenidas: ${parsedData.medals}\n`;
-      prompt += `- Desafíos completados: ${parsedData.challengesCompleted}\n\n`;
+      prompt += `DATOS DE LA ETAPA (Si algún dato es "No registrado", OMITIRLO visualmente del reporte, no dejar el espacio vacío ni inventarlo):\n`;
+      if (parsedData.stageDuration !== 'No registrado') prompt += `- Duración de la etapa: ${parsedData.stageDuration}\n`;
+      if (parsedData.sessions !== 'No registrado') prompt += `- Sesiones realizadas: ${parsedData.sessions}\n`;
+      if (parsedData.compliance !== 'No registrado') prompt += `- Cumplimiento: ${parsedData.compliance}${typeof parsedData.compliance === 'number' ? '%' : ''}\n`;
+      if (parsedData.xpEarned !== 'No registrado') prompt += `- XP obtenida durante la etapa: ${parsedData.xpEarned}\n`;
+      if (parsedData.medals !== 'No registrado') prompt += `- Medallas obtenidas: ${parsedData.medals}\n`;
+      if (parsedData.challengesCompleted !== 'No registrado') prompt += `- Desafíos completados: ${parsedData.challengesCompleted}\n`;
+      prompt += `\n`;
       
-      prompt += `ATRIBUTOS ACTUALES:\n`;
+      prompt += `ATRIBUTOS Y VALORES ACTUALES:\n`;
       prompt += `⚽ TEC: ${athlete.attributes?.TEC || athlete.attributes?.tecnica || 10}\n`;
       prompt += `💪 FIS: ${athlete.attributes?.FIS || athlete.attributes?.fuerza || 10}\n`;
       prompt += `🧠 NEU: ${athlete.attributes?.NEU || athlete.attributes?.neuro || 10}\n`;
       prompt += `🤸 AGI: ${athlete.attributes?.AGI || athlete.attributes?.ritmo || 10}\n`;
       prompt += `🔥 ACT: ${athlete.attributes?.ACT || athlete.attributes?.mentalidad || 10}\n\n`;
       
-      prompt += `EVOLUCIÓN DE ATRIBUTOS\n`;
-      prompt += `⚽ TEC: ${parsedData.attributeEvolution.TEC}\n`;
-      prompt += `💪 FIS: ${parsedData.attributeEvolution.FIS}\n`;
-      prompt += `🧠 NEU: ${parsedData.attributeEvolution.NEU}\n`;
-      prompt += `🤸 AGI: ${parsedData.attributeEvolution.AGI}\n`;
-      prompt += `🔥 ACT: ${parsedData.attributeEvolution.ACT}\n\n`;
+      const hasMedals = parsedData.medals !== 'No registrado' && parsedData.medals > 0;
+      const hasChallenges = parsedData.challengesCompleted !== 'No registrado' && parsedData.challengesCompleted > 0;
+      const hasAchievements = parsedData.stageAchievements && parsedData.stageAchievements !== 'Pendiente de evaluación' && parsedData.stageAchievements !== 'No registrado';
       
-      if (parsedData.developedCapabilities && parsedData.developedCapabilities !== 'Pendiente de evaluación' && parsedData.developedCapabilities !== 'No registrado') {
-        prompt += `CAPACIDADES DESARROLLADAS\n${parsedData.developedCapabilities}\n\n`;
+      if (hasMedals || hasChallenges || hasAchievements) {
+        prompt += `LOGROS DESBLOQUEADOS (Crear una sección visual atractiva para esto):\n`;
+        if (hasMedals) prompt += `- Medallas obtenidas: ${parsedData.medals}\n`;
+        if (hasChallenges) prompt += `- Desafíos completados: ${parsedData.challengesCompleted}\n`;
+        if (hasAchievements) prompt += `- Logros adicionales:\n${parsedData.stageAchievements}\n`;
+        prompt += `\n`;
       }
       
-      if (parsedData.stageAchievements && parsedData.stageAchievements !== 'Pendiente de evaluación' && parsedData.stageAchievements !== 'No registrado') {
-        prompt += `LOGROS\n${parsedData.stageAchievements}\n\n`;
+      if (parsedData.levelObjectiveGen && parsedData.levelObjectiveGen !== 'No registrado' && parsedData.levelObjectiveGen.trim() !== '') {
+        prompt += `OBJETIVO DE NIVEL (GENERAL):\n"${parsedData.levelObjectiveGen}"\n\n`;
       }
-      
-      if (parsedData.nextChallenge && parsedData.nextChallenge !== 'Pendiente de evaluación' && parsedData.nextChallenge !== 'No registrado') {
-        prompt += `NUEVO DESAFÍO\n${parsedData.nextChallenge}\n\n`;
+      if (parsedData.levelObjectiveSpec && parsedData.levelObjectiveSpec !== 'No registrado' && parsedData.levelObjectiveSpec.trim() !== '') {
+        prompt += `OBJETIVOS ESPECÍFICOS:\n${parsedData.levelObjectiveSpec}\n\n`;
       }
-      
-      if (parsedData.levelDescription && parsedData.levelDescription !== 'No registrada') {
-        prompt += `DESCRIPCIÓN DEL NIVEL\n${parsedData.levelDescription}\n\n`;
+
+      if (parsedData.plans && parsedData.plans.length > 0) {
+        prompt += `PLANES DE ENTRENAMIENTO TRABAJADOS (MACROCICLOS/MESOCICLOS):\n`;
+        parsedData.plans.forEach((p: any) => {
+          prompt += `- ${p.title}\n`;
+          if (p.generalObjective && p.generalObjective !== 'Sin objetivo general') {
+            prompt += `  Objetivo: ${p.generalObjective}\n`;
+          }
+        });
+        prompt += `\n`;
       }
+
+      prompt += `MENSAJE MOTIVACIONAL:\n`;
+      const messages = [
+        "El esfuerzo de hoy es el triunfo de mañana. ¡Felicidades por subir de nivel!",
+        "Has demostrado consistencia y disciplina. Sigue elevando tus estándares.",
+        "Un nuevo nivel desbloqueado, nuevas metas por alcanzar. ¡Adelante!",
+        "Tu compromiso habla por sí solo. Celebra este paso y ve por más."
+      ];
+      prompt += `"${messages[Math.floor(Math.random() * messages.length)]}"\n\n`;
       
       prompt += `INSTRUCCIONES VISUALES:\n`;
-      prompt += `- ESTÉTICA: Épica, celebratoria, premium, deportiva y profesional. Destacar visualmente el nuevo nivel. Si el nivel anterior no está registrado, mostrar "No registrado" sin inventar un nivel anterior.\n`;
-      prompt += `- FOTOGRAFÍAS: Antes de generar la pieza, solicitar entre 2 y 5 fotografías reales del atleta que representen su proceso.\n`;
+      prompt += `- ESTÉTICA: Épica, celebratoria, premium, deportiva y profesional. Destacar visualmente el Ascenso (Nivel anterior -> Nuevo nivel).\n`;
+      prompt += `- FOTOGRAFÍAS Y LOGO: Asegurar jerarquía para el logo WLSPORTS y la foto del atleta.\n`;
+      prompt += `- OMITIR SI NO EXISTEN: Si un dato de la etapa no está disponible o es 0/vacío, omítelo completamente. No dejes espacios vacíos ni muestres 'No registrado'.\n`;
 
     } else if (parsedData.type === 'tarjeta') {
       prompt += `==============================================\nPROMPT MAESTRO DEFINITIVO — TARJETA DEPORTIVA WLSPORTS\n==============================================\n\n`;
       prompt += `Crea una TARJETA DEPORTIVA COLECCIONABLE PREMIUM WLSPORTS utilizando EXCLUSIVAMENTE los datos proporcionados por el sistema y los archivos reales proporcionados por el usuario.\n\n`;
       
-      prompt += `============================================================\n1. REGLA ABSOLUTA — LOS DATOS SON LA ÚNICA FUENTE DE VERDAD\n============================================================\n\n`;
-      prompt += `Los datos escritos en este prompt son los ÚNICOS datos oficiales disponibles para la pieza.\nNO inventes, completes, deduzcas, estimes, supongas, calcules ni interpretes información que no esté explícitamente proporcionada.\nLa IA visual puede ser creativa ÚNICAMENTE en el diseño gráfico, composición, iluminación, tipografía, texturas y presentación visual.\nLa IA visual NO puede ser creativa con los datos del atleta.\n\n`;
-      prompt += `PROHIBIDO INVENTAR:\n- Estadísticas.\n- Porcentajes.\n- Atributos.\n- OVR.\n- XP.\n- Nivel.\n- Nivel anterior.\n- Edad.\n- Categoría.\n- Posición.\n- Sesiones.\n- Resultados.\n- Medallas.\n- Logros.\n- Capacidades.\n- Desafíos.\n- Fortalezas.\n- Áreas de mejora.\n- Evoluciones.\n- Fechas.\n- Comentarios.\n- Rendimiento.\n- Progreso.\n- Cualquier otro dato deportivo.\n\n`;
-      prompt += `NO interpretar información a partir de la fotografía.\nNO interpretar información a partir del ID WLSPORTS.\nNO utilizar conocimientos externos para completar información faltante.\nNO convertir información faltante en información estimada.\n\n`;
-      
-      prompt += `============================================================\n2. DATOS DEL ATLETA\n============================================================\n\n`;
+      prompt += `============================================================\n1. ESTRUCTURA VISUAL (ESTILO EA SPORTS / FIFA ULTIMATE TEAM)\n============================================================\n\n`;
+      prompt += `DISEÑO OBLIGATORIO:\n`;
+      prompt += `- FOTOGRAFÍA: Centrada y prominente. Estilo recorte (sin fondo, tipo EA SPORTS / FIFA). El atleta es el absoluto héroe visual de la tarjeta.\n`;
+      prompt += `- LOGO WLSPORTS: Debe incluirse en un tamaño pequeño y discreto (ej. esquina superior) para NO quitarle ningún protagonismo a la foto del atleta.\n`;
+      prompt += `- XP ACTUAL: Colocar en tamaño sutil y complementario debajo del logo WLSPORTS, sin opacar a la imagen central.\n`;
+      prompt += `- BANDERA DE NACIONALIDAD: Integrar como un detalle elegante y en tamaño reducido, como apoyo visual sin exagerar su tamaño.\n`;
+      prompt += `- NOMBRE DEL ATLETA: Ubicado aproximadamente en la zona central, en una única línea, con tipografía fuerte y destacada.\n`;
+      prompt += `- ESCALA DE MAESTRÍA (ASCENSO): Justo debajo del nombre, resaltar de manera destacada e iluminada el logro del ascenso. Texto a incluir: "ASCENSO: ${parsedData.previousLevel} ➔ ${parsedData.currentLevel}".\n`;
+      prompt += `- ATRIBUTOS: Ubicados en la zona inferior de la tarjeta, organizados visualmente (ej. en columnas o cuadrícula tipo Ultimate Team).\n`;
+      prompt += `- DATOS DEL DEPORTISTA: En texto decididamente más pequeño (Edad, Deporte, Perfil y Posición) ubicados estratégicamente como información secundaria.\n\n`;
+
+      prompt += `============================================================\n2. REGLAS ESTRICTAS DE CONTENIDO\n============================================================\n\n`;
+      prompt += `PROHIBIDO INCLUIR:\n`;
+      prompt += `- NO incluir códigos ID (como WLSPORTS ID).\n`;
+      prompt += `- NO incluir ningún tipo de mensaje motivacional.\n`;
+      prompt += `- NO incluir mensajes del coach.\n`;
+      prompt += `- NO inventar estadísticas, porcentajes, atributos o cualquier otro dato.\n\n`;
+
+      prompt += `============================================================\n3. DATOS DEL ATLETA A INCLUIR\n============================================================\n\n`;
       prompt += `NOMBRE: ${parsedData.athlete.name}\n`;
       prompt += `EDAD: ${parsedData.athlete.age}\n`;
+      prompt += `NACIONALIDAD: ${parsedData.athlete.nationality}\n`;
       prompt += `DEPORTE: ${parsedData.athlete.sport}\n`;
-      prompt += `PERFIL: ${parsedData.athlete.profile}\n`;
       prompt += `CATEGORÍA: ${parsedData.athlete.category}\n`;
       prompt += `POSICIÓN: ${parsedData.athlete.position}\n`;
-      prompt += `NIVEL ACTUAL: ${parsedData.currentLevel}\n`;
       prompt += `XP ACTUAL: ${parsedData.currentXP}\n`;
-      prompt += `RATING GENERAL (OVR): ${parsedData.overallRating}\n`;
-      prompt += `ID WLSPORTS: ${parsedData.wlSportsId}\n\n`;
-      prompt += `Mostrar cada dato exactamente como fue proporcionado.\nNO modificar nombres. NO cambiar números. NO redondear números. NO traducir nombres de niveles. NO cambiar mayúsculas o minúsculas de los nombres oficiales de los niveles.\n\n`;
+      prompt += `RATING GENERAL (OVR): ${parsedData.overallRating} (mostrar solo si no es "—")\n\n`;
       
-      prompt += `============================================================\n3. NIVEL ANTERIOR Y NIVEL ACTUAL\n============================================================\n\n`;
-      prompt += `El NIVEL ACTUAL debe mostrarse siempre que exista.\nNUNCA inventar un nivel anterior. NUNCA sustituirlo por otro nivel. NUNCA inferirlo a partir del nivel actual. NUNCA asumir cuál era el nivel anterior.\n\n`;
-      
-      prompt += `============================================================\n4. XP ACTUAL\n============================================================\n\n`;
-      prompt += `Mostrar la XP ACTUAL exactamente como fue proporcionada.\nEjemplo:\nXP ACTUAL\n${parsedData.currentXP} XP\n\nNo calcular nada utilizando la XP. NO utilizar XP para calcular OVR, atributos, nivel anterior, progreso, porcentajes, rendimiento.\n\n`;
-      
-      prompt += `============================================================\n5. OVR / RATING GENERAL\n============================================================\n\n`;
-      prompt += `Si OVR = "—": NO calcularlo, NO estimarlo, NO sustituirlo por el promedio de atributos, NO sustituirlo por XP, NO crear una puntuación visual equivalente. Puede mostrarse "—" de forma limpia o omitirse. Nunca presentar un OVR inventado.\n\n`;
-      
-      prompt += `============================================================\n6. ATRIBUTOS — REGLA CRÍTICA\n============================================================\n\n`;
-      prompt += `Los atributos oficiales WLSPORTS son:\n⚽ TEC — Técnica\n💪 FIS — Físico\n🧠 NEU — Neurocognitivo\n🤸 AGI — Agilidad\n🔥 ACT — Actitud\n\n`;
-      prompt += `⚽ TEC ${parsedData.attributes.TEC}\n`;
-      prompt += `💪 FIS ${parsedData.attributes.FIS}\n`;
-      prompt += `🧠 NEU ${parsedData.attributes.NEU}\n`;
-      prompt += `🤸 AGI ${parsedData.attributes.AGI}\n`;
-      prompt += `🔥 ACT ${parsedData.attributes.ACT}\n\n`;
-      prompt += `SI EXISTE UN PORCENTAJE NUMÉRICO REAL: DEBE MOSTRARSE EN LA TARJETA.\nEl porcentaje debe reproducirse EXACTAMENTE. No modificarlo, no redondearlo, no calcularlo.\nLa barra, indicador o representación gráfica debe corresponder EXACTAMENTE al porcentaje proporcionado.\nSI EL ATRIBUTO ES "—": mostrar "—" o una representación visual neutra equivalente. NO mostrar 0%. NO crear una barra de 0%. NO crear un porcentaje.\n\n`;
-      
-      prompt += `============================================================\n7. EVOLUCIÓN DE ATRIBUTOS\n============================================================\n\n`;
-      prompt += `Si únicamente existe el valor actual, mostrar únicamente el valor actual. NO crear un valor inicial. Solo utilizar gráficos de evolución cuando existan datos reales suficientes. NO inventar puntos intermedios. NO crear flechas de progreso si no existe información de evolución.\n\n`;
-      
-      prompt += `============================================================\n8. INFORMACIÓN FALTANTE\n============================================================\n\n`;
-      prompt += `Los valores "—", "No registrado", "Pendiente de evaluación" NO significan cero.\nNO convertirlos en: 0, 0%, N/A, Sin habilidad, Bajo, Débil, Desconocido ni ningún otro valor inventado.\n\n`;
-      
-      prompt += `============================================================\n9. SECCIONES OPCIONALES\n============================================================\n\n`;
-      prompt += `SI EXISTE INFORMACIÓN REAL: mostrarla.\nSI NO EXISTE INFORMACIÓN REAL: OMITIR COMPLETAMENTE LA SECCIÓN.\nNo rellenar espacios con "No registrado", "Pendiente de evaluación", "Sin información", "—" cuando la sección pueda omitirse sin perjudicar la comprensión de la tarjeta.\n\n`;
-      
-      prompt += `============================================================\n10. RESUMEN DE ETAPA\n============================================================\n\n`;
-      prompt += `Si el resumen de etapa está completamente vacío y no existe ninguna información útil para mostrar: NO inventar estadísticas. NO inventar progreso. NO afirmar que el atleta mejoró. En ese caso, puede utilizarse UNA ÚNICA frase motivacional editorial, genérica y no estadística. Ejemplo permitido: "Cada nueva etapa abre una nueva oportunidad para crecer."\n\n`;
-      
-      prompt += `============================================================\n11. FOTOGRAFÍA DEL ATLETA\n============================================================\n\n`;
-      prompt += `ANTES DE GENERAR LA TARJETA:\nSOLICITAR AL USUARIO 1 FOTOGRAFÍA REAL DEL ATLETA.\nPreferiblemente: Alta resolución. Buena iluminación. Fotografía de acción. Cuerpo completo o encuadre deportivo favorable. Rostro claramente visible.\nUTILIZAR ÚNICAMENTE LA FOTOGRAFÍA PROPORCIONADA.\nPROHIBIDO: Generar un atleta ficticio. Sustituir al atleta. Crear otro rostro. Cambiar la identidad facial. Inventar otra persona.\nNO extraer información deportiva de la fotografía. NO inferir posición, categoría, edad, nivel o habilidades.\n\n`;
-      
-      prompt += `============================================================\n12. LOGO WLSPORTS\n============================================================\n\n`;
-      prompt += `ANTES DE GENERAR LA PIEZA: SOLICITAR AL USUARIO EL LOGO OFICIAL WLSPORTS.\nUTILIZAR EXCLUSIVAMENTE EL LOGO PROPORCIONADO.\nPROHIBIDO: Crear otro logo, redibujar el logo, reinterpretarlo, modificar el símbolo, cambiar la tipografía, cambiar sus colores, alterar sus proporciones, deformarlo.\n\n`;
-      
-      prompt += `============================================================\n13. IDENTIDAD VISUAL WLSPORTS\n============================================================\n\n`;
-      prompt += `MARCA: WLSPORTS\nPALETA OFICIAL: NEGRO, GRAFITO, DORADO METÁLICO, VERDE NEÓN, BLANCO\nESTÉTICA: Deportiva. Premium. Moderna. Editorial. Juvenil. Profesional. Alto rendimiento. Tecnológica. Exclusiva. Coleccionable. Aspiracional. Limpia. Contraste elevado.\n\n`;
-      
-      prompt += `============================================================\n14. FORMATO\n============================================================\n\n`;
-      prompt += `FORMATO: Tarjeta deportiva coleccionable vertical. Optimizada para compartir digitalmente, presentar a padres y atletas, e integrarse en el sistema WLSPORTS.\n\n`;
-      
-      prompt += `============================================================\n15. JERARQUÍA VISUAL\n============================================================\n\n`;
-      prompt += `Priorizar visualmente: 1. Fotografía del atleta. 2. Nombre. 3. Nivel actual. 4. Nivel anterior, si existe. 5. Atributos actuales y sus porcentajes, si existen. 6. XP actual. 7. OVR, únicamente si existe. 8. Información adicional real. 9. ID WLSPORTS. No saturar la tarjeta.\n\n`;
-      
-      prompt += `============================================================\n16. DISEÑO CON POCOS DATOS\n============================================================\n\n`;
-      prompt += `Si existen pocos datos: Dar protagonismo a la fotografía. Utilizar espacios negativos de manera intencional. Mantener una composición premium. Crear jerarquía visual. Omitir secciones sin información. No mostrar bloques vacíos. No rellenar espacios con estadísticas inventadas. No crear gráficos falsos. No hacer que la tarjeta parezca incompleta.\n\n`;
-      
-      prompt += `============================================================\n17. DISEÑO CON MUCHOS DATOS\n============================================================\n\n`;
-      prompt += `Si existen suficientes datos reales: Utilizar barras de atributos, indicadores estadísticos, gráficos. Utilizar radar chart únicamente cuando existan suficientes valores numéricos reales. Utilizar módulos de evolución únicamente cuando exista información real de evolución. Nunca utilizar gráficos decorativos que puedan confundirse con estadísticas reales.\n\n`;
-      
-      prompt += `============================================================\n18. REPRESENTACIÓN DE PORCENTAJES\n============================================================\n\n`;
-      prompt += `Los porcentajes de atributos son DATOS OFICIALES. Si la tarjeta proporciona "TEC 51%", mostrar TEC 51% y la barra debe representar 51%. Si proporciona "NEU —", mostrar NEU — y NO representar 0%. La representación visual debe ser coherente con el dato.\n\n`;
-      
-      prompt += `============================================================\n19. REGLAS DE TEXTO\n============================================================\n\n`;
-      prompt += `Todo texto de datos debe coincidir exactamente con la información recibida. No corregir nombres de niveles, no crear frases que impliquen estadísticas, no inventar títulos deportivos ni comentarios. Los textos motivacionales solo pueden utilizarse cuando estén expresamente permitidos.\n\n`;
-      
-      prompt += `============================================================\n20. ERRORES TÉCNICOS PROHIBIDOS\n============================================================\n\n`;
-      prompt += `VERIFICAR QUE NO APAREZCA NUNCA: undefined, null, NaN, NaN%, No registrado%, null%, undefined%, 0% cuando el dato original era "—", 0 cuando el dato original era "—". Verificar que no existan estadísticas inventadas, OVR calculado, edad inferida.\n\n`;
-      
-      prompt += `============================================================\n21. CONTROL DE CONSISTENCIA FINAL\n============================================================\n\n`;
-      prompt += `ANTES DE ENTREGAR LA TARJETA, realizar una revisión final completa. COMPROBAR:\n□ El nombre es exactamente correcto.\n□ El nivel actual es exactamente correcto.\n□ XP actual es exactamente correcta.\n□ OVR solo aparece si existe un valor real y no fue calculado.\n□ Cada atributo muestra su porcentaje real cuando existe.\n□ Ningún atributo "—" fue convertido en 0.\n□ Las barras representan exactamente los porcentajes proporcionados.\n□ No se inventaron estadísticas, niveles, logros ni resultados.\n□ No aparece undefined, null, NaN.\n□ Las secciones sin información real fueron omitidas.\n□ La fotografía corresponde al atleta proporcionado.\n□ La identidad WLSPORTS se mantiene.\n\n`;
-      
-      prompt += `============================================================\n22. REGLA FINAL DE PRIORIDAD\n============================================================\n\n`;
-      prompt += `SIEMPRE priorizar: 1. Exactitud de los datos. 2. Identidad real del atleta. 3. Identidad oficial WLSPORTS. 4. Legibilidad. 5. Diseño premium. NUNCA sacrificar la exactitud de los datos para llenar un espacio visual.\n\n`;
-      
-      prompt += `============================================================\n23. RESULTADO FINAL\n============================================================\n\n`;
-      prompt += `Generar UNA tarjeta deportiva coleccionable WLSPORTS Premium, Profesional, Moderna. La creatividad está permitida únicamente en Composición, Tipografía, Iluminación, Texturas, Fondos. La creatividad NO está permitida en los datos. LOS DATOS SON INALTERABLES.\n`;
-    }
+      prompt += `PERFIL / LATERALIDAD ORIGINAL: ${parsedData.athlete.profile}\n`;
+      prompt += `OBLIGATORIO CORREGIR LA GRAMÁTICA DEL PERFIL:\n`;
+      prompt += `- Identifica si el atleta es hombre o mujer basándote OBLIGATORIAMENTE en su nombre o su fotografía.\n`;
+      prompt += `- DEBES escribir el perfil con el género gramatical correcto para ese atleta. Por ejemplo: si el texto dice "Derecho" y el atleta es mujer, ES OBLIGATORIO cambiarlo a "Derecha". Si dice "Izquierdo" y es mujer, a "Izquierda". No dejes errores de género gramatical.\n\n`;
+
+      prompt += `============================================================\n4. ATRIBUTOS (ZONA INFERIOR)\n============================================================\n\n`;
+      prompt += `⚽ TEC (Técnica): ${parsedData.attributes.TEC}\n`;
+      prompt += `💪 FIS (Físico): ${parsedData.attributes.FIS}\n`;
+      prompt += `🧠 NEU (Neurocognitivo): ${parsedData.attributes.NEU}\n`;
+      prompt += `🤸 AGI (Agilidad): ${parsedData.attributes.AGI}\n`;
+      prompt += `🔥 ACT (Actitud): ${parsedData.attributes.ACT}\n\n`;
+      prompt += `SI EL ATRIBUTO ES "—": omitir visualmente o mostrar de manera neutra. NO convertir a 0%.\n\n`;
+
+      prompt += `============================================================\n5. IDENTIDAD VISUAL WLSPORTS\n============================================================\n\n`;
+      prompt += `MARCA: WLSPORTS\n`;
+      prompt += `PALETA OFICIAL: NEGRO, GRAFITO, DORADO METÁLICO, VERDE NEÓN, BLANCO\n`;
+      prompt += `ESTÉTICA: Deportiva, tipo EA SPORTS / FIFA Ultimate Team. Coleccionable. Contraste elevado.\n`;
+      prompt += `Fotografía: SOLICITAR FOTOGRAFÍA AL USUARIO. Logo: SOLICITAR LOGO AL USUARIO.\n`;    }
 
         if (parsedData.type !== 'tarjeta') {
       prompt += `\n==============================================\nIDENTIDAD VISUAL WLSPORTS OBLIGATORIA\n==============================================\n`;

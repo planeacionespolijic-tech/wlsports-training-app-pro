@@ -8,6 +8,8 @@ export interface EvaluationFormData {
     position: string;
     laterality: string;
     inspiration: string;
+    nationality: string;
+    category: string;
   };
   health: {
     medicalHistory: string;

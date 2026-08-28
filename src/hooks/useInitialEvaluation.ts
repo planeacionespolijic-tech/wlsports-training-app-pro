@@ -15,7 +15,9 @@ const INITIAL_FORM_DATA: EvaluationFormData = {
     sport: '',
     position: '',
     laterality: 'Derecha',
-    inspiration: ''
+    inspiration: '',
+    nationality: '',
+    category: ''
   },
   health: {
     medicalHistory: '',

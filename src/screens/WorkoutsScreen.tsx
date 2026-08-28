@@ -8,6 +8,7 @@ import { Exercise, TrainingBlock } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { SEED_EXERCISES, EXERCISE_CATEGORIES } from '../lib/exerciseSeed';
 import { useAuth } from '../context/AuthContext';
+import { TrainingPlansTab } from '../components/TrainingPlansTab';
 
 export const WorkoutsScreen = () => {
   const navigate = useNavigate();
@@ -22,20 +23,31 @@ export const WorkoutsScreen = () => {
 
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdding, setIsAdding] = useState(false);
+  const [isAdding, setIsAdding] = useState(location.state?.isAdding || false);
   const [saving, setSaving] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  
+  // Level Objectives State
+  const [levelObjectiveGen, setLevelObjectiveGen] = useState(location.state?.athlete?.levelObjectiveGen || '');
+  const [levelObjectiveSpec, setLevelObjectiveSpec] = useState(location.state?.athlete?.levelObjectiveSpec || '');
+  const [showLevelObjectives, setShowLevelObjectives] = useState(false);
+  const [savingObjectives, setSavingObjectives] = useState(false);
+
   const [showOverview, setShowOverview] = useState(false);
   const [showGlobalRoutinesModal, setShowGlobalRoutinesModal] = useState(false);
   const [globalRoutines, setGlobalRoutines] = useState<any[]>([]);
   const [loadingGlobalRoutines, setLoadingGlobalRoutines] = useState(false);
   const [routineSearch, setRoutineSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'programados' | 'historial'>('programados');
+  const [activeTab, setActiveTab] = useState<'planes' | 'programados' | 'historial'>('planes');
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   
   // Workout form state
+  // Plan integration
+  const [trainingPlans, setTrainingPlans] = useState<any[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState(location.state?.planId || '');
+
   const [newName, setNewName] = useState('');
   const [newObjective, setNewObjective] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -217,6 +229,12 @@ export const WorkoutsScreen = () => {
 
   useEffect(() => {
     if (!targetUserId) return;
+    
+    // Fetch user's plans
+    const qPlans = query(collection(db, 'trainingPlans'), where('userId', '==', targetUserId), orderBy('createdAt', 'desc'));
+    const unsubPlans = onSnapshot(qPlans, (snap) => {
+      setTrainingPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
     setLoadingHistory(true);
 
     const qHistory = query(collection(db, 'history'), where('userId', '==', targetUserId));
@@ -584,6 +602,25 @@ export const WorkoutsScreen = () => {
     }));
   };
 
+
+  const handleSaveLevelObjectives = async () => {
+    if (!targetUserId) return;
+    setSavingObjectives(true);
+    try {
+      await updateDoc(doc(db, 'users', targetUserId), {
+        levelObjectiveGen,
+        levelObjectiveSpec
+      });
+      alert('Objetivos de nivel guardados correctamente');
+      setShowLevelObjectives(false);
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar objetivos');
+    } finally {
+      setSavingObjectives(false);
+    }
+  };
+
   const handleAddWorkout = async () => {
     if (!newName || blocks.length === 0) {
       alert('Por favor agrega un nombre y al menos un bloque de ejercicios.');
@@ -608,9 +645,13 @@ export const WorkoutsScreen = () => {
         return b;
       });
 
+      const selectedPlan = trainingPlans.find(p => p.id === selectedPlanId);
+      
       const workoutData: any = {
         name: newName.trim(),
         objective: newObjective.trim(),
+        planId: selectedPlanId || null,
+        planTitle: selectedPlan ? selectedPlan.title : null,
         date: sessionDate,
         sessionNumber: workouts.length + 1,
         duration: formatTime(sessionTotalTime),
@@ -781,6 +822,8 @@ export const WorkoutsScreen = () => {
         isAscensionSession: false,
         approvedAscension: false,
         workoutName: workout.name || 'Entrenamiento',
+        planId: workout.planId || null,
+        planTitle: workout.planTitle || null,
         status: manageStatus,
         notes: manageNotes || (manageStatus === 'Realizada' ? 'Completada' : 'Sin novedad registrada')
       });
@@ -850,7 +893,7 @@ export const WorkoutsScreen = () => {
           <button onClick={() => isAdding ? resetForm() : navigate(-1)} className="p-2 hover:bg-zinc-800 rounded-full"><ArrowLeft size={24} /></button>
           <h1 className="text-xl font-bold">
             {isAdding ? (editingWorkoutId ? 'Editar Entrenamiento' : 'Nuevo Entrenamiento') : 
-            (isViewingAthlete ? 'Entrenamientos de Atleta' : 'Mis Entrenamientos')}
+            (isViewingAthlete ? 'Plan de Trabajo' : 'Plan de Trabajo')}
           </h1>
         </div>
         {!isAdding && (userProfile?.role === 'trainer' || userProfile?.role === 'superadmin') && (
@@ -1260,21 +1303,41 @@ export const WorkoutsScreen = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex gap-2 p-1.5 bg-zinc-900 border border-zinc-800 rounded-xl mb-2">
+            <div className="flex gap-1 p-1.5 bg-zinc-900 border border-zinc-800 rounded-xl mb-2 overflow-x-auto whitespace-nowrap hide-scrollbar">
+              <button
+                onClick={() => setActiveTab('planes')}
+                className={`flex-1 min-w-fit px-3 py-2.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'planes' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+              >
+                Planes
+              </button>
               <button
                 onClick={() => setActiveTab('programados')}
-                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'programados' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`flex-1 min-w-fit px-3 py-2.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'programados' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
                 Programados
               </button>
               <button
                 onClick={() => setActiveTab('historial')}
-                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'historial' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`flex-1 min-w-fit px-3 py-2.5 text-[10px] sm:text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'historial' ? 'bg-[#D4AF37] text-black shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
                 Historial
               </button>
             </div>
 
+            {activeTab === 'planes' && (
+              <TrainingPlansTab 
+                plans={trainingPlans}
+                targetUserId={targetUserId as string}
+                isAdminOrTrainer={userProfile?.role === 'trainer' || userProfile?.role === 'superadmin'}
+                trainerIdForLog={trainerId || user?.uid || null}
+                onAddSessionForPlan={(planId, planTitle) => {
+                  setSelectedPlanId(planId);
+                  resetForm();
+                  setIsAdding(true);
+                }}
+              />
+            )}
+            
             {activeTab === 'programados' && (
                <>
                  {loading ? <div className="flex justify-center py-20"><Loader2 className="text-[#D4AF37] animate-spin" size={32} /></div> :
@@ -1311,11 +1374,18 @@ export const WorkoutsScreen = () => {
                                 <div className="flex items-center gap-4">
                                   <div className="bg-zinc-800 p-3 rounded-xl text-[#D4AF37] group-hover:bg-[#D4AF37] group-hover:text-black transition-all"><Dumbbell size={20} /></div>
                                   <div>
-                                    <div className="flex items-center gap-2">
-                                      <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
+                                    <div className="flex flex-col">
+                                      {item.planTitle && (
+                                        <span className="text-[8px] text-[#D4AF37] font-black uppercase tracking-widest bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/20 w-fit mb-1">
+                                          Plan: {item.planTitle}
+                                        </span>
+                                      )}
+                                      <div className="flex items-center gap-2">
+                                        <h3 className="font-bold text-sm tracking-tight">{item.name}</h3>
                                       <span className="text-[8px] font-black text-zinc-600 bg-black px-1.5 py-0.5 rounded border border-zinc-800 uppercase group-hover:border-zinc-700">
                                         {item.computedSessionNumber ? `#${item.computedSessionNumber}` : '-'}
                                       </span>
+                                    </div>
                                     </div>
                                     <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">{item.duration} • {item.blocks?.length || 0} Fases • {item.date || 'S/F'}</p>
                                   </div>
@@ -1388,10 +1458,17 @@ export const WorkoutsScreen = () => {
                                          <Calendar size={20} />
                                        </div>
                                        <div>
-                                         <div className="flex items-center gap-2">
-                                            <h3 className="font-bold text-sm">{item.workoutName}</h3>
+                                         <div className="flex flex-col">
+                                            {item.planTitle && (
+                                              <span className="text-[8px] text-[#D4AF37] font-black uppercase tracking-widest bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/20 w-fit mb-1">
+                                                Plan: {item.planTitle}
+                                              </span>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                              <h3 className="font-bold text-sm">{item.workoutName}</h3>
                                             {item.status === 'Realizada' && <span className="bg-green-500/10 text-green-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✓ OK</span>}
                                             {item.status === 'No realizada' && <span className="bg-red-500/10 text-red-500 text-[9px] uppercase font-black px-1.5 py-0.5 rounded">✕ Novedad</span>}
+                                         </div>
                                          </div>
                                          <p className="text-zinc-400 text-xs mt-0.5">{item.date} {item.xpGained ? `• +${item.xpGained} XP` : ''}</p>
                                        </div>

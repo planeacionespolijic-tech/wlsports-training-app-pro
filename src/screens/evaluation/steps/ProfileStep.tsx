@@ -40,6 +40,28 @@ export const ProfileStep: React.FC<StepProps> = ({ formData, updateData }) => {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
+            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Nacionalidad</label>
+            <input 
+              type="text" 
+              value={formData.profile.nationality || ''}
+              onChange={(e) => updateData('profile', { ...formData.profile, nationality: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
+              placeholder="Ej: Colombia, México"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Categoría</label>
+            <input 
+              type="text" 
+              value={formData.profile.category || ''}
+              onChange={(e) => updateData('profile', { ...formData.profile, category: e.target.value })}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
+              placeholder="Ej: Sub-15, Élite"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
             <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Deporte</label>
             <input 
               type="text" 

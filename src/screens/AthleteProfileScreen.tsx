@@ -41,6 +41,61 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   const [isDemoting, setIsDemoting] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingAttributes, setIsEditingAttributes] = useState(false);
+  const [editAttributes, setEditAttributes] = useState({
+    TEC: athlete?.attributes?.TEC || athlete?.attributes?.tecnica || 10,
+    FIS: athlete?.attributes?.FIS || athlete?.attributes?.fuerza || 10,
+    NEU: athlete?.attributes?.NEU || athlete?.attributes?.neuro || 10,
+    AGI: athlete?.attributes?.AGI || athlete?.attributes?.ritmo || 10,
+    ACT: athlete?.attributes?.ACT || athlete?.attributes?.mentalidad || 10
+  });
+  const [isSavingAttributes, setIsSavingAttributes] = useState(false);
+
+  const handleUpdateAttributes = async () => {
+    if (!isTrainer) return;
+    setIsSavingAttributes(true);
+    try {
+      const docRef = doc(db, 'users', athleteId);
+      await updateDoc(docRef, {
+        attributes: editAttributes
+      });
+      setAthlete((prev: any) => ({ ...prev, attributes: editAttributes }));
+      setIsEditingAttributes(false);
+      setFeedback({ message: 'Atributos actualizados', type: 'success' });
+    } catch (error) {
+      console.error('Error updating attributes:', error);
+      setFeedback({ message: 'Error al actualizar atributos', type: 'error' });
+    } finally {
+      setIsSavingAttributes(false);
+    }
+  };
+  const [editNameValue, setEditNameValue] = useState(athlete?.displayName || '');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  const handleUpdateName = async () => {
+    if (!editNameValue.trim() || editNameValue.trim() === athlete.displayName || !isTrainer) {
+      setIsEditingName(false);
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      const docRef = doc(db, 'users', athleteId);
+      await updateDoc(docRef, {
+        displayName: editNameValue.trim()
+      });
+      setAthlete(prev => ({ ...prev, displayName: editNameValue.trim() }));
+      setFeedback({ message: 'Nombre actualizado', type: 'success' });
+      setIsEditingName(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${athleteId}`);
+      setFeedback({ message: 'Error al actualizar el nombre', type: 'error' });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isChild = athlete?.type === 'child';
 
@@ -185,16 +240,15 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   
   const menuItems = [
     { id: 'evaluacion360', title: 'Evaluación Inicial 360°', icon: Shield, desc: 'Escáner inicial integral de rendimiento', type: 'both' },
+    { id: 'entrenamientos', title: 'Plan de Trabajo Individual', icon: CalendarClock, desc: 'Planes, Sesiones y Progreso', type: 'both' },
     { id: 'valoracion', title: 'Valoración Física', icon: Activity, desc: 'Métricas antropométricas y tests', type: 'both', subTab: 'physical' },
     { id: 'diagnostico', title: 'Diagnóstico e Inteligencia', icon: Brain, desc: 'Análisis IA y enfoque sugerido', type: 'adult', subTab: 'intelligence' },
     { id: 'informes', title: 'Informes de Progreso', icon: FileText, desc: 'Reportes de rendimiento', type: 'both', subTab: 'reports' },
-    { id: 'planificacion', title: 'Planificación', icon: CalendarClock, desc: 'Planes y progresiones', type: 'adult' },
     { id: 'seguimiento', title: 'Seguimiento', icon: TrendingUp, desc: 'Gráficas de progreso', type: 'both' },
     { id: 'tests', title: 'Biblioteca de Pruebas', icon: Zap, desc: 'Escaneo de rendimiento y tests', type: 'both' },
     { id: 'videoAnalysis', title: 'Análisis de Video', icon: Video, desc: 'Análisis de movimiento', type: 'both' },
     { id: 'kidsModule', title: 'Módulo Niños', icon: Baby, desc: 'Desarrollo motriz y niveles', type: 'child' },
     { id: 'zonas', title: 'Zonas Cardíacas', icon: Heart, desc: 'Cálculo de FC por Karvonen', type: 'adult' },
-    { id: 'entrenamientos', title: 'Entrenamientos', icon: Dumbbell, desc: 'Rutinas personalizadas', type: 'both' },
     { id: 'retos', title: 'Retos y Logros', icon: Trophy, desc: 'Logros y desafíos activos', type: 'child' },
     { id: 'historial', title: 'Historial', icon: History, desc: 'Registro de sesiones', type: 'both' },
   ].filter(item => item.type === 'both' || item.type === (isChild ? 'child' : 'adult'));
@@ -301,7 +355,46 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
             )}
             <div className="absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-black shadow-lg" style={{ backgroundColor: isChild ? '#3B82F6' : '#10B981' }} />
           </div>
-          <h2 className="text-3xl font-black tracking-tighter mb-1">{athlete.displayName}</h2>
+                    <div className="flex items-center gap-3 mb-1">
+            {isEditingName ? (
+              <div className="flex items-center gap-2 w-full max-w-sm">
+                <input 
+                  type="text" 
+                  value={editNameValue}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  className="bg-zinc-900 border border-zinc-800 p-2 rounded-xl text-xl font-black tracking-tighter w-full focus:outline-none focus:border-[#D4AF37]"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateName(); if (e.key === 'Escape') setIsEditingName(false); }}
+                />
+                <button 
+                  onClick={handleUpdateName}
+                  disabled={isSavingName}
+                  className="p-2 bg-[#D4AF37] text-black rounded-xl hover:bg-amber-400 disabled:opacity-50"
+                >
+                  {isSavingName ? <Loader2 size={18} className="animate-spin" /> : <Edit2 size={18} />}
+                </button>
+                <button 
+                  onClick={() => setIsEditingName(false)}
+                  disabled={isSavingName}
+                  className="p-2 bg-zinc-800 text-zinc-400 rounded-xl hover:text-white disabled:opacity-50"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <h2 className="text-3xl font-black tracking-tighter">{athlete.displayName}</h2>
+                {isTrainer && (
+                  <button 
+                    onClick={() => { setEditNameValue(athlete.displayName); setIsEditingName(true); }}
+                    className="opacity-0 group-hover:opacity-100 p-2 text-zinc-500 hover:text-[#D4AF37] transition-all"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-zinc-500 text-sm mt-1">
             <Mail size={14} />
             <span>{athlete.email || 'Sin correo'}</span>
@@ -410,6 +503,14 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                     </span>
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-tighter">{athlete.displayName}</h3>
+                  {isTrainer && (
+                    <button 
+                      onClick={() => setIsEditingAttributes(!isEditingAttributes)}
+                      className="ml-2 p-2 bg-zinc-800/80 rounded-full text-zinc-400 hover:text-white transition-all"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  )}
                 </div>
   
                 <div className="grid grid-cols-5 gap-2 mb-6 uppercase">
@@ -423,12 +524,31 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                     <div key={attr.key} className="flex flex-col items-center gap-1">
                       <span className="text-xl">{attr.icon}</span>
                       <span className="text-[8px] font-black text-zinc-500 uppercase">{attr.label}</span>
-                      <span className="text-sm font-black" style={{ color: themeColor }}>
-                        {attributes[attr.key] || attributes[attr.oldKey] || 10}
-                      </span>
+                      {isEditingAttributes ? (
+                        <input
+                          type="number"
+                          className="w-10 bg-black border border-zinc-800 text-center text-sm font-black rounded outline-none focus:border-[#D4AF37]"
+                          style={{ color: themeColor }}
+                          value={editAttributes[attr.key as keyof typeof editAttributes]}
+                          onChange={(e) => setEditAttributes({...editAttributes, [attr.key]: Number(e.target.value)})}
+                        />
+                      ) : (
+                        <span className="text-sm font-black" style={{ color: themeColor }}>
+                          {attributes[attr.key] || attributes[attr.oldKey] || 10}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
+                {isEditingAttributes && (
+                  <button
+                    onClick={handleUpdateAttributes}
+                    disabled={isSavingAttributes}
+                    className="w-full bg-[#D4AF37] text-black font-black uppercase tracking-widest text-xs py-2 rounded-xl mb-4 hover:bg-yellow-500 transition-colors"
+                  >
+                    {isSavingAttributes ? 'Guardando...' : 'Guardar Atributos'}
+                  </button>
+                )}
   
                 <div className="space-y-4 pt-4 border-t border-zinc-800">
                   {(() => {
