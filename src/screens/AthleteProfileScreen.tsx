@@ -24,6 +24,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   const isTrainer = isTrainerProp !== undefined ? isTrainerProp : authIsTrainer;
   const athleteId = userId || id || '';
   const trainerId = user?.uid || '';
+  const canEditProfile = isTrainer || user?.uid === athleteId;
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'physical' | 'intelligence' | 'reports'>('overview');
   
@@ -128,7 +129,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
 
   const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !isTrainer) return;
+    if (!file || !canEditProfile) return;
 
     setUploading(true);
     try {
@@ -188,8 +189,8 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
 
     setIsDemoting(true);
     try {
-      // Usar XP guardada o en su defecto el maximo del nivel anterior
-      const newXP = athlete.previousLevelXP !== undefined ? athlete.previousLevelXP : prevLevel.maxXP;
+      // Set to the exact max XP of the previous level to guarantee demotion
+      const newXP = prevLevel.maxXP;
       await updateDoc(doc(db, 'users', athleteId), {
         xp: newXP
       });
@@ -330,7 +331,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
               </div>
             )}
             
-            {isTrainer && (
+            {canEditProfile && (
               <>
                 <button 
                   onClick={() => fileInputRef.current?.click()}
@@ -657,7 +658,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
         onClose={() => setShowDemoteConfirm(false)}
         onConfirm={handleDemoteLevel}
         title="Regresar Nivel"
-        message={`¿Estás seguro de que deseas regresar a ${athlete.displayName} al nivel anterior? Esto restaurará su XP anterior o al máximo del nivel previo.`}
+        message={`¿Estás seguro de que deseas regresar a ${athlete.displayName} al nivel anterior? Esto ajustará su XP al máximo del nivel previo.`}
         variant="danger"
         confirmText={isDemoting ? "Regresando..." : "Regresar Nivel"}
       />

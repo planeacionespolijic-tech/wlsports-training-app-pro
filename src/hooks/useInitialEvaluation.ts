@@ -11,6 +11,7 @@ import { mapLegacyData } from '../services/evaluationMapper';
 const INITIAL_FORM_DATA: EvaluationFormData = {
   profile: {
     name: '',
+    birthDate: '',
     age: '',
     sport: '',
     position: '',

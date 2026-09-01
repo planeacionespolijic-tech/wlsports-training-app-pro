@@ -10,13 +10,19 @@ export const TrainingPlansTab = ({
   isAdminOrTrainer, 
   trainerIdForLog, 
   onAddSessionForPlan,
-  loading = false
+  loading = false,
+  workouts = [],
+  onEditSession,
+  onDeleteSession
 }: { 
-  plans: any[]; 
+  plans: any[];
+  workouts?: any[]; 
   targetUserId: string;
   isAdminOrTrainer: boolean;
   trainerIdForLog: string | null;
   onAddSessionForPlan: (planId: string, planTitle: string) => void;
+  onEditSession?: (session: any) => void;
+  onDeleteSession?: (sessionId: string) => void;
   loading?: boolean;
 }) => {
   const [showForm, setShowForm] = useState(false);
@@ -31,6 +37,7 @@ export const TrainingPlansTab = ({
   const [blocks, setBlocks] = useState<string[]>(['Adaptación', 'Desarrollo', 'Mantenimiento']);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [targetSessionCount, setTargetSessionCount] = useState<number | ''>('');
 
   const resetForm = () => {
     setEditingPlanId(null);
@@ -41,6 +48,7 @@ export const TrainingPlansTab = ({
     setNewSpecificObjective('');
     setStartDate('');
     setEndDate('');
+    setTargetSessionCount('');
     setBlocks(['Adaptación', 'Desarrollo', 'Mantenimiento']);
   };
 
@@ -53,6 +61,7 @@ export const TrainingPlansTab = ({
     setBlocks(plan.blocks || []);
     setStartDate(plan.startDate || '');
     setEndDate(plan.endDate || '');
+    setTargetSessionCount(plan.targetSessionCount || '');
     setShowForm(true);
   };
 
@@ -70,6 +79,7 @@ export const TrainingPlansTab = ({
           blocks,
           startDate,
           endDate,
+          targetSessionCount: targetSessionCount ? Number(targetSessionCount) : null,
           updatedAt: serverTimestamp(),
         });
         alert('Planificación actualizada con éxito');
@@ -83,6 +93,7 @@ export const TrainingPlansTab = ({
           blocks,
           startDate,
           endDate,
+          targetSessionCount: targetSessionCount ? Number(targetSessionCount) : null,
           createdAt: serverTimestamp(),
         });
         alert('Planificación creada con éxito');
@@ -193,6 +204,14 @@ export const TrainingPlansTab = ({
                 )}
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500 uppercase font-bold">Cantidad de Sesiones (Meta)</label>
+                <input 
+                  type="number" min="1" value={targetSessionCount} onChange={e => setTargetSessionCount(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full bg-black border border-zinc-800 rounded-xl p-3 focus:border-[#D4AF37] outline-none"
+                  placeholder="Ej: 12"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] text-zinc-500 uppercase font-bold">Fecha Inicio</label>
@@ -255,7 +274,20 @@ export const TrainingPlansTab = ({
               No hay planes de entrenamiento registrados
             </div>
           ) : (
-            plans.map((item) => (
+            plans.map((item) => {
+              // Automatically sum sessions either linked explicitly OR created in the same period
+              const planSessions = (workouts || []).filter((w: any) => {
+                if (w.planId === item.id) return true;
+                if (item.startDate && item.endDate && w.date) {
+                  return w.date >= item.startDate && w.date <= item.endDate;
+                }
+                return false;
+              });
+              const completedCount = planSessions.length;
+              const targetCount = item.targetSessionCount || null;
+              const progressPercentage = targetCount ? Math.min(100, Math.round((completedCount / targetCount) * 100)) : 0;
+
+              return (
               <div key={item.id} className="bg-zinc-900 rounded-3xl border border-zinc-800 overflow-hidden shadow-xl">
                 <div className="p-5 flex justify-between items-center bg-zinc-800/30 border-b border-zinc-800">
                   <div className="flex items-center gap-4">
@@ -267,6 +299,16 @@ export const TrainingPlansTab = ({
                       <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                         {item.startDate ? `${new Date(item.startDate + 'T12:00:00').toLocaleDateString()} al ${new Date(item.endDate + 'T12:00:00').toLocaleDateString()}` : 'Sin fechas definidas'}
                       </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-xs font-bold text-white bg-zinc-800 px-2 py-0.5 rounded-full">
+                          {completedCount} {targetCount ? `/ ${targetCount}` : ''} Sesiones
+                        </span>
+                        {targetCount && (
+                          <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#D4AF37] transition-all" style={{ width: `${progressPercentage}%` }} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {isAdminOrTrainer && (
@@ -320,7 +362,31 @@ export const TrainingPlansTab = ({
                   )}
                 </div>
                 
-                {isAdminOrTrainer && (
+                  {planSessions.length > 0 && (
+                    <div className="px-6 pb-2">
+                      <h4 className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-2">Sesiones Vinculadas ({planSessions.length})</h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        {planSessions.map((session: any) => (
+                          <div key={session.id} className="flex justify-between items-center bg-black/40 p-2 rounded-lg border border-zinc-800/50">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-zinc-300">{session.name}</span>
+                              <span className="text-[10px] text-zinc-500">{new Date(session.date + 'T12:00:00').toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {session.completed && <CheckCircle2 size={14} className="text-emerald-500 mr-2" />}
+                              {isAdminOrTrainer && onEditSession && (
+                                <button onClick={(e) => { e.stopPropagation(); onEditSession(session); }} className="p-1.5 text-zinc-500 hover:text-[#D4AF37] transition-colors"><Edit2 size={14} /></button>
+                              )}
+                              {isAdminOrTrainer && onDeleteSession && (
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteSession(session.id); }} className="p-1.5 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {isAdminOrTrainer && (
                   <div className="pt-4 border-t border-zinc-800 bg-zinc-800/10 p-4">
                     <button
                       onClick={(e) => {
@@ -334,7 +400,8 @@ export const TrainingPlansTab = ({
                   </div>
                 )}
               </div>
-            ))
+            );
+          })
           )}
         </div>
       )}

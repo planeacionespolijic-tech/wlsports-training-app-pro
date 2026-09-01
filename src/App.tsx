@@ -26,6 +26,10 @@ const VideoAnalysisScreen = lazy(() => import('./screens/VideoAnalysisScreen').t
 const DiagnosisScreen = lazy(() => import('./screens/DiagnosisScreen').then(m => ({ default: m.DiagnosisScreen })));
 
 const KidsModuleScreen = lazy(() => import('./screens/KidsModuleScreen').then(m => ({ default: m.KidsModuleScreen })));
+const NeuroHubScreen = lazy(() => import('./screens/neuro/NeuroHubScreen').then(m => ({ default: m.NeuroHubScreen })));
+const StroopScreen = lazy(() => import('./screens/neuro/StroopScreen').then(m => ({ default: m.StroopScreen })));
+const SchulteScreen = lazy(() => import('./screens/neuro/SchulteScreen').then(m => ({ default: m.SchulteScreen })));
+const SimonScreen = lazy(() => import('./screens/neuro/SimonScreen').then(m => ({ default: m.SimonScreen })));
 const SessionExecutionScreen = lazy(() => import('./screens/SessionExecutionScreen').then(m => ({ default: m.SessionExecutionScreen })));
 const ChallengesScreen = lazy(() => import('./screens/ChallengesScreen').then(m => ({ default: m.ChallengesScreen })));
 const TournamentsScreen = lazy(() => import('./screens/TournamentsScreen').then(m => ({ default: m.TournamentsScreen })));
@@ -184,6 +188,10 @@ const AppShell: React.FC = () => {
           <Route path="/ejecucion-circuito" element={<ProtectedRoute><ScreenWrapper><CircuitExecutionScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/reaccion" element={<ProtectedRoute><ScreenWrapper><ReactionScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/kids-module" element={<ProtectedRoute><ScreenWrapper><KidsModuleScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/neuro" element={<ProtectedRoute><ScreenWrapper><NeuroHubScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/stroop" element={<ProtectedRoute><ScreenWrapper><StroopScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/schulte" element={<ProtectedRoute><ScreenWrapper><SchulteScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/simon" element={<ProtectedRoute><ScreenWrapper><SimonScreen /></ScreenWrapper></ProtectedRoute>} />
 
           {/* Root Redirects */}
           <Route path="/" element={

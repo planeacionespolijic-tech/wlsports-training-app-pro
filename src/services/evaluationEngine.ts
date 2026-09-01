@@ -3,6 +3,7 @@ import { serverTimestamp, FieldValue } from 'firebase/firestore';
 export interface EvaluationFormData {
   profile: {
     name: string;
+    birthDate: string;
     age: string;
     sport: string;
     position: string;

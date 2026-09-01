@@ -496,8 +496,8 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       allow read: if isSuperAdmin() || request.auth.uid == resource.data.athleteId || request.auth.uid == resource.data.trainerId;
       allow create: if (request.auth.uid == request.resource.data.get('athleteId', '') || isTrainer()) && isNotBlocked() && isValidSession(request.resource.data);
-      allow update: if isSuperAdmin() || (isNotBlocked() && isTrainer());
-      allow delete: if isSuperAdmin() || (isNotBlocked() && isTrainer());
+      allow update: if isSuperAdmin() || (isNotBlocked() && (isTrainer() || request.auth.uid == resource.data.athleteId));
+      allow delete: if isSuperAdmin() || (isNotBlocked() && (isTrainer() || request.auth.uid == resource.data.athleteId));
     }
 
     match /reactionTests/{testId} {

@@ -1,56 +1,64 @@
 const fs = require('fs');
 let code = fs.readFileSync('src/screens/evaluation/steps/ProfileStep.tsx', 'utf8');
 
-const targetStr = `        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Deporte</label>
-            <input 
-              type="text" 
-              value={formData.profile.sport}
-              onChange={(e) => updateData('profile', { ...formData.profile, sport: e.target.value })}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
-              placeholder="Ej: Fútbol"
-            />
-          </div>`;
+const calculateAgeFn = `
+const calculateAge = (birthDateString: string) => {
+  if (!birthDateString) return '';
+  const today = new Date();
+  const birthDate = new Date(birthDateString);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age.toString();
+};
+`;
 
-const insertStr = `        <div className="grid grid-cols-2 gap-4">
+const replaceAge = `
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Nacionalidad</label>
+            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Fecha de Nacimiento</label>
             <input 
-              type="text" 
-              value={formData.profile.nationality || ''}
-              onChange={(e) => updateData('profile', { ...formData.profile, nationality: e.target.value })}
+              type="date" 
+              value={formData.profile.birthDate || ''}
+              onChange={(e) => {
+                const dateVal = e.target.value;
+                const calculatedAge = calculateAge(dateVal);
+                updateData('profile', { ...formData.profile, birthDate: dateVal, age: calculatedAge });
+              }}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
-              placeholder="Ej: Colombia, México"
             />
           </div>
           <div>
-            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Categoría</label>
+            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Edad</label>
             <input 
-              type="text" 
-              value={formData.profile.category || ''}
-              onChange={(e) => updateData('profile', { ...formData.profile, category: e.target.value })}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
-              placeholder="Ej: Sub-15, Élite"
+              type="number" 
+              value={formData.profile.age}
+              readOnly
+              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 text-sm text-zinc-500 outline-none cursor-not-allowed"
+              placeholder="Automático"
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Deporte</label>
-            <input 
-              type="text" 
-              value={formData.profile.sport}
-              onChange={(e) => updateData('profile', { ...formData.profile, sport: e.target.value })}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
-              placeholder="Ej: Fútbol"
-            />
-          </div>`;
+`;
 
-if (code.includes(targetStr)) {
-  code = code.replace(targetStr, insertStr);
+const targetAge = `        <div>
+          <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 px-1">Edad</label>
+          <input 
+            type="number" 
+            value={formData.profile.age}
+            onChange={(e) => updateData('profile', { ...formData.profile, age: e.target.value })}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm focus:border-[#D4AF37] outline-none transition-colors"
+            placeholder="Ej: 25"
+          />
+        </div>`;
+
+if (code.includes(targetAge)) {
+  code = code.replace(targetAge, replaceAge);
+  code = code.replace('export const ProfileStep: React.FC<StepProps> = ({ formData, updateData }) => {', calculateAgeFn + '\nexport const ProfileStep: React.FC<StepProps> = ({ formData, updateData }) => {');
   fs.writeFileSync('src/screens/evaluation/steps/ProfileStep.tsx', code);
   console.log('patched ProfileStep');
 } else {
-  console.log('failed to patch ProfileStep');
+  console.log('targetAge not found in ProfileStep');
 }

@@ -300,6 +300,7 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
       athlete: {
         name: cleanUndefined(athlete.displayName, 'text'),
         age: cleanUndefined(athlete.age || athlete.initialEvaluation?.profile?.age || athlete.profile?.age, 'text'),
+        nationality: cleanUndefined(athlete.nationality || athlete.initialEvaluation?.profile?.nationality || athlete.profile?.nationality, 'text'),
         category: cleanUndefined(athlete.category || athlete.initialEvaluation?.profile?.category || athlete.profile?.category, 'text'),
         position: cleanUndefined(athlete.position || athlete.initialEvaluation?.profile?.position || athlete.profile?.position, 'text'),
         sport: cleanUndefined(athlete.sport || athlete.deporte || athlete.initialEvaluation?.profile?.sport || athlete.profile?.sport, 'text'),
@@ -355,6 +356,7 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
       athlete: {
         name: cleanUndefined(athlete.displayName, 'text'),
         age: cleanUndefined(athlete.age || athlete.initialEvaluation?.profile?.age || athlete.profile?.age, 'text'),
+        nationality: cleanUndefined(athlete.nationality || athlete.initialEvaluation?.profile?.nationality || athlete.profile?.nationality, 'text'),
         category: cleanUndefined(athlete.category || athlete.initialEvaluation?.profile?.category || athlete.profile?.category, 'text'),
         position: cleanUndefined(athlete.position || athlete.initialEvaluation?.profile?.position || athlete.profile?.position, 'text'),
         sport: cleanUndefined(athlete.sport || athlete.deporte || athlete.initialEvaluation?.profile?.sport || athlete.profile?.sport, 'text'),
@@ -643,13 +645,12 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
       prompt += `============================================================\n1. ESTRUCTURA VISUAL (ESTILO EA SPORTS / FIFA ULTIMATE TEAM)\n============================================================\n\n`;
       prompt += `DISEÑO OBLIGATORIO:\n`;
       prompt += `- FOTOGRAFÍA: Centrada y prominente. Estilo recorte (sin fondo, tipo EA SPORTS / FIFA). El atleta es el absoluto héroe visual de la tarjeta.\n`;
-      prompt += `- LOGO WLSPORTS: Debe incluirse en un tamaño pequeño y discreto (ej. esquina superior) para NO quitarle ningún protagonismo a la foto del atleta.\n`;
-      prompt += `- XP ACTUAL: Colocar en tamaño sutil y complementario debajo del logo WLSPORTS, sin opacar a la imagen central.\n`;
-      prompt += `- BANDERA DE NACIONALIDAD: Integrar como un detalle elegante y en tamaño reducido, como apoyo visual sin exagerar su tamaño.\n`;
+      prompt += `- LOGO, XP y BANDERA: Deben estar perfectamente ALINEADOS entre sí (ej. en una columna en la esquina superior). El Logo WLSports debe ser pequeño; justo debajo el XP ACTUAL en tamaño sutil, y debajo la BANDERA de nacionalidad correspondiente a "${parsedData.athlete.nationality}".\n`;
       prompt += `- NOMBRE DEL ATLETA: Ubicado aproximadamente en la zona central, en una única línea, con tipografía fuerte y destacada.\n`;
-      prompt += `- ESCALA DE MAESTRÍA (ASCENSO): Justo debajo del nombre, resaltar de manera destacada e iluminada el logro del ascenso. Texto a incluir: "ASCENSO: ${parsedData.previousLevel} ➔ ${parsedData.currentLevel}".\n`;
+      prompt += `- ESCALA DE MAESTRÍA (ASCENSO): Justo debajo del nombre. Texto a incluir: "ASCENSO: ${parsedData.previousLevel} ➔ ${parsedData.currentLevel}".\n`;
+      prompt += `  -> MUY IMPORTANTE: El NUEVO NIVEL (${parsedData.currentLevel}) debe tener un EFECTO VISUAL ESPECIAL (ej. brillo, resplandor, destello dorado, neón o glow en las letras) para que resalte épicamente sobre el nivel anterior.\n`;
       prompt += `- ATRIBUTOS: Ubicados en la zona inferior de la tarjeta, organizados visualmente (ej. en columnas o cuadrícula tipo Ultimate Team).\n`;
-      prompt += `- DATOS DEL DEPORTISTA: En texto decididamente más pequeño (Edad, Deporte, Perfil y Posición) ubicados estratégicamente como información secundaria.\n\n`;
+      prompt += `- DATOS DEL DEPORTISTA: En texto decididamente más pequeño, la Edad, Deporte, Categoría, Perfil y Posición DEBEN ir en UNA SOLA LÍNEA (separados por un punto o pleca, ej: 25 AÑOS • FÚTBOL • ELITE • DIESTRO • DELANTERO) ubicados estratégicamente como información secundaria en la base o centro de la tarjeta.\n\n`;
 
       prompt += `============================================================\n2. REGLAS ESTRICTAS DE CONTENIDO\n============================================================\n\n`;
       prompt += `PROHIBIDO INCLUIR:\n`;
@@ -661,17 +662,25 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
       prompt += `============================================================\n3. DATOS DEL ATLETA A INCLUIR\n============================================================\n\n`;
       prompt += `NOMBRE: ${parsedData.athlete.name}\n`;
       prompt += `EDAD: ${parsedData.athlete.age}\n`;
-      prompt += `NACIONALIDAD: ${parsedData.athlete.nationality}\n`;
+      prompt += `BANDERA (SIN TEXTO): Muestra SOLO el gráfico/emoji de la bandera de ${parsedData.athlete.nationality} (omite por completo escribir el nombre del país).\n`;
       prompt += `DEPORTE: ${parsedData.athlete.sport}\n`;
       prompt += `CATEGORÍA: ${parsedData.athlete.category}\n`;
       prompt += `POSICIÓN: ${parsedData.athlete.position}\n`;
       prompt += `XP ACTUAL: ${parsedData.currentXP}\n`;
       prompt += `RATING GENERAL (OVR): ${parsedData.overallRating} (mostrar solo si no es "—")\n\n`;
       
-      prompt += `PERFIL / LATERALIDAD ORIGINAL: ${parsedData.athlete.profile}\n`;
-      prompt += `OBLIGATORIO CORREGIR LA GRAMÁTICA DEL PERFIL:\n`;
-      prompt += `- Identifica si el atleta es hombre o mujer basándote OBLIGATORIAMENTE en su nombre o su fotografía.\n`;
-      prompt += `- DEBES escribir el perfil con el género gramatical correcto para ese atleta. Por ejemplo: si el texto dice "Derecho" y el atleta es mujer, ES OBLIGATORIO cambiarlo a "Derecha". Si dice "Izquierdo" y es mujer, a "Izquierda". No dejes errores de género gramatical.\n\n`;
+      
+      let perfilNeutral = parsedData.athlete.profile;
+      if (perfilNeutral?.toLowerCase() === 'derecha' || perfilNeutral?.toLowerCase() === 'derecho') {
+        perfilNeutral = 'Derecho(a) / Diestro(a)';
+      } else if (perfilNeutral?.toLowerCase() === 'izquierda' || perfilNeutral?.toLowerCase() === 'izquierdo') {
+        perfilNeutral = 'Izquierdo(a) / Zurdo(a)';
+      } else if (perfilNeutral?.toLowerCase() === 'mixta' || perfilNeutral?.toLowerCase() === 'mixto' || perfilNeutral?.toLowerCase() === 'ambidiestro') {
+        perfilNeutral = 'Ambidiestro(a)';
+      }
+
+      prompt += `PERFIL / LATERALIDAD: ${perfilNeutral}\n`;
+      prompt += `- INSTRUCCIÓN: Adapta el término gramatical al género del atleta (ej: usa "Zurdo", "Izquierdo" o "Derecho" si es hombre; "Zurda", "Izquierda" o "Derecha" si es mujer).\n\n`;
 
       prompt += `============================================================\n4. ATRIBUTOS (ZONA INFERIOR)\n============================================================\n\n`;
       prompt += `⚽ TEC (Técnica): ${parsedData.attributes.TEC}\n`;
@@ -684,8 +693,10 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
       prompt += `============================================================\n5. IDENTIDAD VISUAL WLSPORTS\n============================================================\n\n`;
       prompt += `MARCA: WLSPORTS\n`;
       prompt += `PALETA OFICIAL: NEGRO, GRAFITO, DORADO METÁLICO, VERDE NEÓN, BLANCO\n`;
-      prompt += `ESTÉTICA: Deportiva, tipo EA SPORTS / FIFA Ultimate Team. Coleccionable. Contraste elevado.\n`;
-      prompt += `Fotografía: SOLICITAR FOTOGRAFÍA AL USUARIO. Logo: SOLICITAR LOGO AL USUARIO.\n`;    }
+      prompt += `ESTÉTICA: Deportiva, exactamente con los mismos colores y estilo de EA SPORTS / FIFA Ultimate Team. Coleccionable. Contraste elevado.\n`;
+      prompt += `FORMATO DE SALIDA (IMPRESCINDIBLE): Proporción de aspecto ESTRICTAMENTE 5:8 (Vertical).\n`;
+      prompt += `MARGEN DE IMPRESIÓN (IMPRESCINDIBLE): Asegúrate de dejar un margen negro sólido de 5 milímetros (o el equivalente proporcional) en TODOS los bordes (arriba, abajo, izquierda, derecha) completamente libre de textos, logos, y sin que la cara del atleta toque los bordes. Esto es para que al recortar el carnet físico no se dañe el diseño.\n`;
+      prompt += `DATOS A SOLICITAR: Fotografía (SOLICITAR FOTOGRAFÍA AL USUARIO), Logo (SOLICITAR LOGO AL USUARIO), y OVR (SOLICITAR EL NIVEL DE OVR AL USUARIO antes de generar la imagen si no se especificó o si quiere cambiarlo).\n`;    }
 
         if (parsedData.type !== 'tarjeta') {
       prompt += `\n==============================================\nIDENTIDAD VISUAL WLSPORTS OBLIGATORIA\n==============================================\n`;

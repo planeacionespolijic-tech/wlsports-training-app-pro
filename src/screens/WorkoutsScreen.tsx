@@ -26,6 +26,7 @@ export const WorkoutsScreen = () => {
   const [isAdding, setIsAdding] = useState(location.state?.isAdding || false);
   const [saving, setSaving] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [editingCollection, setEditingCollection] = useState<string>('workouts');
   
   // Level Objectives State
   const [levelObjectiveGen, setLevelObjectiveGen] = useState(location.state?.athlete?.levelObjectiveGen || '');
@@ -51,6 +52,8 @@ export const WorkoutsScreen = () => {
   const [newName, setNewName] = useState('');
   const [newObjective, setNewObjective] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionStatus, setSessionStatus] = useState<'Realizada' | 'No realizada'>('Realizada');
+  const [sessionNotes, setSessionNotes] = useState('');
   const [blocks, setBlocks] = useState<TrainingBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
@@ -663,7 +666,25 @@ export const WorkoutsScreen = () => {
       };
 
       if (editingWorkoutId) {
-        await updateDoc(doc(db, 'workouts', editingWorkoutId), workoutData);
+        if (editingCollection === 'sessions' || editingCollection === 'history') {
+           const historyUpdate: any = {
+             workoutName: newName.trim(),
+             date: sessionDate,
+             planId: selectedPlanId || null,
+             planTitle: selectedPlan ? selectedPlan.title : null,
+             status: sessionStatus,
+             notes: sessionNotes,
+             workoutDetails: {
+               blocks: cleanedBlocks,
+               objective: newObjective.trim(),
+               duration: formatTime(sessionTotalTime),
+               totalTime: sessionTotalTime
+             }
+           };
+           await updateDoc(doc(db, editingCollection, editingWorkoutId), historyUpdate);
+        } else {
+           await updateDoc(doc(db, editingCollection, editingWorkoutId), workoutData);
+        }
       } else {
         await addDoc(collection(db, 'workouts'), { 
           ...workoutData, 
@@ -703,8 +724,11 @@ export const WorkoutsScreen = () => {
     setBlocks([]);
     setIsAdding(false);
     setEditingWorkoutId(null);
+    setEditingCollection('workouts');
     setActiveBlockId(null);
     setEditingExerciseId(null);
+    setSessionStatus('Realizada');
+    setSessionNotes('');
   };
 
   const normalizeMoments = () => {
@@ -733,13 +757,18 @@ export const WorkoutsScreen = () => {
   };
 
   const handleEdit = (workout: any) => {
-    setNewName(workout.name);
-    setNewObjective(workout.objective || '');
+    setNewName(workout.name || workout.workoutName || '');
+    setNewObjective(workout.objective || workout.workoutDetails?.objective || '');
     setSessionDate(workout.date || new Date().toISOString().split('T')[0]);
-    setBlocks(workout.blocks || []);
+    setBlocks(workout.blocks || workout.workoutDetails?.blocks || []);
     setEditingWorkoutId(workout.id);
+    setEditingCollection(workout.collection || 'workouts');
+    setSessionStatus(workout.status || 'Realizada');
+    setSessionNotes(workout.notes || '');
+    setSelectedPlanId(workout.planId || '');
     setIsAdding(true);
     if (workout.blocks?.length > 0) setActiveBlockId(workout.blocks[0].id);
+    else if (workout.workoutDetails?.blocks?.length > 0) setActiveBlockId(workout.workoutDetails.blocks[0].id);
   };
 
   const handleImportGlobalRoutine = (routine: any) => {
@@ -932,6 +961,35 @@ export const WorkoutsScreen = () => {
                   onChange={(e) => setNewObjective(e.target.value)} 
                 />
               </div>
+
+              {(editingCollection === 'sessions' || editingCollection === 'history') && (
+                <div className="space-y-4 pt-4 border-t border-zinc-800">
+                  <h3 className="text-sm font-bold text-[#D4AF37] uppercase tracking-widest">Estado en Historial</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setSessionStatus('Realizada')}
+                      className={`py-3 px-4 rounded-xl font-bold text-xs uppercase transition-all ${sessionStatus === 'Realizada' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-zinc-900 border border-zinc-800 text-zinc-400'}`}
+                    >
+                      Realizada
+                    </button>
+                    <button 
+                      onClick={() => setSessionStatus('No realizada')}
+                      className={`py-3 px-4 rounded-xl font-bold text-xs uppercase transition-all ${sessionStatus === 'No realizada' ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-zinc-900 border border-zinc-800 text-zinc-400'}`}
+                    >
+                      No realizada
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] uppercase text-zinc-500 ml-2">Novedad / Nota (Opcional)</label>
+                    <textarea 
+                      placeholder={sessionStatus === 'Realizada' ? '¿Alguna observación?' : '¿Por qué no se realizó?'}
+                      className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl focus:border-[#D4AF37] outline-none resize-none h-20" 
+                      value={sessionNotes} 
+                      onChange={(e) => setSessionNotes(e.target.value)} 
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <AnimatePresence>
@@ -1327,6 +1385,7 @@ export const WorkoutsScreen = () => {
             {activeTab === 'planes' && (
               <TrainingPlansTab 
                 plans={trainingPlans}
+                workouts={workouts}
                 targetUserId={targetUserId as string}
                 isAdminOrTrainer={userProfile?.role === 'trainer' || userProfile?.role === 'superadmin'}
                 trainerIdForLog={trainerId || user?.uid || null}
@@ -1334,6 +1393,12 @@ export const WorkoutsScreen = () => {
                   setSelectedPlanId(planId);
                   resetForm();
                   setIsAdding(true);
+                }}
+                onEditSession={(session) => {
+                  handleEdit(session);
+                }}
+                onDeleteSession={(sessionId) => {
+                  handleDelete(sessionId);
                 }}
               />
             )}
@@ -1475,7 +1540,17 @@ export const WorkoutsScreen = () => {
                                      </div>
                                      <div className="flex items-center gap-3">
                                        {(userProfile?.role === 'trainer' || userProfile?.role === 'superadmin' || targetUserId === user?.uid) && (
-                                         <button 
+                                         <>
+                                           <button
+                                             onClick={(e) => {
+                                               e.stopPropagation();
+                                               handleEdit(item);
+                                             }}
+                                             className="p-2 text-zinc-700 hover:text-[#D4AF37] transition-colors"
+                                           >
+                                             <Edit2 size={18} />
+                                           </button>
+                                           <button 
                                            onClick={(e) => {
                                              e.stopPropagation();
                                              handleDeleteHistory(item.id, item.collection);
@@ -1484,6 +1559,7 @@ export const WorkoutsScreen = () => {
                                          >
                                            <Trash2 size={18} />
                                          </button>
+                                         </>
                                        )}
                                        {(item.workoutDetails?.blocks?.length > 0 || item.notes) && (
                                          <div className="text-zinc-600">

@@ -5,7 +5,7 @@ import {
   Users, Activity, Dumbbell, History, FileText, TrendingUp, 
   Trophy, Zap, Timer, Video, Plus, Search, Loader2, Trash2,
   ChevronRight, Calendar, MessageSquare, Bell, CheckCircle2, X, Play, ExternalLink, LogOut as LogOutIcon, RefreshCw, ArrowLeft,
-  LayoutDashboard, Award
+  LayoutDashboard, Award, Brain
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, getDoc, doc, updateDoc, addDoc, serverTimestamp, increment, getDocs, deleteDoc } from 'firebase/firestore';
@@ -431,7 +431,7 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { id: 'tabata', title: 'Tabata Timer', icon: Timer, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-                { id: 'reaccion', title: 'Reacción Visual', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                { id: 'neuro', title: 'Entrenamiento Neuro', icon: Brain, color: 'text-purple-500', bg: 'bg-purple-500/10' },
                 { id: 'video-analysis', title: 'Análisis Video', icon: Video, color: 'text-red-500', bg: 'bg-red-500/10' },
                 { id: 'entrenamientos', title: 'Rutinas Globales', icon: Dumbbell, color: 'text-green-500', bg: 'bg-green-500/10' },
                 { id: 'exercise-bank', title: 'Biblioteca ELITE', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
