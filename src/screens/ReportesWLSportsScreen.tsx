@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, BookOpen, Trophy, Copy, CheckCircle2, FileText, Award, UserSquare } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, BookOpen, Trophy, Copy, CheckCircle2, FileText, Award, UserSquare, Camera, Download, Image as ImageIcon } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { getLevelFromXP, LEVELS } from '../constants';
+import { jsPDF } from 'jspdf';
 
 interface ReportesWLSportsScreenProps {
   userId: string;
@@ -17,7 +19,11 @@ export const ReportesWLSportsScreen: React.FC<ReportesWLSportsScreenProps> = ({ 
   const [trainingPlans, setTrainingPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeFlow, setActiveFlow] = useState<'none' | 'mensual' | 'nivel' | 'tarjeta'>('none');
+  const [activeFlow, setActiveFlow] = useState<'none' | 'mensual' | 'nivel' | 'tarjeta' | 'tarjeta-visual'>('none');
+  const [athletePhoto, setAthletePhoto] = useState<string>('');
+  const [clubLogo, setClubLogo] = useState<string>('');
+  const [generatingCard, setGeneratingCard] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<'config' | 'review' | 'prompt'>('config');
   
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -716,6 +722,27 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
     setGeneratedPrompt(prompt);
     setStep('prompt');
   };
+  const generatePrintablePDF = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imgData = event.target?.result as string;
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [54, 85.6]
+      });
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, 54, 85.6);
+      pdf.save(`Carnet_${athlete.displayName || 'WLSPORTS'}.pdf`);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const copyPrompt = () => {
     navigator.clipboard.writeText(generatedPrompt);
     alert('Prompt copiado al portapapeles. Pégalo en tu IA de generación (ChatGPT, Claude, Midjourney).');
@@ -776,6 +803,224 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
               <p className="text-zinc-400 text-xs mt-1">Identidad deportiva coleccionable.</p>
             </div>
           </button>
+        <button 
+            onClick={() => setActiveFlow('tarjeta-visual')}
+            className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl hover:bg-zinc-800 transition-all text-left flex flex-col gap-4 group"
+          >
+            <div className="bg-emerald-500/10 text-emerald-500 p-4 rounded-full w-fit group-hover:scale-110 transition-transform">
+              <Camera size={32} />
+            </div>
+            <div>
+              <h3 className="font-black text-lg uppercase">Tarjeta Interactiva</h3>
+              <p className="text-zinc-400 text-xs mt-1">Generador visual con descarga directa a PDF sin prompts.</p>
+            </div>
+          </button>
+        </div>
+      ) : activeFlow === 'tarjeta-visual' ? (
+        <div className="space-y-6">
+          <button 
+            onClick={() => { setActiveFlow('none'); setStep('config'); }}
+            className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-wider mb-2"
+          >
+            <ArrowLeft size={16} /> Volver a Opciones
+          </button>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Controles de Imagen */}
+            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-6">
+              <h3 className="text-xl font-black uppercase text-[#D4AF37]">Generador Visual</h3>
+              <p className="text-xs text-zinc-400">Sube la foto del atleta (preferiblemente sin fondo) y el logo para generar la tarjeta.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">Foto del Atleta</label>
+                  <label className="flex flex-col items-center justify-center w-full h-32 bg-black border-2 border-dashed border-zinc-700 rounded-2xl cursor-pointer hover:border-[#D4AF37] transition-colors overflow-hidden relative">
+                    {athletePhoto ? (
+                      <img src={athletePhoto} alt="Athlete" className="h-full object-contain z-10" />
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <UserSquare size={24} className="text-zinc-500 mb-2" />
+                        <span className="text-xs text-zinc-500 font-bold uppercase">Subir Foto</span>
+                      </div>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setAthletePhoto(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }} />
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-zinc-400 uppercase mb-2 block">Logo del Club (Opcional)</label>
+                  <label className="flex flex-col items-center justify-center w-full h-24 bg-black border-2 border-dashed border-zinc-700 rounded-2xl cursor-pointer hover:border-[#D4AF37] transition-colors overflow-hidden relative">
+                    {clubLogo ? (
+                      <img src={clubLogo} alt="Logo" className="h-full object-contain z-10" />
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <ImageIcon size={24} className="text-zinc-500 mb-2" />
+                        <span className="text-xs text-zinc-500 font-bold uppercase">Subir Logo</span>
+                      </div>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setClubLogo(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }} />
+                  </label>
+                </div>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  if (!cardRef.current) return;
+                  setGeneratingCard(true);
+                  try {
+                    // Forzamos un reflow para asegurar que las fuentes/imágenes carguen si es necesario, 
+                    // aunque html2canvas manejará lo visible.
+                    const canvas = await html2canvas(cardRef.current, {
+                      scale: 3, // Alta calidad
+                      useCORS: true,
+                      backgroundColor: '#000000'
+                    });
+                    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                    
+                    const pdf = new jsPDF({
+                      orientation: 'portrait',
+                      unit: 'mm',
+                      format: [54, 85.6]
+                    });
+                    
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 54, 85.6);
+                    pdf.save(`Carnet_WLSPORTS_${athlete.displayName || 'Atleta'}.pdf`);
+                  } catch (error) {
+                    console.error("Error al generar PDF:", error);
+                    alert("Error al generar el PDF. Revisa la consola.");
+                  } finally {
+                    setGeneratingCard(false);
+                  }
+                }}
+                disabled={generatingCard || !athletePhoto}
+                className="w-full bg-[#D4AF37] text-black font-black uppercase py-4 rounded-xl tracking-widest hover:bg-yellow-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {generatingCard ? 'Generando PDF...' : <><Download size={18} /> Descargar PDF (CR80)</>}
+              </button>
+            </div>
+
+            {/* Vista Previa de la Tarjeta */}
+            <div className="flex justify-center items-center bg-black p-8 rounded-3xl border border-zinc-800">
+              {/* Contenedor que simula proporciones 54x85.6 (Ratio ~0.63) */}
+              <div 
+                ref={cardRef}
+                className="relative w-[300px] h-[475px] overflow-hidden rounded-2xl flex flex-col"
+                style={{
+                   padding: '15px', 
+                   boxSizing: 'border-box',
+                   background: 'linear-gradient(to bottom right, #27272a, #1a1a1a, #000000)',
+                   border: '1px solid rgba(63, 63, 70, 0.5)',
+                   boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                }}
+              >
+                {/* Fondo Decorativo */}
+                <div 
+                  className="absolute inset-0 mix-blend-overlay"
+                  style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")', opacity: 0.2 }}
+                ></div>
+                <div 
+                  className="absolute inset-0 z-10"
+                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,1), rgba(0,0,0,0.6), rgba(0,0,0,0))' }}
+                ></div>
+                
+                {/* Contenido (Dentro del padding/margen seguro) */}
+                <div 
+                  className="relative z-20 flex flex-col h-full rounded-xl p-3 overflow-hidden"
+                  style={{ border: '2px solid rgba(212, 175, 55, 0.3)' }}
+                >
+                  
+                  {/* Foto Atleta */}
+                  <div className="absolute inset-0 -top-10 flex justify-center z-0">
+                    {athletePhoto ? (
+                      <img 
+                        src={athletePhoto} 
+                        className="w-full h-[320px] object-cover object-top" 
+                        style={{ filter: 'contrast(1.25) saturate(1.1) drop-shadow(0 0 15px rgba(212,175,55,0.2))' }}
+                        alt="Athlete" 
+                      />
+                    ) : (
+                      <div className="w-full h-[320px] animate-pulse" style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}></div>
+                    )}
+                  </div>
+                  
+                  {/* OVR y Stats Arriba Izquierda */}
+                  <div className="absolute top-2 left-2 z-30 text-center">
+                    <div className="text-4xl font-black leading-none" style={{ color: '#D4AF37', textShadow: '0 4px 6px rgba(0,0,0,0.5)' }}>
+                      {athlete.ovr || 0}
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                      OVR
+                    </div>
+                  </div>
+
+                  {/* Logo Club Arriba Derecha */}
+                  {clubLogo && (
+                    <div className="absolute top-2 right-2 z-30 w-10 h-10 flex justify-center items-center">
+                      <img src={clubLogo} className="max-w-full max-h-full object-contain" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))' }} alt="Club Logo" />
+                    </div>
+                  )}
+
+                  <div className="flex-1"></div>
+
+                  {/* Info Inferior */}
+                  <div className="relative z-30 flex flex-col items-center">
+                    {/* Nivel */}
+                    <div className="px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] mb-1" style={{ backgroundColor: 'rgba(212, 175, 55, 0.9)', color: '#000000' }}>
+                      {getLevelFromXP(athlete.xp || 0).name}
+                    </div>
+                    
+                    {/* Nombre */}
+                    <h2 className="text-xl font-black uppercase text-center w-full truncate mb-2" style={{ color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                      {athlete.displayName?.split(' ')[0] || 'Atleta'}
+                    </h2>
+                    
+                    <div className="w-full h-px mb-2" style={{ background: 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.5), transparent)' }}></div>
+                    
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-5 w-full gap-1 px-1 mb-2">
+                      {[
+                        { label: 'TEC', val: athlete.attributes?.TEC || athlete.attributes?.tecnica || 10 },
+                        { label: 'FIS', val: athlete.attributes?.FIS || athlete.attributes?.fuerza || 10 },
+                        { label: 'NEU', val: athlete.attributes?.NEU || athlete.attributes?.neuro || 10 },
+                        { label: 'AGI', val: athlete.attributes?.AGI || athlete.attributes?.ritmo || 10 },
+                        { label: 'ACT', val: athlete.attributes?.ACT || athlete.attributes?.mentalidad || 10 }
+                      ].map(stat => (
+                        <div key={stat.label} className="flex flex-col items-center">
+                          <span className="text-sm font-black leading-none" style={{ color: '#ffffff' }}>{stat.val}</span>
+                          <span className="text-[7px] font-bold" style={{ color: '#D4AF37' }}>{stat.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="w-full h-px mb-1.5" style={{ background: 'linear-gradient(to right, transparent, rgba(63, 63, 70, 1), transparent)' }}></div>
+
+                    {/* Metadata */}
+                    <div className="text-[7px] font-bold uppercase tracking-widest text-center" style={{ color: '#d4d4d8' }}>
+                      {[
+                        athlete.age || athlete.profile?.age ? `${athlete.age || athlete.profile?.age} AÑOS` : null,
+                        athlete.sport || athlete.profile?.sport || 'DEPORTE',
+                        athlete.position || athlete.profile?.position || 'POS'
+                      ].filter(Boolean).join(' • ')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -889,6 +1134,23 @@ ESTÉTICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, Tecnol�
                   <Copy size={16} /> Copiar Prompt
                 </button>
               </div>
+
+              {activeFlow === 'tarjeta' && (
+                <div className="bg-blue-500/10 border border-blue-500/20 p-6 rounded-2xl relative overflow-hidden group">
+                  <div className="relative z-10 space-y-4">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-blue-400 flex items-center gap-2">
+                      <FileText size={16} /> Generar PDF Imprimible (Carnet)
+                    </h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Sube la imagen generada por la IA para crear tu PDF. Se ajustará exactamente al tamaño estándar de identificación (54mm x 85.6mm vertical) conservando los márgenes de 5mm para garantizar una impresión correcta.
+                    </p>
+                    <label className="flex items-center justify-center w-full bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-xl font-bold uppercase tracking-widest text-xs cursor-pointer transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:scale-[1.02] active:scale-[0.98]">
+                      Subir Imagen y Descargar PDF
+                      <input type="file" accept="image/*" className="hidden" onChange={generatePrintablePDF} />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-4 pt-4">
                 <button 

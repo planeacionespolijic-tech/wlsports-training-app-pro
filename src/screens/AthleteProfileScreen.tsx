@@ -37,6 +37,9 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
   const [showDemoteConfirm, setShowDemoteConfirm] = useState(false);
+  const [showEditXpModal, setShowEditXpModal] = useState(false);
+  const [editingXp, setEditingXp] = useState<number | string>('');
+  const [isUpdatingXp, setIsUpdatingXp] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
   const [isDemoting, setIsDemoting] = useState(false);
@@ -170,6 +173,28 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
     } finally {
       setIsPromoting(false);
       setShowPromoteConfirm(false);
+    }
+  };
+
+  const handleUpdateXp = async () => {
+    if (!isTrainer) return;
+    const newXpNum = Number(editingXp);
+    if (isNaN(newXpNum) || newXpNum < 0) {
+      alert('XP inválida');
+      return;
+    }
+    
+    setIsUpdatingXp(true);
+    try {
+      await updateDoc(doc(db, 'users', athleteId), { xp: newXpNum });
+      setAthlete({ ...athlete, xp: newXpNum });
+      setFeedback({ message: 'XP actualizada exitosamente', type: 'success' });
+      setShowEditXpModal(false);
+    } catch (error) {
+      console.error('Error al actualizar XP:', error);
+      setFeedback({ message: 'Error al actualizar XP', type: 'error' });
+    } finally {
+      setIsUpdatingXp(false);
     }
   };
 
@@ -429,6 +454,18 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                   <span className={`text-xs font-bold uppercase tracking-widest ${isChild ? 'text-blue-500' : 'text-[#D4AF37]'}`}>
                     {getLevelFromXP(athlete.xp || 0).name} • {athlete.xp || 0} XP
                   </span>
+                  {isTrainer && (
+                    <button 
+                      onClick={() => {
+                        setEditingXp(athlete.xp || 0);
+                        setShowEditXpModal(true);
+                      }} 
+                      className="ml-2 p-1 text-zinc-500 hover:text-white transition-colors"
+                      title="Editar XP"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                  )}
                 </div>
                 {isTrainer && (() => {
                   const currentXP = athlete.xp || 0;
@@ -653,6 +690,39 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
         variant="primary"
         confirmText={isPromoting ? "Promoviendo..." : "Promover Nivel"}
       />
+            {showEditXpModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm text-white">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-zinc-900 w-full max-w-sm rounded-3xl p-6 border border-zinc-800">
+            <h2 className="text-xl font-black uppercase text-[#D4AF37] mb-4">Editar XP</h2>
+            <div className="mb-6 space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500">Puntos de Experiencia (XP)</label>
+              <input 
+                type="number" 
+                value={editingXp} 
+                onChange={(e) => setEditingXp(e.target.value)} 
+                className="w-full bg-black border border-zinc-700 p-3 rounded-xl focus:border-[#D4AF37] outline-none"
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowEditXpModal(false)}
+                className="flex-1 py-3 bg-zinc-800 rounded-xl font-bold text-xs uppercase"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleUpdateXp}
+                disabled={isUpdatingXp}
+                className="flex-1 py-3 bg-[#D4AF37] text-black rounded-xl font-bold text-xs uppercase disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isUpdatingXp ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <ConfirmationModal
         isOpen={showDemoteConfirm}
         onClose={() => setShowDemoteConfirm(false)}
