@@ -87,6 +87,30 @@ export const ClientDashboard = ({ onNavigate }: any) => {
     }
   }, [user?.uid]);
 
+  const handleForceRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.update();
+        }
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        for (const name of cacheNames) {
+          if (!name.includes('v4')) {
+            await caches.delete(name);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    await fetchData(true);
+    window.location.reload();
+  };
+
   useEffect(() => {
     fetchData();
     
@@ -114,30 +138,30 @@ export const ClientDashboard = ({ onNavigate }: any) => {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <div className="space-y-8 pb-24">
+          <div className="space-y-4 sm:space-y-6 pb-24">
             {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 text-center">
-                <Zap size={20} className="mx-auto mb-2 text-blue-500" fill="currentColor" />
-                <p className="text-lg font-black">{userData?.points || 0}</p>
-                <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Puntos</p>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-zinc-900 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 text-center shadow-lg">
+                <Zap size={22} className="mx-auto mb-1 text-blue-500" fill="currentColor" />
+                <p className="text-xl sm:text-2xl font-black">{userData?.points || 0}</p>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Puntos</p>
               </div>
-              <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 text-center">
-                <Trophy size={20} className="mx-auto mb-2 text-yellow-500" fill="currentColor" />
-                <p className="text-lg font-black">{userData?.level || 1}</p>
-                <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Nivel</p>
+              <div className="bg-zinc-900 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 text-center shadow-lg">
+                <Trophy size={22} className="mx-auto mb-1 text-yellow-500" fill="currentColor" />
+                <p className="text-xl sm:text-2xl font-black">{userData?.level || 1}</p>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Nivel</p>
               </div>
-              <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 text-center">
-                <ShieldCheck size={20} className="mx-auto mb-2 text-emerald-500" fill="currentColor" />
-                <p className="text-lg font-black">{userData?.trustScore?.toFixed(1) || '5.0'}</p>
-                <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Confianza</p>
+              <div className="bg-zinc-900 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 text-center shadow-lg">
+                <ShieldCheck size={22} className="mx-auto mb-1 text-emerald-500" fill="currentColor" />
+                <p className="text-xl sm:text-2xl font-black">{userData?.trustScore?.toFixed(1) || '5.0'}</p>
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Confianza</p>
               </div>
             </div>
 
             {/* Initial Evaluation Call to Action */}
             {!userData?.initialEvaluation && !localStorage.getItem('dismiss_eval_cta') && (
               <section 
-                className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 p-6 rounded-3xl relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer" 
+                className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer" 
                 onClick={() => onNavigate ? onNavigate('evaluacion360') : navigate(`/evaluacion360`)}
               >
                 <button 
@@ -146,15 +170,15 @@ export const ClientDashboard = ({ onNavigate }: any) => {
                     localStorage.setItem('dismiss_eval_cta', 'true');
                     fetchData(); // Trigger re-render
                   }}
-                  className="absolute top-4 right-4 z-20 p-2 hover:bg-black/20 rounded-lg text-[#D4AF37] opacity-60 hover:opacity-100 transition-opacity"
+                  className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 p-2 hover:bg-black/20 rounded-lg text-[#D4AF37] opacity-60 hover:opacity-100 transition-opacity"
                 >
                   <X size={16} />
                 </button>
                 <div className="relative z-10">
-                  <div className="bg-black/20 w-10 h-10 rounded-xl flex items-center justify-center text-[#D4AF37] mb-4">
+                  <div className="bg-black/20 w-10 h-10 rounded-xl flex items-center justify-center text-[#D4AF37] mb-3 sm:mb-4">
                     <Shield size={20} />
                   </div>
-                  <h3 className="text-lg font-black text-[#D4AF37] mb-1">Evaluación Inicial 360°</h3>
+                  <h3 className="text-base sm:text-lg font-black text-[#D4AF37] mb-1">Evaluación Inicial 360°</h3>
                   <p className="text-xs text-zinc-400 font-medium">Realiza tu escáner inicial integral para un entrenamiento personalizado.</p>
                 </div>
                 <Shield size={120} className="absolute -right-8 -bottom-8 opacity-5 text-[#D4AF37] group-hover:scale-110 transition-transform" />
@@ -163,26 +187,26 @@ export const ClientDashboard = ({ onNavigate }: any) => {
 
             {/* Heart Rate Zone Quick Reference */}
             {userData?.hrZones && (
-              <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+              <section className="bg-zinc-900 border border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden group">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
                     <div className="p-2 bg-red-500/10 rounded-xl text-red-500">
-                      <Heart size={20} fill="currentColor" />
+                      <Heart size={18} fill="currentColor" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-tighter">Mi Intensidad Hoy</h3>
-                      <p className="text-[10px] text-zinc-500 font-bold">ZONAS DE ENTRENAMIENTO</p>
+                      <h3 className="text-sm font-black uppercase tracking-tight">Mi Intensidad Hoy</h3>
+                      <p className="text-[11px] text-zinc-500 font-bold">ZONAS DE ENTRENAMIENTO</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => onNavigate ? onNavigate('zonas') : navigate('/zonas')}
-                    className="text-[10px] font-black text-[#D4AF37] uppercase bg-[#D4AF37]/10 px-3 py-1.5 rounded-full"
+                    className="text-xs font-black text-[#D4AF37] uppercase bg-[#D4AF37]/10 px-3 py-1.5 rounded-full"
                   >
                     Ajustar
                   </button>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 sm:gap-2">
                   {userData.hrZones.map((zone: any, i: number) => {
                     const isTarget = analysis?.status === 'Recuperación' ? i < 2 : (analysis?.status === 'Progresando' ? i === 3 : i === 2);
                     return (
@@ -192,14 +216,14 @@ export const ClientDashboard = ({ onNavigate }: any) => {
                         title={`${zone.name}: ${zone.min}-${zone.max} BPM`}
                       >
                         <div className={`w-full h-1.5 ${zone.color} rounded-t-xl mb-1`} />
-                        <span className="text-[8px] font-black leading-none">Z{i+1}</span>
-                        <span className="text-[9px] font-bold text-zinc-500 mt-0.5">{zone.min}</span>
+                        <span className="text-[10px] font-black leading-none">Z{i+1}</span>
+                        <span className="text-[10px] sm:text-xs font-bold text-zinc-400 mt-0.5">{zone.min}</span>
                       </div>
                     );
                   })}
                 </div>
                 {analysis?.status && (
-                  <p className="mt-4 text-[10px] text-center text-zinc-400 font-medium">
+                  <p className="mt-3 text-xs text-center text-zinc-400 font-medium">
                     Hoy el sistema sugiere mantenerte en <span className="text-white font-bold">{analysis.status === 'Recuperación' ? 'Zona 1-2' : analysis.status === 'Progresando' ? 'Zona 4' : 'Zona 3'}</span> para optimizar tu carga.
                   </p>
                 )}
@@ -208,19 +232,19 @@ export const ClientDashboard = ({ onNavigate }: any) => {
 
             {/* Active Challenges Preview */}
             <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em]">Retos Disponibles</h2>
-                <button onClick={() => setActiveTab('retos')} className="text-[10px] font-bold text-[#D4AF37] uppercase">Ver todos</button>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs sm:text-sm font-black text-zinc-400 uppercase tracking-wider">Retos Disponibles</h2>
+                <button onClick={() => setActiveTab('retos')} className="text-xs font-bold text-[#D4AF37] uppercase">Ver todos</button>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {activeChallenges.slice(0, 2).map((challenge) => (
-                  <div key={challenge.id} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center gap-4">
-                    <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500">
+                  <div key={challenge.id} className="p-3.5 sm:p-4 bg-zinc-900 border border-zinc-800 rounded-xl sm:rounded-2xl flex items-center gap-3.5">
+                    <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500 flex-shrink-0">
                       <Award size={20} />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-bold">{challenge.title}</h3>
-                      <p className="text-[10px] text-zinc-500">{challenge.score} PTS</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold truncate">{challenge.title}</h3>
+                      <p className="text-xs text-zinc-400">{challenge.score} PTS</p>
                     </div>
                     <button 
                       onClick={() => navigate('/retos', { state: challenge })}
@@ -234,22 +258,22 @@ export const ClientDashboard = ({ onNavigate }: any) => {
             </section>
 
             <section>
-              <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4">Actividad Reciente</h2>
-              <div className="space-y-3">
+              <h2 className="text-xs sm:text-sm font-black text-zinc-400 uppercase tracking-wider mb-3">Actividad Reciente</h2>
+              <div className="space-y-2.5">
                 {recentHistory.map((log) => (
-                  <div key={log.id} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex items-center justify-between group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400">
-                        <History size={18} />
+                  <div key={log.id} className="p-3.5 sm:p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl sm:rounded-2xl flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 flex-shrink-0">
+                        <History size={16} />
                       </div>
                       <div>
                         <p className="text-sm font-bold">{log.workoutName}</p>
-                        <p className="text-[10px] text-zinc-500">{log.createdAt?.toDate().toLocaleDateString()}</p>
+                        <p className="text-xs text-zinc-400">{log.createdAt?.toDate().toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-xs font-black text-[#D4AF37]">{log.rpe || 0} RPE</p>
+                        <p className="text-xs sm:text-sm font-black text-[#D4AF37]">{log.rpe || 0} RPE</p>
                       </div>
                       <button 
                         onClick={() => handleDeleteActivity(log.id)}
@@ -436,80 +460,84 @@ export const ClientDashboard = ({ onNavigate }: any) => {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Header */}
-      <header className="p-8 pt-12 bg-zinc-900/50 border-b border-zinc-800">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                {user && (
-                  <img 
-                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=${themeColor.replace('#', '')}&color=000`} 
-                    alt={user.displayName || ''} 
-                    className="w-16 h-16 rounded-3xl object-cover border-2"
-                    style={{ borderColor: themeColor }}
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <div className="absolute -bottom-2 -right-2 bg-black border border-zinc-800 px-2 py-1 rounded-xl flex items-center gap-1 shadow-lg">
-                  <Star size={12} style={{ color: themeColor }} fill={themeColor} />
-                  <span className="text-[10px] font-black" style={{ color: themeColor }}>
-                    {getLevelFromXP(userData?.xp || 0).name}
-                  </span>
-                </div>
+      <header className="p-4 sm:p-6 pt-safe bg-zinc-900/70 border-b border-zinc-800 sticky top-0 z-20 backdrop-blur-md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="relative">
+              {user && (
+                <img 
+                  src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=${themeColor.replace('#', '')}&color=000`} 
+                  alt={user.displayName || ''} 
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border-2"
+                  style={{ borderColor: themeColor }}
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <div className="absolute -bottom-1 -right-1 bg-black border border-zinc-800 px-1.5 py-0.5 rounded-lg flex items-center gap-1 shadow-lg">
+                <Star size={10} style={{ color: themeColor }} fill={themeColor} />
+                <span className="text-[9px] font-black" style={{ color: themeColor }}>
+                  {getLevelFromXP(userData?.xp || 0).name}
+                </span>
               </div>
-              <div>
-                <h1 className="text-xl font-black tracking-tight">{user?.displayName?.split(' ')[0] || 'Atleta'}</h1>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atleta Elite</p>
-              </div>
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-black tracking-tight">{user?.displayName?.split(' ')[0] || 'Atleta'}</h1>
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Atleta Elite</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => fetchData(true)}
+              onClick={() => handleForceRefresh()}
               disabled={refreshing}
-              className="p-3 bg-zinc-900 rounded-2xl text-zinc-600 hover:text-white transition-colors"
+              className="p-2.5 sm:p-3 bg-zinc-900 rounded-2xl text-zinc-400 hover:text-white transition-colors"
+              title="Actualizar Interfaz"
             >
-              <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
             </button>
             <button 
               onClick={() => logout()}
-              className="p-3 bg-zinc-900 rounded-2xl text-zinc-600 hover:text-red-500 transition-colors"
+              className="p-2.5 sm:p-3 bg-zinc-900 rounded-2xl text-zinc-400 hover:text-red-500 transition-colors"
+              title="Cerrar sesión"
             >
-              <LogOut size={20} />
+              <LogOut size={18} />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-3.5 sm:p-6 max-w-2xl mx-auto w-full">
         {renderContent()}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-zinc-900 p-4 flex justify-around items-center z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-3 py-2 pb-safe flex justify-around items-center z-50">
         <button 
           onClick={() => setActiveTab('dashboard')} 
-          className={`p-2 transition-colors ${activeTab === 'dashboard' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}
+          className={`flex flex-col items-center gap-1 p-1.5 transition-colors ${activeTab === 'dashboard' ? 'text-[#D4AF37]' : 'text-zinc-500 hover:text-zinc-400'}`}
         >
-          <TrendingUp size={24} />
+          <TrendingUp size={20} />
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">Inicio</span>
         </button>
         <button 
           onClick={() => setActiveTab('retos')} 
-          className={`p-2 transition-colors ${activeTab === 'retos' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}
+          className={`flex flex-col items-center gap-1 p-1.5 transition-colors ${activeTab === 'retos' ? 'text-[#D4AF37]' : 'text-zinc-500 hover:text-zinc-400'}`}
         >
-          <Trophy size={24} />
+          <Trophy size={20} />
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">Retos</span>
         </button>
         <button 
           onClick={() => setActiveTab('progreso')} 
-          className={`p-2 transition-colors ${activeTab === 'progreso' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}
+          className={`flex flex-col items-center gap-1 p-1.5 transition-colors ${activeTab === 'progreso' ? 'text-[#D4AF37]' : 'text-zinc-500 hover:text-zinc-400'}`}
         >
-          <Award size={24} />
+          <Award size={20} />
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">Progreso</span>
         </button>
         <button 
           onClick={() => setActiveTab('ranking')} 
-          className={`p-2 transition-colors ${activeTab === 'ranking' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}
+          className={`flex flex-col items-center gap-1 p-1.5 transition-colors ${activeTab === 'ranking' ? 'text-[#D4AF37]' : 'text-zinc-500 hover:text-zinc-400'}`}
         >
-          <Users size={24} />
+          <Users size={20} />
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">Ranking</span>
         </button>
       </nav>
     </div>

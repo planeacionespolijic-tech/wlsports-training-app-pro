@@ -23,6 +23,17 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
     
+    // Reglas para videos de análisis biomecánico y deportivo
+    match /videoAnalysis/{userId}/{fileName} {
+      // Permitir lectura a usuarios autenticados (dueño, entrenador o admin)
+      allow read: if request.auth != null;
+      
+      // Permitir subida si el usuario está autenticado y es su video o es admin/entrenador
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin())
+                   && request.resource.size < 50 * 1024 * 1024 // Máximo 50MB
+                   && request.resource.contentType.matches('video/.*');
+    }
+    
     // Denegar todo lo demás por defecto
     match /{allPaths=**} {
       allow read, write: if false;

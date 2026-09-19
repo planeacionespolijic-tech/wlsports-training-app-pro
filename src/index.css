@@ -16,10 +16,147 @@
   --color-zinc-950: #09090b;
 }
 
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body, #root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: black;
   color: white;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Mobile Typography & Proportions: eliminate micro-text and bloated wasted spaces on mobile screens */
+@media screen and (max-width: 768px) {
+  /* 1. Elevate micro-text to crisp, readable sizing on phones */
+  [class*="text-[7px]"],
+  [class*="text-[8px]"],
+  [class*="text-[9px]"],
+  [class*="text-[10px]"],
+  .text-\[7px\],
+  .text-\[8px\],
+  .text-\[9px\],
+  .text-\[10px\] {
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+  }
+
+  .text-xs,
+  [class*="text-[11px]"],
+  [class*="text-[12px]"],
+  .text-\[11px\],
+  .text-\[12px\] {
+    font-size: 13.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  .text-sm {
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* 2. Prevent excessive tracking from rendering text unreadable or wrapping awkwardly */
+  .tracking-\[0\.2em\],
+  .tracking-\[0\.3em\],
+  .tracking-\[0\.4em\],
+  .tracking-widest {
+    letter-spacing: 0.04em !important;
+  }
+
+  /* 3. Compact bloated paddings on mobile: reclaim wasted screen real estate */
+  .p-6 {
+    padding: 0.875rem !important; /* 14px instead of 24px - gains 20px usable width */
+  }
+
+  .p-8 {
+    padding: 1.25rem !important;
+  }
+
+  .px-6 {
+    padding-left: 0.875rem !important;
+    padding-right: 0.875rem !important;
+  }
+
+  .py-12 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+
+  /* 4. Compact vertical gaps: eliminates empty voids between cards and lists */
+  .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem !important; /* 16px instead of 32px */
+  }
+
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.875rem !important; /* 14px instead of 24px */
+  }
+
+  .mb-10 {
+    margin-bottom: 1.25rem !important; /* 20px instead of 40px */
+  }
+
+  .mb-8 {
+    margin-bottom: 1rem !important;
+  }
+
+  /* 5. Tame exaggerated border radii that pinch cards into narrow tunnels */
+  .rounded-\[2\.5rem\],
+  [class*="rounded-[2.5rem]"] {
+    border-radius: 1.25rem !important; /* 20px instead of 40px */
+  }
+
+  .rounded-3xl {
+    border-radius: 1rem !important; /* 16px instead of 24px */
+  }
+}
+
+button, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Mobile Safe Area Utility Classes */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+.pl-safe {
+  padding-left: max(env(safe-area-inset-left, 0px), 0px);
+}
+.pr-safe {
+  padding-right: max(env(safe-area-inset-right, 0px), 0px);
+}
+.top-safe {
+  top: env(safe-area-inset-top, 0px);
+}
+.bottom-safe {
+  bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Custom scrollbar for dark theme */

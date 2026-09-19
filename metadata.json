@@ -1,5 +1,6 @@
 {
   "name": "wlsports",
   "description": "Plataforma profesional de entrenamiento personalizado con inteligencia deportiva, gamificación y monitoreo en tiempo real.",
-  "requestFramePermissions": ["camera", "microphone", "screen-wake-lock"]
+  "requestFramePermissions": ["camera", "microphone", "screen-wake-lock"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Shield, Users, User, LogOut } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -32,17 +32,17 @@ export const RoleSelectorScreen = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
-      <header className="mb-12 text-center">
-        <h1 className="text-5xl font-black tracking-tighter mb-2">
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 sm:p-6">
+      <header className="mb-8 sm:mb-12 text-center">
+        <h1 className="text-4xl sm:text-5xl font-black tracking-tighter mb-2">
           WL<span className="text-[#D4AF37]">SPORTS</span>
         </h1>
-        <p className="text-zinc-500 text-xs uppercase tracking-[0.3em] font-medium">
+        <p className="text-zinc-400 text-xs sm:text-sm uppercase tracking-[0.25em] font-bold">
           Selecciona tu panel de acceso
         </p>
       </header>
 
-      <div className="grid gap-4 w-full max-w-md">
+      <div className="grid gap-3 sm:gap-4 w-full max-w-md">
         {roles.map((role, i) => (
           <motion.button
             key={role.id}
@@ -51,18 +51,18 @@ export const RoleSelectorScreen = () => {
             transition={{ delay: i * 0.1 }}
             onClick={() => role.allowed && navigate(role.id === 'trainer' ? '/trainer-dashboard' : '/client-dashboard')}
             disabled={!role.allowed}
-            className={`flex items-center gap-6 p-6 rounded-3xl border transition-all text-left relative overflow-hidden group ${
+            className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-6 rounded-3xl border transition-all text-left relative overflow-hidden group ${
               role.allowed 
                 ? 'bg-zinc-900 border-zinc-800 hover:border-[#D4AF37]/50 active:scale-95' 
                 : 'bg-zinc-900/30 border-zinc-900 opacity-50 cursor-not-allowed'
             }`}
           >
-            <div className={`p-4 rounded-2xl ${role.bg} ${role.color} group-hover:scale-110 transition-transform`}>
-              <role.icon size={32} />
+            <div className={`p-3.5 sm:p-4 rounded-2xl ${role.bg} ${role.color} group-hover:scale-110 transition-transform shrink-0`}>
+              <role.icon size={28} />
             </div>
             <div>
-              <h3 className="text-xl font-black">{role.title}</h3>
-              <p className="text-zinc-500 text-xs mt-1">{role.description}</p>
+              <h3 className="text-lg sm:text-xl font-black">{role.title}</h3>
+              <p className="text-zinc-400 text-xs sm:text-sm mt-1">{role.description}</p>
             </div>
             {!role.allowed && (
               <div className="absolute top-4 right-4">

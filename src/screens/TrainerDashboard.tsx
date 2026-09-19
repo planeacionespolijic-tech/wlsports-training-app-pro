@@ -22,8 +22,6 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchAthletes = useCallback(async () => {
-    // This is now handled by onSnapshot in useEffect
-    // Keeping the function signature if needed for manual refresh button
     if (!user?.uid) return;
     setLoading(true);
     try {
@@ -49,6 +47,30 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
       setLoading(false);
     }
   }, [user?.uid, userProfile?.role]);
+
+  const handleForceRefresh = async () => {
+    setLoading(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.update();
+        }
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        for (const name of cacheNames) {
+          if (!name.includes('v4')) {
+            await caches.delete(name);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    await fetchAthletes();
+    window.location.reload();
+  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -456,33 +478,35 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Header */}
-      <header className="p-6 pt-10 border-b border-zinc-900 bg-black/50 backdrop-blur-md sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+      <header className="p-4 sm:p-6 pt-safe border-b border-zinc-900 bg-black/80 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-2xl font-black tracking-tight">Panel <span className="text-[#D4AF37]">Entrenador</span></h1>
-              <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-1">Gestión de Alto Rendimiento</p>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Panel <span className="text-[#D4AF37]">Entrenador</span></h1>
+              <p className="text-zinc-400 text-xs uppercase tracking-wider font-bold mt-0.5">Gestión de Alto Rendimiento</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button 
-              onClick={() => fetchAthletes()}
+              onClick={() => handleForceRefresh()}
               disabled={loading}
-              className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white transition-colors"
+              className="p-2 sm:p-2.5 bg-zinc-900 rounded-full text-zinc-400 hover:text-white transition-colors"
+              title="Actualizar Interfaz"
             >
-              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             </button>
             <button 
               onClick={() => logout()}
-              className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
+              className="p-2 sm:p-2.5 bg-zinc-900 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
+              title="Cerrar sesión"
             >
-              <LogOutIcon size={20} />
+              <LogOutIcon size={18} />
             </button>
             {user && (
               <img 
                 src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=D4AF37&color=000`} 
                 alt={user.displayName || ''} 
-                className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-zinc-800 object-cover"
                 referrerPolicy="no-referrer"
               />
             )}
@@ -490,20 +514,20 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
           {stats.map((stat, i) => (
-            <div key={i} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-2xl">
+            <div key={i} className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-2xl shadow-md">
               <div className="flex items-center gap-2 mb-1">
-                <stat.icon size={14} className={stat.color} />
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">{stat.label}</span>
+                <stat.icon size={16} className={stat.color} />
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-tight">{stat.label}</span>
               </div>
-              <p className="text-xl font-black">{stat.value}</p>
+              <p className="text-xl sm:text-2xl font-black">{stat.value}</p>
             </div>
           ))}
         </div>
       </header>
 
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 p-3.5 sm:p-6 max-w-4xl mx-auto w-full overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -518,7 +542,7 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-zinc-900 p-4 pb-8 flex justify-around items-center z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-3 py-2 pb-safe flex justify-around items-center z-50">
         {[
           { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
           { id: 'athletes', label: 'Atletas', icon: Users },
@@ -528,12 +552,12 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === tab.id ? 'text-[#D4AF37] scale-110' : 'text-zinc-600 hover:text-zinc-400'
+            className={`flex flex-col items-center gap-1 p-1.5 transition-all ${
+              activeTab === tab.id ? 'text-[#D4AF37] scale-105' : 'text-zinc-500 hover:text-zinc-400'
             }`}
           >
-            <tab.icon size={24} strokeWidth={activeTab === tab.id ? 3 : 2} />
-            <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+            <tab.icon size={20} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">{tab.label}</span>
           </button>
         ))}
       </nav>

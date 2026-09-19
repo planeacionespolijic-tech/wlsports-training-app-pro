@@ -336,20 +336,20 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
         )}
       </AnimatePresence>
 
-      <main className="flex-1 p-6 overflow-y-auto">
-        <div className="flex flex-col items-center mb-10">
+      <main className="flex-1 p-3.5 sm:p-6 overflow-y-auto">
+        <div className="flex flex-col items-center mb-6 sm:mb-8">
           <div className="relative group">
             {currentPhotoURL ? (
               <img 
                 src={currentPhotoURL} 
                 alt={athlete.displayName} 
-                className="w-32 h-32 rounded-full border-4 mb-4 object-cover shadow-2xl transition-transform group-hover:scale-[1.02]"
+                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 mb-3 sm:mb-4 object-cover shadow-2xl transition-transform group-hover:scale-[1.02]"
                 style={{ borderColor: themeColor }}
                 referrerPolicy="no-referrer"
               />
             ) : (
               <div 
-                className="w-32 h-32 rounded-full border-4 mb-4 flex items-center justify-center text-3xl font-black bg-zinc-900"
+                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 mb-3 sm:mb-4 flex items-center justify-center text-2xl sm:text-3xl font-black bg-zinc-900"
                 style={{ borderColor: themeColor, color: themeColor }}
               >
                 {getInitials(athlete.displayName)}
@@ -409,7 +409,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
               </div>
             ) : (
               <div className="flex items-center gap-2 group">
-                <h2 className="text-3xl font-black tracking-tighter">{athlete.displayName}</h2>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{athlete.displayName}</h2>
                 {isTrainer && (
                   <button 
                     onClick={() => { setEditNameValue(athlete.displayName); setIsEditingName(true); }}
@@ -421,7 +421,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 text-zinc-500 text-sm mt-1">
+          <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm mt-1">
             <Mail size={14} />
             <span>{athlete.email || 'Sin correo'}</span>
           </div>
@@ -521,7 +521,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
           const themeColor = isChild ? '#3B82F6' : '#D4AF37';
           
           return (
-            <section className="bg-zinc-900/50 border-2 border-zinc-800 p-6 rounded-[2.5rem] shadow-2xl mb-10 max-w-md mx-auto relative overflow-hidden group">
+            <section className="bg-zinc-900/50 border-2 border-zinc-800 p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl mb-6 sm:mb-8 max-w-md mx-auto relative overflow-hidden group">
               <button 
                 onClick={() => setShowProgressionInfo(true)}
                 className="absolute top-4 right-4 z-20 p-2 bg-zinc-800/80 rounded-full text-amber-500 hover:bg-amber-500 hover:text-black transition-all"
@@ -534,13 +534,13 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
               </div>
               
               <div className="relative z-10">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-4 sm:mb-6">
                   <div className="bg-black/50 px-3 py-1 rounded-full border border-zinc-800">
-                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: themeColor }}>
+                    <span className="text-xs font-black uppercase tracking-wider" style={{ color: themeColor }}>
                       [{getLevelFromXP(athlete.xp || 0).name}]
                     </span>
                   </div>
-                  <h3 className="text-sm font-black uppercase tracking-tighter">{athlete.displayName}</h3>
+                  <h3 className="text-sm font-black uppercase tracking-tight">{athlete.displayName}</h3>
                   {isTrainer && (
                     <button 
                       onClick={() => setIsEditingAttributes(!isEditingAttributes)}
@@ -551,7 +551,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                   )}
                 </div>
   
-                <div className="grid grid-cols-5 gap-2 mb-6 uppercase">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-5 sm:mb-6 uppercase">
                   {[
                     { key: 'TEC', label: 'TEC', icon: '⚽', oldKey: 'tecnica' },
                     { key: 'FIS', label: 'FIS', icon: '💪', oldKey: 'fuerza' },
@@ -559,9 +559,9 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                     { key: 'AGI', label: 'AGI', icon: '🤸', oldKey: 'ritmo' },
                     { key: 'ACT', label: 'ACT', icon: '🔥', oldKey: 'mentalidad' }
                   ].map(attr => (
-                    <div key={attr.key} className="flex flex-col items-center gap-1">
-                      <span className="text-xl">{attr.icon}</span>
-                      <span className="text-[8px] font-black text-zinc-500 uppercase">{attr.label}</span>
+                    <div key={attr.key} className="flex flex-col items-center gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800/40">
+                      <span className="text-lg sm:text-xl">{attr.icon}</span>
+                      <span className="text-[10px] sm:text-xs font-black text-zinc-400 uppercase">{attr.label}</span>
                       {isEditingAttributes ? (
                         <input
                           type="number"
@@ -571,7 +571,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                           onChange={(e) => setEditAttributes({...editAttributes, [attr.key]: Number(e.target.value)})}
                         />
                       ) : (
-                        <span className="text-sm font-black" style={{ color: themeColor }}>
+                        <span className="text-xs sm:text-sm font-black" style={{ color: themeColor }}>
                           {attributes[attr.key] || attributes[attr.oldKey] || 10}
                         </span>
                       )}
@@ -582,13 +582,13 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                   <button
                     onClick={handleUpdateAttributes}
                     disabled={isSavingAttributes}
-                    className="w-full bg-[#D4AF37] text-black font-black uppercase tracking-widest text-xs py-2 rounded-xl mb-4 hover:bg-yellow-500 transition-colors"
+                    className="w-full bg-[#D4AF37] text-black font-black uppercase tracking-wider text-xs py-2 rounded-xl mb-4 hover:bg-yellow-500 transition-colors"
                   >
                     {isSavingAttributes ? 'Guardando...' : 'Guardar Atributos'}
                   </button>
                 )}
   
-                <div className="space-y-4 pt-4 border-t border-zinc-800">
+                <div className="space-y-3 pt-3 border-t border-zinc-800">
                   {(() => {
                     const mapping = [
                       { key: 'TEC', old: 'tecnica', label: 'Técnica' },
@@ -609,12 +609,12 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                     return (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Atributo Destacado</span>
-                          <span className="text-xs font-black text-emerald-500 uppercase italic">🚀 {maxAttr.label}</span>
+                          <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Atributo Destacado</span>
+                          <span className="text-xs sm:text-sm font-black text-emerald-500 uppercase italic">🚀 {maxAttr.label}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Área de Mejora</span>
-                          <span className="text-xs font-black text-amber-500 uppercase italic">🎯 {minAttr.label}</span>
+                          <span className="text-xs font-bold uppercase text-zinc-400 tracking-wider">Área de Mejora</span>
+                          <span className="text-xs sm:text-sm font-black text-amber-500 uppercase italic">🎯 {minAttr.label}</span>
                         </div>
                       </>
                     );
@@ -626,7 +626,7 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
         })()}
 
         {isTrainer && (
-          <div className="mb-10">
+          <div className="mb-6 sm:mb-8">
             <CoachAthleteDashboard 
               athleteId={athlete.id} 
               athleteName={athlete.displayName} 
@@ -635,8 +635,8 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
           </div>
         )}
 
-        <div className="space-y-3 max-w-md mx-auto">
-          <p className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.2em] mb-4 ml-1">
+        <div className="space-y-2.5 max-w-md mx-auto">
+          <p className="text-xs text-zinc-400 uppercase font-black tracking-wider mb-3 ml-1">
             {isChild ? 'Aventura de Entrenamiento' : 'Gestión de Rendimiento'}
           </p>
           {menuItems.map((item, index) => (
@@ -654,14 +654,14 @@ export const AthleteProfileScreen = ({ userId, athlete: propAthlete, isAdmin: is
                   navigate(`/${item.id}`, { state: { athleteId: athlete.id, athlete } });
                 }
               }}
-              className="w-full bg-zinc-900/50 hover:bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-center gap-4 transition-all group active:scale-[0.98]"
+              className="w-full bg-zinc-900/50 hover:bg-zinc-900 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-800 flex items-center gap-3.5 transition-all group active:scale-[0.98]"
             >
-              <div className="p-3 bg-black rounded-xl group-hover:text-white transition-colors" style={{ color: themeColor }}>
+              <div className="p-2.5 sm:p-3 bg-black rounded-xl group-hover:text-white transition-colors" style={{ color: themeColor }}>
                 <item.icon size={20} />
               </div>
-              <div className="text-left">
-                <h3 className="font-bold text-sm">{item.title}</h3>
-                <p className="text-[10px] text-zinc-600">{item.desc}</p>
+              <div className="text-left min-w-0 flex-1">
+                <h3 className="font-bold text-sm truncate">{item.title}</h3>
+                <p className="text-xs text-zinc-400 truncate">{item.desc}</p>
               </div>
             </motion.button>
           ))}

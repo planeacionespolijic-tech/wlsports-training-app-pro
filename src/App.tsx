@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useWakeLock } from './hooks/useWakeLock';
+import { PWAInstallButton } from './components/PWAInstallButton';
 
 // Lazy load all screens for optimal performance
 const LoginScreen = lazy(() => import('./screens/LoginScreen').then(m => ({ default: m.LoginScreen })));
@@ -41,7 +42,7 @@ const InitialEvaluationScreen = lazy(() => import('./screens/evaluation/InitialE
 
 // Global Loading Component
 const PageLoader = () => (
-  <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+  <div className="min-h-screen min-h-[100dvh] bg-black flex flex-col items-center justify-center">
     <Loader2 className="text-[#D4AF37] animate-spin mb-4" size={48} />
     <p className="text-zinc-500 font-medium animate-pulse uppercase tracking-[0.2em] text-[10px]">WLSPORTS</p>
   </div>
@@ -100,7 +101,7 @@ const AppShell: React.FC = () => {
   const showNavButtons = user && !location.pathname.includes('/login');
 
   return (
-    <div className="min-h-screen bg-black font-sans selection:bg-[#D4AF37] selection:text-black transition-colors duration-300">
+    <div className="min-h-screen min-h-[100dvh] bg-black font-sans selection:bg-[#D4AF37] selection:text-black transition-colors duration-300">
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public Access */}
@@ -168,6 +169,7 @@ const AppShell: React.FC = () => {
           <Route path="/seguimiento" element={<ProtectedRoute><ScreenWrapper><SeguimientoScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/tests" element={<ProtectedRoute><ScreenWrapper><TestsScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/video-analysis" element={<ProtectedRoute><ScreenWrapper><VideoAnalysisScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/videoAnalysis" element={<ProtectedRoute><ScreenWrapper><VideoAnalysisScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/diagnostico" element={<ProtectedRoute><ScreenWrapper><DiagnosisScreen /></ScreenWrapper></ProtectedRoute>} />
           
           
@@ -232,6 +234,8 @@ const AppShell: React.FC = () => {
           </div>
         </div>
       )}
+      {/* PWA In-App Install Button and iOS Guide */}
+      <PWAInstallButton />
     </div>
   );
 };

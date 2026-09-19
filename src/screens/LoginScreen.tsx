@@ -69,21 +69,21 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#D4AF37]/10 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
       
-      <div className="z-10 w-full max-w-md px-8 flex flex-col items-center">
+      <div className="z-10 w-full max-w-md px-4 sm:px-6 flex flex-col items-center">
         {/* Logo Section */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center mb-8"
+          className="text-center mb-6"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-[2.5rem] mb-6 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl mb-4 shadow-2xl">
             <Activity size={40} className="text-[#D4AF37]" />
           </div>
-          <h1 className="text-6xl font-black tracking-tighter mb-2">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-2">
             WL<span className="text-[#D4AF37]">SPORTS</span>
           </h1>
-          <p className="text-zinc-500 text-xs uppercase tracking-[0.4em] font-bold">
+          <p className="text-zinc-400 text-xs sm:text-sm uppercase tracking-[0.3em] font-bold">
             Elite Performance Tracking
           </p>
         </motion.div>
@@ -93,9 +93,9 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.8 }}
-          className="w-full bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2rem] mb-6 backdrop-blur-xl"
+          className="w-full bg-zinc-900/70 border border-zinc-800 p-5 sm:p-7 rounded-3xl mb-6 backdrop-blur-xl shadow-2xl"
         >
-          <h2 className="text-xl font-bold mb-6 text-center text-zinc-100 uppercase tracking-widest">
+          <h2 className="text-lg sm:text-xl font-black mb-5 text-center text-zinc-100 uppercase tracking-widest">
             {isForgotPassword ? 'Recuperar Contraseña' : 'Iniciar Sesión'}
           </h2>
 
@@ -103,7 +103,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 text-red-400 text-sm"
+              className="mb-5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 text-red-400 text-sm"
             >
               <AlertCircle size={20} className="shrink-0 mt-0.5" />
               <div>{error || externalError}</div>
@@ -114,7 +114,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-start gap-3 text-green-400 text-sm"
+              className="mb-5 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-start gap-3 text-green-400 text-sm"
             >
               <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
               <div>{success}</div>
@@ -129,7 +129,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
                 placeholder="Correo electrónico"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full bg-black border border-zinc-800 rounded-2xl py-3.5 sm:py-4 pl-12 pr-4 text-base focus:outline-none focus:border-[#D4AF37] transition-colors placeholder:text-zinc-600"
                 disabled={isLoading}
                 required
               />
@@ -142,7 +142,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
                   placeholder="Contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37] transition-colors"
+                  className="w-full bg-black border border-zinc-800 rounded-2xl py-3.5 sm:py-4 pl-12 pr-4 text-base focus:outline-none focus:border-[#D4AF37] transition-colors placeholder:text-zinc-600"
                   disabled={isLoading}
                   required
                 />
@@ -151,7 +151,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
             <button 
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#D4AF37] text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#C4A030] transition-all transform active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+              className="w-full bg-[#D4AF37] text-black py-3.5 sm:py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#C4A030] transition-all transform active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 shadow-lg"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
@@ -167,7 +167,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
           <div className="mt-4 text-center">
             <button 
               onClick={() => { setIsForgotPassword(!isForgotPassword); setError(null); setSuccess(null); }}
-              className="text-[10px] text-zinc-500 hover:text-[#D4AF37] font-bold uppercase tracking-widest transition-colors"
+              className="text-xs text-zinc-400 hover:text-[#D4AF37] font-bold uppercase tracking-wider transition-colors py-2"
             >
               {isForgotPassword ? 'Volver al inicio de sesión' : '¿Olvidaste tu contraseña?'}
             </button>
@@ -175,18 +175,18 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
         </motion.div>
 
         {/* Divider */}
-        <div className="w-full flex items-center gap-4 mb-6">
+        <div className="w-full flex items-center gap-4 mb-5">
           <div className="h-[1px] flex-1 bg-zinc-800" />
-          <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">O</span>
+          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">O</span>
           <div className="h-[1px] flex-1 bg-zinc-800" />
         </div>
 
         {/* Social Buttons */}
-        <div className="w-full grid grid-cols-2 gap-4 mb-4">
+        <div className="w-full grid grid-cols-2 gap-3 sm:gap-4 mb-4">
           <button 
             onClick={() => handleLogin(loginWithGoogle)}
             disabled={isLoading}
-            className="flex items-center justify-center gap-3 bg-white text-black py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all transform active:scale-95 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 sm:gap-3 bg-white text-black py-3.5 sm:py-4 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-zinc-200 transition-all transform active:scale-95 disabled:opacity-50"
           >
             <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
             Google
@@ -195,7 +195,7 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
           <button 
             onClick={() => handleLogin(loginAnonymously)}
             disabled={isLoading}
-            className="flex items-center justify-center gap-3 bg-zinc-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest border border-zinc-800 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 sm:gap-3 bg-zinc-900 text-white py-3.5 sm:py-4 rounded-2xl font-bold text-xs uppercase tracking-wider border border-zinc-800 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50"
           >
             <LogIn size={16} className="text-[#D4AF37]" />
             Invitado
@@ -210,13 +210,13 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
             handleLogin(loginAnonymously);
           }}
           disabled={isLoading}
-          className="w-full bg-zinc-800/50 text-[#D4AF37] py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-[#D4AF37]/20 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
+          className="w-full bg-zinc-800/60 text-[#D4AF37] py-3.5 sm:py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-[#D4AF37]/30 hover:bg-zinc-800 transition-all transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-6"
         >
           <Zap size={18} />
           Acceso Directo
         </button>
         
-        <p className="text-center text-zinc-600 text-[10px] mt-8 uppercase tracking-widest font-bold">
+        <p className="text-center text-zinc-500 text-xs mt-4 uppercase tracking-widest font-bold">
           Plataforma Profesional de Entrenamiento
         </p>
       </div>
