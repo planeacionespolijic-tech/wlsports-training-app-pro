@@ -929,8 +929,8 @@ ESTÃ‰TICA: Deportiva, Premium, Moderna, Editorial, Juvenil, Profesional, TecnolÃ
               >
                 {/* Fondo Decorativo */}
                 <div 
-                  className="absolute inset-0 mix-blend-overlay"
-                  style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")', opacity: 0.2 }}
+                  className="absolute inset-0"
+                  style={{ backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)', opacity: 0.5 }}
                 ></div>
                 <div 
                   className="absolute inset-0 z-10"
