@@ -31,6 +31,10 @@ const NeuroHubScreen = lazy(() => import('./screens/neuro/NeuroHubScreen').then(
 const StroopScreen = lazy(() => import('./screens/neuro/StroopScreen').then(m => ({ default: m.StroopScreen })));
 const SchulteScreen = lazy(() => import('./screens/neuro/SchulteScreen').then(m => ({ default: m.SchulteScreen })));
 const SimonScreen = lazy(() => import('./screens/neuro/SimonScreen').then(m => ({ default: m.SimonScreen })));
+const BallReactionScreen = lazy(() => import('./screens/neuro/BallReactionScreen').then(m => ({ default: m.BallReactionScreen })));
+const NeuroTrackerScreen = lazy(() => import('./screens/neuro/NeuroTrackerScreen').then(m => ({ default: m.NeuroTrackerScreen })));
+const StrobeVisionScreen = lazy(() => import('./screens/neuro/StrobeVisionScreen').then(m => ({ default: m.StrobeVisionScreen })));
+const HomeCourtAgilityScreen = lazy(() => import('./screens/neuro/HomeCourtAgilityScreen').then(m => ({ default: m.HomeCourtAgilityScreen })));
 const SessionExecutionScreen = lazy(() => import('./screens/SessionExecutionScreen').then(m => ({ default: m.SessionExecutionScreen })));
 const ChallengesScreen = lazy(() => import('./screens/ChallengesScreen').then(m => ({ default: m.ChallengesScreen })));
 const TournamentsScreen = lazy(() => import('./screens/TournamentsScreen').then(m => ({ default: m.TournamentsScreen })));
@@ -194,6 +198,10 @@ const AppShell: React.FC = () => {
           <Route path="/stroop" element={<ProtectedRoute><ScreenWrapper><StroopScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/schulte" element={<ProtectedRoute><ScreenWrapper><SchulteScreen /></ScreenWrapper></ProtectedRoute>} />
           <Route path="/simon" element={<ProtectedRoute><ScreenWrapper><SimonScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/balon-reactivo" element={<ProtectedRoute><ScreenWrapper><BallReactionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/neurotracker" element={<ProtectedRoute><ScreenWrapper><NeuroTrackerScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/strobe-vision" element={<ProtectedRoute><ScreenWrapper><StrobeVisionScreen /></ScreenWrapper></ProtectedRoute>} />
+          <Route path="/homecourt-agility" element={<ProtectedRoute><ScreenWrapper><HomeCourtAgilityScreen /></ScreenWrapper></ProtectedRoute>} />
 
           {/* Root Redirects */}
           <Route path="/" element={

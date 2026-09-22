@@ -3,12 +3,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Función para verificar si el usuario es administrador
-    function isAdmin() {
+    // Función para verificar si el usuario es administrador o entrenador
+    function isStaff() {
       return request.auth != null && (
         request.auth.token.email == "planeacionespolijic@gmail.com" ||
-        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) && 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) && 
+         (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'trainer'))
       );
     }
 
@@ -18,8 +19,8 @@ service firebase.storage {
       allow read: if true; 
       
       // Escritura solo por el dueño o admin
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin())
-                   && request.resource.size < 1 * 1024 * 1024 // Máximo 1MB
+      allow write: if request.auth != null && (request.auth.uid == userId || isStaff())
+                   && request.resource.size < 5 * 1024 * 1024 // Máximo 5MB
                    && request.resource.contentType.matches('image/.*');
     }
     
@@ -29,8 +30,8 @@ service firebase.storage {
       allow read: if request.auth != null;
       
       // Permitir subida si el usuario está autenticado y es su video o es admin/entrenador
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin())
-                   && request.resource.size < 50 * 1024 * 1024 // Máximo 50MB
+      allow write: if request.auth != null && (request.auth.uid == userId || isStaff())
+                   && request.resource.size < 150 * 1024 * 1024 // Máximo 150MB
                    && request.resource.contentType.matches('video/.*');
     }
     

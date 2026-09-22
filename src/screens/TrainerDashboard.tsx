@@ -54,15 +54,17 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const reg of registrations) {
+          if (reg.active) {
+            reg.active.postMessage({ action: 'clearCache' });
+            reg.active.postMessage({ action: 'skipWaiting' });
+          }
           await reg.update();
         }
       }
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         for (const name of cacheNames) {
-          if (!name.includes('v4')) {
-            await caches.delete(name);
-          }
+          await caches.delete(name);
         }
       }
     } catch {

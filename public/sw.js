@@ -1,5 +1,5 @@
-// WLSPORTS PWA Service Worker - v5 Compact Mobile Layout
-const CACHE_NAME = 'wlsports-cache-v5-compact-mobile';
+// WLSPORTS PWA Service Worker - v7 Large Mobile-First Layout
+const CACHE_NAME = 'wlsports-cache-v7-mobile-large';
 const PRECACHE_URLS = [
   '/manifest.json',
   '/manifest.webmanifest',
@@ -123,4 +123,13 @@ self.addEventListener('fetch', (event) => {
         return new Response('', { status: 408, statusText: 'Request Timeout' });
       })
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.action === 'clearCache') {
+    caches.keys().then((names) => Promise.all(names.map(name => caches.delete(name))));
+  }
 });
