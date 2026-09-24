@@ -16,7 +16,6 @@
     <meta name="apple-mobile-web-app-title" content="WLSPORTS" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="manifest" href="/manifest.json" />
     
     <!-- Favicon and App Icons -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
@@ -32,45 +31,45 @@
         e.preventDefault();
         window.deferredPrompt = e;
         window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
-        console.log('[PWA] beforeinstallprompt captured early');
       });
 
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          .then(function (reg) {
-            reg.update();
-            console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
-            
-            // Auto check on app focus/visibility
-            document.addEventListener('visibilitychange', function() {
-              if (document.visibilityState === 'visible') {
-                reg.update();
-              }
-            });
+      // Avoid running ServiceWorker inside developer iframe to prevent proxy MIME issues
+      var isInIframe = false;
+      try {
+        isInIframe = window.self !== window.top;
+      } catch (err) {
+        isInIframe = true;
+      }
 
-            reg.addEventListener('updatefound', function () {
-              var newWorker = reg.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', function () {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('[PWA] New version ready - triggering update event');
-                    window.dispatchEvent(new CustomEvent('pwa-update-available'));
+      if ('serviceWorker' in navigator) {
+        if (isInIframe) {
+          // Inside preview iframe: cleanly unregister any stale workers
+          navigator.serviceWorker.getRegistrations().then(function (registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+          }).catch(function () {});
+        } else {
+          // Top-level standalone / native browser: register safely on load
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+              .then(function (reg) {
+                reg.addEventListener('updatefound', function () {
+                  var newWorker = reg.installing;
+                  if (newWorker) {
+                    newWorker.addEventListener('statechange', function () {
+                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        window.dispatchEvent(new CustomEvent('pwa-update-available'));
+                      }
+                    });
                   }
                 });
-              }
-            });
-          })
-          .catch(function (err) {
-            console.warn('[PWA] ServiceWorker register failed:', err);
+              })
+              .catch(function (err) {
+                // Silently handle if offline or unsupported
+              });
           });
-
-        var refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
-          }
-        });
+        }
       }
     </script>
   </head>

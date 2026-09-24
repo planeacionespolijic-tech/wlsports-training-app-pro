@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Camera, SwitchCamera, Play, Square, RotateCcw, 
   Volume2, VolumeX, Sparkles, Activity, Award, CheckCircle2,
-  Zap, Target, Layers
+  Zap, Target, Layers, Maximize2, Minimize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useFullscreen } from '../../hooks/useFullscreen';
 
 type DrillMode = 'RANDOM_FLASH' | 'SEQUENCE_MEMORY' | 'TIME_TRIAL_30';
 
@@ -25,7 +26,7 @@ interface TargetZone {
 
 const INITIAL_ZONES: TargetZone[] = [
   { id: 1, label: '1. Delantero Izq', quadrant: 'FL', color: '#06B6D4', glowColor: 'rgba(6,182,212,0.6)', xPercent: 25, yPercent: 30, active: false },
-  { id: 2, label: '2. Delantero Der', quadrant: 'FR', color: '#10B981', glowColor: 'rgba(16,185,129,0.6)', xPercent: 75, yPercent: 30, active: false },
+  { id: 2, label: '2. Delantero Der', quadrant: 'FR', color: '#10B981', glowColor: 'rgba(168,85,247,0.6)', xPercent: 75, yPercent: 30, active: false },
   { id: 3, label: '3. Trasero Izq', quadrant: 'BL', color: '#F59E0B', glowColor: 'rgba(245,158,11,0.6)', xPercent: 25, yPercent: 70, active: false },
   { id: 4, label: '4. Trasero Der', quadrant: 'BR', color: '#A855F7', glowColor: 'rgba(168,85,247,0.6)', xPercent: 75, yPercent: 70, active: false },
 ];
@@ -33,6 +34,8 @@ const INITIAL_ZONES: TargetZone[] = [
 export const HomeCourtAgilityScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef);
 
   // === Drill Settings ===
   const [drillMode, setDrillMode] = useState<DrillMode>('RANDOM_FLASH');
@@ -111,22 +114,20 @@ export const HomeCourtAgilityScreen: React.FC = () => {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.3);
-      } else {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(660, ctx.currentTime);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      } else if (type === 'alert') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.1);
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
   }, [soundEnabled]);
 
-  // Camera Management
+  // Camera stream initialization
   const startCamera = useCallback(async () => {
     try {
       if (mediaStreamRef.current) {
@@ -146,7 +147,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
         videoRef.current.play().catch(() => {});
       }
     } catch (err) {
-      console.warn('Camera failed in HomeCourt Agility:', err);
+      console.warn('HomeCourt Camera Access Warning:', err);
     }
   }, [cameraFacing]);
 
@@ -158,191 +159,210 @@ export const HomeCourtAgilityScreen: React.FC = () => {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-    }
   }, []);
 
-  // Pick Next Zone
-  const pickNextZone = useCallback((currentId: number | null) => {
-    if (drillMode === 'RANDOM_FLASH') {
-      const remaining = [1, 2, 3, 4].filter(id => id !== currentId);
-      const nextId = remaining[Math.floor(Math.random() * remaining.length)];
-      setActiveZoneId(nextId);
-      targetStartTimeRef.current = performance.now();
-      playAgilitySound('alert');
+  // Frame processing loop for motion detection over virtual cone sectors
+  const processMotionLoop = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      animFrameRef.current = requestAnimationFrame(processMotionLoop);
+      return;
     }
-  }, [drillMode, playAgilitySound]);
 
-  // Trigger hit on zone
-  const registerZoneHit = useCallback((zoneId: number) => {
-    if (cooldownRef.current) return;
+    if (!canvasProcRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 120;
+      canvasProcRef.current = canvas;
+    }
+
+    const canvas = canvasProcRef.current;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      animFrameRef.current = requestAnimationFrame(processMotionLoop);
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = frame.data;
+    const prev = prevFrameRef.current;
+
+    if (prev && prev.length === data.length) {
+      const motionMatrix: number[] = new Array(data.length / 4).fill(0);
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Quadrant energy sums
+      let energyFL = 0; // Front Left (top-left)
+      let energyFR = 0; // Front Right (top-right)
+      let energyBL = 0; // Back Left (bottom-left)
+      let energyBR = 0; // Back Right (bottom-right)
+
+      const halfW = w / 2;
+      const halfH = h / 2;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const diffR = Math.abs(data[i] - prev[i]);
+        const diffG = Math.abs(data[i + 1] - prev[i + 1]);
+        const diffB = Math.abs(data[i + 2] - prev[i + 2]);
+        const diff = (diffR + diffG + diffB) / 3;
+
+        if (diff > 30) {
+          const pixelIndex = i / 4;
+          const x = pixelIndex % w;
+          const y = Math.floor(pixelIndex / w);
+
+          if (x < halfW && y < halfH) energyFL++;
+          else if (x >= halfW && y < halfH) energyFR++;
+          else if (x < halfW && y >= halfH) energyBL++;
+          else if (x >= halfW && y >= halfH) energyBR++;
+        }
+      }
+
+      // Max reference per quadrant (halfW * halfH) = 80 * 60 = 4800
+      const norm = (val: number) => Math.min(100, Math.round((val / 800) * 100));
+
+      const energies: Record<number, number> = {
+        1: norm(energyFL),
+        2: norm(energyFR),
+        3: norm(energyBL),
+        4: norm(energyBR),
+      };
+      setLiveEnergyByZone(energies);
+
+      // Check hit if active zone has motion energy above threshold
+      if (activeZoneId && !cooldownRef.current) {
+        const activeEnergy = energies[activeZoneId] || 0;
+        if (activeEnergy >= 25) {
+          // Trigger successful touch
+          handleZoneTouch(activeZoneId);
+        }
+      }
+    }
+
+    prevFrameRef.current = new Uint8ClampedArray(data);
+    animFrameRef.current = requestAnimationFrame(processMotionLoop);
+  }, [activeZoneId]);
+
+  // Handle successful touch of target zone
+  const handleZoneTouch = (zoneId: number) => {
     cooldownRef.current = true;
+    const now = performance.now();
+    const reactionMs = Math.round(now - targetStartTimeRef.current);
 
-    const reactionTime = Math.round(performance.now() - targetStartTimeRef.current);
-    setLastTouchReactionMs(reactionTime);
     playAgilitySound('hit');
+    setLastTouchReactionMs(reactionMs);
 
     setTouchLog(prev => {
-      const nextList = [
+      const nextLog = [
         ...prev,
         {
           rep: prev.length + 1,
           zoneId,
-          reactionMs: reactionTime
+          reactionMs
         }
       ];
 
       // End condition check
-      if (drillMode !== 'TIME_TRIAL_30' && nextList.length >= totalRepsTarget) {
+      if (drillMode === 'RANDOM_FLASH' && nextLog.length >= totalRepsTarget) {
+        setTimeout(handleStopDrill, 400);
+      } else {
+        // Next zone after brief cooldown
         setTimeout(() => {
-          setIsActive(false);
-          setIsFinished(true);
-          stopCamera();
+          activateNextZone(nextLog.length);
+          cooldownRef.current = false;
         }, 500);
       }
 
-      return nextList;
+      return nextLog;
     });
+  };
 
-    // Short cooldown before activating next cone (400ms)
-    setTimeout(() => {
-      cooldownRef.current = false;
-      pickNextZone(zoneId);
-    }, 450);
-  }, [drillMode, totalRepsTarget, pickNextZone, playAgilitySound, stopCamera]);
+  // Next zone selection
+  const activateNextZone = (currentRepCount: number) => {
+    targetStartTimeRef.current = performance.now();
 
-  // Motion Detection Processing Loop
-  const startMotionLoop = useCallback(() => {
-    const processFrame = () => {
-      const video = videoRef.current;
-      if (video && video.readyState >= 2) {
-        if (!canvasProcRef.current) {
-          canvasProcRef.current = document.createElement('canvas');
-          canvasProcRef.current.width = 160;
-          canvasProcRef.current.height = 120;
-        }
-        const canvas = canvasProcRef.current;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, 160, 120);
-          const currentData = ctx.getImageData(0, 0, 160, 120).data;
+    if (drillMode === 'RANDOM_FLASH' || drillMode === 'TIME_TRIAL_30') {
+      let nextId: number;
+      do {
+        nextId = Math.floor(Math.random() * 4) + 1;
+      } while (nextId === activeZoneId);
 
-          if (prevFrameRef.current && prevFrameRef.current.length === currentData.length) {
-            const prevData = prevFrameRef.current;
-
-            // Quadrant energy buckets
-            // FL (X: 0-80, Y: 0-60)   | FR (X: 80-160, Y: 0-60)
-            // BL (X: 0-80, Y: 60-120) | BR (X: 80-160, Y: 60-120)
-            let diffCountFL = 0;
-            let diffCountFR = 0;
-            let diffCountBL = 0;
-            let diffCountBR = 0;
-
-            const threshold = 28;
-            for (let i = 0; i < currentData.length; i += 4) {
-              const diff = (
-                Math.abs(currentData[i] - prevData[i]) +
-                Math.abs(currentData[i + 1] - prevData[i + 1]) +
-                Math.abs(currentData[i + 2] - prevData[i + 2])
-              ) / 3;
-
-              if (diff > threshold) {
-                const pixelIdx = i / 4;
-                const px = pixelIdx % 160;
-                const py = Math.floor(pixelIdx / 160);
-
-                if (py < 60) {
-                  if (px < 80) diffCountFL++;
-                  else diffCountFR++;
-                } else {
-                  if (px < 80) diffCountBL++;
-                  else diffCountBR++;
-                }
-              }
-            }
-
-            const totalQuadPixels = 80 * 60;
-            const energyFL = Math.min(100, Math.round((diffCountFL / totalQuadPixels) * 100 * 5));
-            const energyFR = Math.min(100, Math.round((diffCountFR / totalQuadPixels) * 100 * 5));
-            const energyBL = Math.min(100, Math.round((diffCountBL / totalQuadPixels) * 100 * 5));
-            const energyBR = Math.min(100, Math.round((diffCountBR / totalQuadPixels) * 100 * 5));
-
-            setLiveEnergyByZone({
-              1: energyFL,
-              2: energyFR,
-              3: energyBL,
-              4: energyBR
-            });
-
-            // Check if active cone was triggered by motion
-            const triggerThreshold = 22; // 22% energy in quadrant
-            if (activeZoneId !== null && !cooldownRef.current) {
-              if (activeZoneId === 1 && energyFL > triggerThreshold) registerZoneHit(1);
-              else if (activeZoneId === 2 && energyFR > triggerThreshold) registerZoneHit(2);
-              else if (activeZoneId === 3 && energyBL > triggerThreshold) registerZoneHit(3);
-              else if (activeZoneId === 4 && energyBR > triggerThreshold) registerZoneHit(4);
-            }
-          }
-
-          prevFrameRef.current = new Uint8ClampedArray(currentData);
-        }
+      setActiveZoneId(nextId);
+      playAgilitySound('alert');
+    } else if (drillMode === 'SEQUENCE_MEMORY') {
+      const nextIndex = sequenceStepIndex + 1;
+      if (nextIndex < targetSequence.length) {
+        setSequenceStepIndex(nextIndex);
+        setActiveZoneId(targetSequence[nextIndex]);
+        playAgilitySound('alert');
+      } else {
+        handleStopDrill();
       }
+    }
+  };
 
-      animFrameRef.current = requestAnimationFrame(processFrame);
-    };
-
-    animFrameRef.current = requestAnimationFrame(processFrame);
-  }, [activeZoneId, registerZoneHit]);
-
-  // Start Drill Execution
+  // Start Drill Flow
   const handleStartDrill = () => {
     setIsConfiguring(false);
-    setCountdown(3);
+    setIsFinished(false);
     setTouchLog([]);
     setLastTouchReactionMs(null);
     setElapsedSec(0);
-    setSaveSuccess(false);
+    setCountdown(3);
 
     startCamera();
 
+    // 3..2..1 Countdown
+    let c = 3;
     const countTimer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countTimer);
-          setIsActive(true);
-          playAgilitySound('start');
-          pickNextZone(null);
-          startMotionLoop();
+      c -= 1;
+      setCountdown(c);
+      if (c <= 0) {
+        clearInterval(countTimer);
+        setIsActive(true);
+        playAgilitySound('start');
 
-          timerIntervalRef.current = setInterval(() => {
-            setElapsedSec(sec => {
-              const next = sec + 1;
-              if (drillMode === 'TIME_TRIAL_30' && next >= 30) {
-                clearInterval(timerIntervalRef.current);
-                setIsActive(false);
-                setIsFinished(true);
-                stopCamera();
-              }
-              return next;
-            });
-          }, 1000);
+        // Start timer
+        targetStartTimeRef.current = performance.now();
+        const initialZone = Math.floor(Math.random() * 4) + 1;
+        setActiveZoneId(initialZone);
 
-          return 0;
-        }
-        return prev - 1;
-      });
+        // Elapsed seconds counter
+        timerIntervalRef.current = setInterval(() => {
+          setElapsedSec(prev => {
+            const next = prev + 1;
+            if (drillMode === 'TIME_TRIAL_30' && next >= 30) {
+              handleStopDrill();
+            }
+            return next;
+          });
+        }, 1000);
+
+        animFrameRef.current = requestAnimationFrame(processMotionLoop);
+      }
     }, 1000);
   };
 
   // Stop Drill
-  const handleStopDrill = () => {
-    clearInterval(timerIntervalRef.current);
+  const handleStopDrill = useCallback(() => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    stopCamera();
+
     setIsActive(false);
     setIsFinished(true);
-    stopCamera();
-  };
+    setActiveZoneId(null);
+  }, [stopCamera]);
+
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   // Save to Firestore
   const handleSaveToFirestore = async () => {
@@ -350,94 +370,98 @@ export const HomeCourtAgilityScreen: React.FC = () => {
     setIsSaving(true);
 
     try {
-      const avgReaction = Math.round(touchLog.reduce((acc, t) => acc + t.reactionMs, 0) / touchLog.length);
-      const bestReaction = Math.min(...touchLog.map(t => t.reactionMs));
-      const touchesPerMinute = elapsedSec > 0 ? Math.round((touchLog.length / elapsedSec) * 60) : 0;
+      const avgReaction = Math.round(touchLog.reduce((acc, r) => acc + r.reactionMs, 0) / touchLog.length);
+      const bestReaction = Math.min(...touchLog.map(r => r.reactionMs));
 
       await addDoc(collection(db, 'reactionTests'), {
         userId: user.uid,
-        type: 'HOMECOURT_AGILITY_AR',
-        title: 'HomeCourt Agility AR (Matriz de Conos Virtuales)',
-        drillMode,
+        type: 'HOMECOURT_AR_AGILITY',
+        title: 'HomeCourt Agility (Conos Virtuales AR)',
+        date: new Date().toISOString(),
+        mode: drillMode,
         repetitions: touchLog.length,
         average: avgReaction,
         best: bestReaction,
-        touchesPerMinute,
-        durationSec: elapsedSec,
-        touchHistory: touchLog,
-        date: new Date().toISOString(),
+        elapsedSec,
+        touchLog,
         createdAt: new Date().toISOString()
       });
 
       setSaveSuccess(true);
     } catch (err) {
-      console.error('Error saving HomeCourt Agility results:', err);
+      console.error('Error saving Agility result:', err);
     } finally {
       setIsSaving(false);
     }
   };
 
-  useEffect(() => {
-    return () => {
-      clearInterval(timerIntervalRef.current);
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      stopCamera();
-    };
-  }, [stopCamera]);
-
-  // Summary Metrics
-  const avgReactionTime = touchLog.length > 0
-    ? Math.round(touchLog.reduce((acc, t) => acc + t.reactionMs, 0) / touchLog.length)
+  const avgReactionTime = touchLog.length > 0 
+    ? Math.round(touchLog.reduce((acc, r) => acc + r.reactionMs, 0) / touchLog.length) 
     : 0;
-  const bestReactionTime = touchLog.length > 0
-    ? Math.min(...touchLog.map(t => t.reactionMs))
-    : 0;
-  const touchesPerMinute = elapsedSec > 0 
-    ? Math.round((touchLog.length / elapsedSec) * 60) 
+  const bestReactionTime = touchLog.length > 0 
+    ? Math.min(...touchLog.map(r => r.reactionMs)) 
     : 0;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-between selection:bg-[#D4AF37] selection:text-black">
+    <div 
+      ref={containerRef}
+      className={`min-h-screen bg-black text-white flex flex-col justify-between selection:bg-[#D4AF37] selection:text-black ${
+        isFullscreen ? 'fixed inset-0 z-50 overflow-y-auto' : ''
+      }`}
+    >
       {/* TOP HEADER */}
-      <header className="p-4 sm:p-6 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md flex items-center justify-between z-30">
-        <div className="flex items-center gap-3">
+      <header className="p-3 sm:p-5 border-b border-zinc-900 bg-zinc-950/90 backdrop-blur-md flex items-center justify-between z-30 sticky top-0">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <button 
             onClick={() => {
               if (isActive) handleStopDrill();
               navigate('/neuro');
             }}
-            className="p-2.5 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
+            className="p-2 sm:p-2.5 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20 flex items-center gap-1">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20 flex items-center gap-1">
                 <Target size={12} /> HomeCourt Agility AR
               </span>
             </div>
-            <h1 className="text-lg sm:text-xl font-black text-white">Conos y Platillos Virtuales con Cámara IA</h1>
+            <h1 className="text-sm sm:text-lg font-black text-white leading-tight">Conos y Platillos Virtuales con Cámara IA</h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className={`p-2 sm:p-2.5 rounded-xl border transition-all ${
+              isFullscreen 
+                ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-lg shadow-[#D4AF37]/20' 
+                : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
+            }`}
+            title={isFullscreen ? 'Salir de Pantalla Completa' : 'Ver en Pantalla Completa'}
+          >
+            {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+          </button>
+
           <button
             onClick={() => setSoundEnabled(prev => !prev)}
-            className="p-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors border border-zinc-800"
+            className="p-2 sm:p-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors border border-zinc-800"
             title="Audio"
           >
-            {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            {soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
           </button>
 
           {isActive && (
             <div className="flex items-center gap-2">
-              <div className="bg-zinc-900 border border-zinc-800 px-3.5 py-1 rounded-xl text-right">
-                <p className="text-[9px] font-mono uppercase text-zinc-500">Toques</p>
-                <p className="text-sm font-mono font-bold text-emerald-400">{touchLog.length}</p>
+              <div className="bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl text-right">
+                <p className="text-[8px] sm:text-[9px] font-mono uppercase text-zinc-500">Toques</p>
+                <p className="text-xs sm:text-sm font-mono font-bold text-emerald-400">{touchLog.length}</p>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800 px-3.5 py-1 rounded-xl text-right">
-                <p className="text-[9px] font-mono uppercase text-zinc-500">Tiempo</p>
-                <p className="text-sm font-mono font-bold text-[#D4AF37]">{elapsedSec}s</p>
+              <div className="bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl text-right">
+                <p className="text-[8px] sm:text-[9px] font-mono uppercase text-zinc-500">Tiempo</p>
+                <p className="text-xs sm:text-sm font-mono font-bold text-[#D4AF37]">{elapsedSec}s</p>
               </div>
             </div>
           )}
@@ -445,33 +469,45 @@ export const HomeCourtAgilityScreen: React.FC = () => {
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-hidden">
         {/* VIEW 1: CONFIGURATION */}
         {isConfiguring && (
           <motion.div 
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl w-full bg-zinc-900/90 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md"
+            className="max-w-2xl w-full bg-zinc-900/95 border border-zinc-800 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-md my-auto"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-[#D4AF37]/10 text-[#D4AF37] rounded-2xl border border-[#D4AF37]/20">
-                <Sparkles size={28} />
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 sm:p-3 bg-[#D4AF37]/10 text-[#D4AF37] rounded-2xl border border-[#D4AF37]/20">
+                  <Sparkles size={24} />
+                </div>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-black text-white">Configuración del Circuito AR</h2>
+                  <p className="text-xs text-zinc-400">Emula los ejercicios de desplazamiento con conos virtuales interactivos.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black text-white">Agilidad AR sin Conos Físicos</h2>
-                <p className="text-xs text-zinc-400">La cámara proyecta 4 dianas interactivas en tu suelo. Muévete y toca el cono activo con tus pies.</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs border border-zinc-700 font-bold"
+              >
+                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                <span>{isFullscreen ? 'Modo Normal' : 'Pantalla Completa'}</span>
+              </button>
             </div>
 
             {/* Drill Mode Selection */}
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2 block">
-                Modalidad del Ejercicio
+                Modo de Agilidad
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => setDrillMode('RANDOM_FLASH')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all ${
                     drillMode === 'RANDOM_FLASH'
                       ? 'bg-[#D4AF37]/10 border-[#D4AF37] shadow-lg shadow-[#D4AF37]/10'
                       : 'bg-zinc-800/60 border-zinc-700/60 hover:bg-zinc-800'
@@ -479,16 +515,17 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <Zap size={18} className={drillMode === 'RANDOM_FLASH' ? 'text-[#D4AF37]' : 'text-zinc-400'} />
-                    <span className="text-sm font-bold text-white">Relámpago Aleatorio</span>
+                    <span className="text-sm font-bold text-white">Reacción Aleatoria</span>
                   </div>
                   <p className="text-xs text-zinc-400">
-                    Un cono se ilumina al azar. Pisa su cuadrante a máxima velocidad para disparar el siguiente.
+                    Se ilumina un cono al azar; desplázate y písalo lo más rápido posible.
                   </p>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setDrillMode('TIME_TRIAL_30')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all ${
                     drillMode === 'TIME_TRIAL_30'
                       ? 'bg-[#D4AF37]/10 border-[#D4AF37] shadow-lg shadow-[#D4AF37]/10'
                       : 'bg-zinc-800/60 border-zinc-700/60 hover:bg-zinc-800'
@@ -499,7 +536,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                     <span className="text-sm font-bold text-white">Test 30 Segundos</span>
                   </div>
                   <p className="text-xs text-zinc-400">
-                    Récord de toques por minuto (PPM) a máxima intensidad en medio minuto continuo.
+                    Récord de toques por minuto a máxima intensidad en medio minuto continuo.
                   </p>
                 </button>
               </div>
@@ -507,7 +544,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
 
             {/* Repetitions target if random flash */}
             {drillMode === 'RANDOM_FLASH' && (
-              <div className="mb-6">
+              <div className="mb-5">
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                     Cantidad de Toques de Cono
@@ -518,8 +555,9 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                   {[10, 20, 30].map(reps => (
                     <button
                       key={reps}
+                      type="button"
                       onClick={() => setTotalRepsTarget(reps)}
-                      className={`py-2.5 rounded-xl font-bold text-xs transition-all border ${
+                      className={`py-2 rounded-xl font-bold text-xs transition-all border ${
                         totalRepsTarget === reps
                           ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                           : 'bg-zinc-800/80 text-zinc-300 border-zinc-700/60 hover:bg-zinc-800'
@@ -533,7 +571,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
             )}
 
             {/* Camera Setup Instructions */}
-            <div className="bg-black/60 border border-zinc-800 p-4 rounded-2xl mb-6">
+            <div className="bg-black/60 border border-zinc-800 p-3.5 rounded-2xl mb-5">
               <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-1">
                 📍 Cómo posicionar tu teléfono
               </p>
@@ -554,9 +592,11 @@ export const HomeCourtAgilityScreen: React.FC = () => {
 
         {/* VIEW 2: ACTIVE AR ARENA */}
         {(!isConfiguring && !isFinished) && (
-          <div className="w-full max-w-4xl flex flex-col items-center">
+          <div className="w-full max-w-4xl flex flex-col items-center flex-1 justify-center">
             {/* Live AR Viewport */}
-            <div className="relative w-full aspect-[16/10] max-h-[68vh] rounded-3xl overflow-hidden border-2 border-zinc-800 shadow-2xl bg-black flex items-center justify-center">
+            <div className={`relative w-full rounded-3xl overflow-hidden border-2 border-zinc-800 shadow-2xl bg-black flex items-center justify-center ${
+              isFullscreen ? 'h-[74vh] max-h-[78vh]' : 'aspect-[16/10] sm:aspect-[16/9] max-h-[68vh]'
+            }`}>
               {/* Camera Feed */}
               <video
                 ref={videoRef}
@@ -576,7 +616,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
               )}
 
               {/* AR Virtual Cones Matrix (4 Discs on floor) */}
-              <div className="absolute inset-0 pointer-events-none grid grid-cols-2 grid-rows-2 p-6 z-20">
+              <div className="absolute inset-0 pointer-events-none grid grid-cols-2 grid-rows-2 p-4 sm:p-6 z-20">
                 {INITIAL_ZONES.map(cone => {
                   const isThisActive = activeZoneId === cone.id;
                   const currentEnergy = liveEnergyByZone[cone.id] || 0;
@@ -596,21 +636,21 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                           repeat: isThisActive ? Infinity : 0,
                           duration: 1.2
                         }}
-                        className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 flex flex-col items-center justify-center shadow-2xl transition-all duration-200 ${
+                        className={`w-20 h-20 sm:w-32 sm:h-32 rounded-full border-4 flex flex-col items-center justify-center shadow-2xl transition-all duration-200 ${
                           isThisActive
                             ? 'border-white bg-gradient-to-tr from-[#D4AF37] to-amber-300 text-black shadow-[0_0_50px_rgba(212,175,55,0.9)] ring-8 ring-[#D4AF37]/40'
                             : 'border-white/30 bg-black/50 text-white/80'
                         }`}
                       >
-                        <span className="text-2xl sm:text-3xl font-mono font-black">
+                        <span className="text-xl sm:text-3xl font-mono font-black">
                           {cone.id}
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-wider">
+                        <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider">
                           {cone.quadrant}
                         </span>
 
                         {/* Motion energy bar inside cone */}
-                        <div className="w-12 h-1.5 bg-black/40 rounded-full mt-1 overflow-hidden">
+                        <div className="w-10 sm:w-12 h-1.5 bg-black/40 rounded-full mt-1 overflow-hidden">
                           <div 
                             className="h-full bg-emerald-400 transition-all duration-75"
                             style={{ width: `${currentEnergy}%` }}
@@ -619,7 +659,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                       </motion.div>
 
                       {isThisActive && (
-                        <div className="mt-2 bg-black/80 border border-[#D4AF37] text-[#D4AF37] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider animate-bounce shadow-lg">
+                        <div className="mt-1.5 bg-black/80 border border-[#D4AF37] text-[#D4AF37] font-black text-[9px] sm:text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-bounce shadow-lg">
                           ¡PISA AQUÍ!
                         </div>
                       )}
@@ -657,7 +697,7 @@ export const HomeCourtAgilityScreen: React.FC = () => {
             <div className="mt-4">
               <button
                 onClick={handleStopDrill}
-                className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center gap-2 transition-all"
+                className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center gap-2 transition-all active:scale-95"
               >
                 <Square size={16} fill="currentColor" /> Detener Ejercicio
               </button>
@@ -670,31 +710,31 @@ export const HomeCourtAgilityScreen: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="max-w-xl w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center"
+            className="max-w-xl w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center my-auto"
           >
             <div className="w-16 h-16 rounded-3xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-4">
               <Award size={36} />
             </div>
 
-            <h2 className="text-2xl font-black text-white">Sesión de Agilidad AR Completada</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white">Sesión de Agilidad AR Completada</h2>
             <p className="text-xs text-zinc-400 mt-1">Detección de desplazamientos y reflejos con conos virtuales.</p>
 
             {/* METRICS */}
-            <div className="grid grid-cols-3 gap-3 my-6">
-              <div className="bg-black/60 border border-zinc-800 p-4 rounded-2xl">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 my-6">
+              <div className="bg-black/60 border border-zinc-800 p-3.5 rounded-2xl">
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Toques Totales</p>
-                <p className="text-2xl font-mono font-black text-emerald-400">{touchLog.length}</p>
-                <span className="text-[9px] text-zinc-400">{elapsedSec}s duración</span>
+                <p className="text-xl sm:text-2xl font-mono font-black text-[#D4AF37]">{touchLog.length}</p>
+                <span className="text-[9px] text-zinc-400">En {elapsedSec}s</span>
               </div>
-              <div className="bg-black/60 border border-zinc-800 p-4 rounded-2xl">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Reacción Promedio</p>
-                <p className="text-2xl font-mono font-black text-[#D4AF37]">{avgReactionTime} ms</p>
-                <span className="text-[9px] text-zinc-400">Mejor: {bestReactionTime} ms</span>
+              <div className="bg-black/60 border border-zinc-800 p-3.5 rounded-2xl">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Promedio</p>
+                <p className="text-xl sm:text-2xl font-mono font-black text-emerald-400">{avgReactionTime} ms</p>
+                <span className="text-[9px] text-zinc-400">Tiempo de Reacción</span>
               </div>
-              <div className="bg-black/60 border border-zinc-800 p-4 rounded-2xl">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Ritmo Motor</p>
-                <p className="text-2xl font-mono font-black text-cyan-400">{touchesPerMinute}</p>
-                <span className="text-[9px] text-zinc-400">Toques / Minuto</span>
+              <div className="bg-black/60 border border-zinc-800 p-3.5 rounded-2xl">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Mejor Toque</p>
+                <p className="text-xl sm:text-2xl font-mono font-black text-cyan-400">{bestReactionTime} ms</p>
+                <span className="text-[9px] text-zinc-400">Récord de Ronda</span>
               </div>
             </div>
 
@@ -705,15 +745,15 @@ export const HomeCourtAgilityScreen: React.FC = () => {
                   setIsFinished(false);
                   setIsConfiguring(true);
                 }}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 border border-zinc-700 transition-colors"
+                className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 border border-zinc-700 transition-colors"
               >
-                <RotateCcw size={16} /> Configurar de Nuevo
+                <RotateCcw size={16} /> Repetir Circuito
               </button>
 
               <button
                 onClick={handleSaveToFirestore}
                 disabled={isSaving || saveSuccess}
-                className={`flex-1 py-3 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all ${
+                className={`flex-1 py-3.5 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all ${
                   saveSuccess 
                     ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' 
                     : 'bg-[#D4AF37] hover:bg-[#e6c158] text-black shadow-lg shadow-[#D4AF37]/20'

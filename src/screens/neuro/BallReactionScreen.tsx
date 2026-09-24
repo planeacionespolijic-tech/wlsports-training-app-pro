@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useFullscreen } from '../../hooks/useFullscreen';
 
 interface BallReactionScreenProps {
   onBack?: () => void;
@@ -195,6 +196,7 @@ const DIRECTIONS_MAP: Record<DirectionKey, DirectionInfo> = {
 export const BallReactionScreen = ({ onBack, userId }: BallReactionScreenProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   // === Settings ===
   const [drillMode, setDrillMode] = useState<DrillMode>('MIRROR');
@@ -997,6 +999,18 @@ export const BallReactionScreen = ({ onBack, userId }: BallReactionScreenProps) 
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleFullscreen}
+              className={`p-2.5 rounded-xl border transition-all ${
+                isFullscreen 
+                  ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-lg shadow-[#D4AF37]/20' 
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white border-zinc-800'
+              }`}
+              title={isFullscreen ? 'Salir de Pantalla Completa' : 'Ver en Pantalla Completa'}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+
             <button 
               onClick={() => setVoiceEnabled(!voiceEnabled)}
               className={`p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 ${
@@ -1897,16 +1911,29 @@ export const BallReactionScreen = ({ onBack, userId }: BallReactionScreenProps) 
 
       {/* TOP STATUS BAR */}
       <header className="p-4 sm:p-6 flex items-center justify-between z-30 pointer-events-auto">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            resetDrill();
-          }}
-          className="px-3.5 py-1.5 bg-black/60 hover:bg-black/90 border border-white/20 rounded-xl flex items-center gap-1.5 text-xs font-bold text-white backdrop-blur-md transition-all active:scale-95 shadow-lg"
-        >
-          <ArrowLeft size={16} />
-          <span>Detener</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              resetDrill();
+            }}
+            className="px-3.5 py-1.5 bg-black/60 hover:bg-black/90 border border-white/20 rounded-xl flex items-center gap-1.5 text-xs font-bold text-white backdrop-blur-md transition-all active:scale-95 shadow-lg"
+          >
+            <ArrowLeft size={16} />
+            <span>Detener</span>
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen();
+            }}
+            className="p-1.5 bg-black/60 hover:bg-black/90 border border-white/20 rounded-xl text-zinc-300 hover:text-white backdrop-blur-md transition-all active:scale-95 shadow-lg"
+            title={isFullscreen ? 'Salir de Pantalla Completa' : 'Ver en Pantalla Completa'}
+          >
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
 
         {/* Live Counters */}
         <div className="flex items-center gap-3 text-right">

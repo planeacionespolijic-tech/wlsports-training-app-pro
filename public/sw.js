@@ -68,6 +68,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!url.protocol.startsWith('http')) return;
 
+  // Never intercept requests to the service worker script itself
+  if (url.pathname === '/sw.js') return;
+
   // HTML Navigation: Always Network-first to deliver latest mobile UI updates immediately
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(

@@ -1,13 +1,45 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Vite plugin to ensure sw.js is ALWAYS served with application/javascript MIME type
+function swMimeTypePlugin() {
+  return {
+    name: 'sw-mime-type-middleware',
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        const rawUrl = req.url?.split('?')[0];
+        if (rawUrl === '/sw.js') {
+          const swPath = path.resolve(__dirname, 'public/sw.js');
+          if (fs.existsSync(swPath)) {
+            const content = fs.readFileSync(swPath, 'utf-8');
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+            res.setHeader('Service-Worker-Allowed', '/');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.statusCode = 200;
+            res.end(content);
+            return;
+          } else {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+            res.statusCode = 200;
+            res.end('// Service Worker fallback\nself.addEventListener("install", () => self.skipWaiting());');
+            return;
+          }
+        }
+        next();
+      });
+    },
+  };
+}
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [
+      swMimeTypePlugin(),
       react(),
       tailwindcss(),
       VitePWA({
