@@ -4,7 +4,7 @@ import {
   ArrowLeft, Brain, Play, RotateCcw, Volume2, VolumeX, 
   Sparkles, CheckCircle2, XCircle, TrendingUp, Info, Activity,
   ChevronRight, Award, Zap, Maximize2, Minimize2, Settings2, FastForward,
-  Plus, Minus, Clock, RotateCw
+  Plus, Minus, Clock, RotateCw, Eye, EyeOff, Columns, Rows
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -53,6 +53,8 @@ export const NeuroTrackerScreen: React.FC = () => {
     return true;
   });
   const [showOrientationHint, setShowOrientationHint] = useState<boolean>(false);
+  const [dockMinimized, setDockMinimized] = useState<boolean>(false);
+  const [landscapeDockPosition, setLandscapeDockPosition] = useState<'bottom' | 'side'>('bottom');
 
   useEffect(() => {
     const handleOrientation = () => {
@@ -235,7 +237,7 @@ export const NeuroTrackerScreen: React.FC = () => {
 
     const isPortrait = typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false;
     const spawnX = isPortrait ? 460 : 640;
-    const spawnY = isPortrait ? 540 : 320;
+    const spawnY = isPortrait ? 540 : 230;
 
     for (let i = 0; i < totalSpheres; i++) {
       const x = (Math.random() - 0.5) * spawnX;
@@ -294,7 +296,7 @@ export const NeuroTrackerScreen: React.FC = () => {
     // Dynamic 3D Wireframe Boundary Box - Matches landscape or portrait aspect ratio
     const isPortrait = height > width * 1.05;
     const boxHalfW = isPortrait ? 310 : 430;
-    const boxHalfH = isPortrait ? 360 : 225;
+    const boxHalfH = isPortrait ? 360 : 185;
     const boxCorners = [
       { x: -boxHalfW, y: -boxHalfH, z: 320 },
       { x: boxHalfW, y: -boxHalfH, z: 320 },
@@ -853,60 +855,245 @@ export const NeuroTrackerScreen: React.FC = () => {
             className={`w-full h-full object-contain touch-none select-none ${phase === 'SELECT' ? 'cursor-pointer' : 'cursor-default'}`}
           />
 
-          {/* FLOATING SELECTION DOCK IN SELECT PHASE (DOES NOT DISPLACE OR SHRINK CANVAS) */}
+          {/* FLOATING SELECTION DOCK IN SELECT PHASE (ADAPTIVE, NON-OBSCURING, TOGGLEABLE) */}
           {phase === 'SELECT' && (
             <div 
-              className="absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-lg z-30 pointer-events-auto"
+              className={`z-30 pointer-events-auto transition-all ${
+                dockMinimized
+                  ? 'absolute bottom-2 right-2 sm:right-4'
+                  : isLandscape && landscapeDockPosition === 'side'
+                  ? 'absolute right-2 top-1/2 -translate-y-1/2 w-48'
+                  : isLandscape
+                  ? 'absolute bottom-1.5 sm:bottom-2 left-1/2 -translate-x-1/2 w-auto max-w-[98%]'
+                  : 'absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-lg'
+              }`}
               onClick={e => e.stopPropagation()}
               onTouchStart={e => e.stopPropagation()}
             >
-              <div className="bg-zinc-950/95 border border-zinc-700/80 p-2 sm:p-2.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl flex flex-col gap-2">
-                <div className="flex items-center justify-between text-[11px] text-zinc-300 font-bold uppercase tracking-wider px-1">
-                  <span className="flex items-center gap-1.5 text-white">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Toca las esferas en 3D o en el teclado:
-                  </span>
-                  <span className="text-emerald-400 font-mono font-bold">
-                    {selectedSphereIds.length} de {numTargets} Seleccionadas
-                  </span>
-                </div>
+              {/* 1. MINIMIZED STATE: Completely frees 100% of the screen so user can see and tap 3D balls directly */}
+              {dockMinimized ? (
+                <div className="flex items-center gap-2 bg-zinc-950/90 border border-zinc-700/80 px-2.5 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl">
+                  <button
+                    type="button"
+                    onClick={() => setDockMinimized(false)}
+                    className="px-2 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-[11px] font-bold border border-zinc-700 flex items-center gap-1 transition-colors"
+                    title="Mostrar teclado numérico"
+                  >
+                    <Eye size={13} className="text-[#D4AF37]" />
+                    <span>Teclado</span>
+                  </button>
 
-                {/* 1 to 8 keypad */}
-                <div className="grid grid-cols-8 gap-1 sm:gap-1.5">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
-                    const isSel = selectedSphereIds.includes(id);
-                    return (
+                  <span className="text-emerald-400 font-mono font-bold text-xs px-1">
+                    {selectedSphereIds.length}/{numTargets}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmSelection}
+                    disabled={selectedSphereIds.length === 0}
+                    className={`px-3 py-1 font-black text-xs uppercase tracking-wider rounded-xl flex items-center gap-1.5 transition-transform active:scale-95 shadow-md ${
+                      selectedSphereIds.length >= numTargets
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/30 animate-pulse'
+                        : selectedSphereIds.length > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} /> Comprobar
+                  </button>
+                </div>
+              ) : isLandscape && landscapeDockPosition === 'side' ? (
+                /* 2. LANDSCAPE LATERAL RIGHT DOCK: Leaves entire central/left 3D arena completely free */
+                <div className="bg-zinc-950/95 border border-zinc-700/80 p-2 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-300 font-bold uppercase tracking-wider px-1">
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {selectedSphereIds.length}/{numTargets} Sel
+                    </span>
+                    <div className="flex items-center gap-1">
                       <button
-                        key={id}
                         type="button"
-                        onClick={() => toggleSphereById(id)}
-                        className={`py-2 rounded-xl font-mono font-black text-sm sm:text-base transition-transform active:scale-90 border ${
-                          isSel
-                            ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.7)] scale-105'
-                            : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
-                        }`}
+                        onClick={() => setLandscapeDockPosition('bottom')}
+                        className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
+                        title="Mover barra abajo"
                       >
-                        {id}
+                        <Rows size={13} />
                       </button>
-                    );
-                  })}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => setDockMinimized(true)}
+                        className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
+                        title="Ocultar teclado para ver todas las bolas"
+                      >
+                        <EyeOff size={13} />
+                      </button>
+                    </div>
+                  </div>
 
-                {/* Instant Confirm / Comprobar Button */}
-                <button
-                  onClick={handleConfirmSelection}
-                  disabled={selectedSphereIds.length === 0}
-                  className={`w-full py-2.5 sm:py-3 font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-xl ${
-                    selectedSphereIds.length >= numTargets
-                      ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] animate-pulse'
-                      : selectedSphereIds.length > 0
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
-                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                  }`}
-                >
-                  <CheckCircle2 size={18} /> Comprobar Selección ({selectedSphereIds.length}/{numTargets})
-                </button>
-              </div>
+                  {/* 4x2 grid of buttons */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
+                      const isSel = selectedSphereIds.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => toggleSphereById(id)}
+                          className={`h-8 rounded-lg font-mono font-black text-xs transition-transform active:scale-90 border ${
+                            isSel
+                              ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.7)] scale-105'
+                              : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {id}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Confirm Button */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmSelection}
+                    disabled={selectedSphereIds.length === 0}
+                    className={`w-full py-2 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-transform active:scale-95 shadow-md ${
+                      selectedSphereIds.length >= numTargets
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/30 animate-pulse'
+                        : selectedSphereIds.length > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} /> Comprobar
+                  </button>
+                </div>
+              ) : isLandscape ? (
+                /* 3. LANDSCAPE ULTRA-COMPACT BOTTOM STRIP: Only 36px tall, sits below ball bounce zone */
+                <div className="bg-zinc-950/95 border border-zinc-700/80 px-2 py-1 rounded-2xl shadow-2xl backdrop-blur-xl flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDockMinimized(true)}
+                      className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+                      title="Ocultar teclado para ver todas las bolas"
+                    >
+                      <EyeOff size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLandscapeDockPosition('side')}
+                      className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+                      title="Mover al lateral derecho"
+                    >
+                      <Columns size={13} />
+                    </button>
+                  </div>
+
+                  <div className="h-4 w-[1px] bg-zinc-800 shrink-0" />
+
+                  {/* 8 numbers in a single horizontal row */}
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
+                      const isSel = selectedSphereIds.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => toggleSphereById(id)}
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-mono font-black text-xs transition-transform active:scale-90 border shrink-0 ${
+                            isSel
+                              ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.7)] scale-105'
+                              : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {id}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="h-4 w-[1px] bg-zinc-800 shrink-0" />
+
+                  {/* Counter */}
+                  <span className="text-emerald-400 font-mono font-bold text-xs shrink-0 px-0.5">
+                    {selectedSphereIds.length}/{numTargets}
+                  </span>
+
+                  {/* Confirm Button */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmSelection}
+                    disabled={selectedSphereIds.length === 0}
+                    className={`h-7 sm:h-8 px-2.5 sm:px-3.5 font-black text-xs uppercase tracking-wider rounded-xl flex items-center gap-1.5 transition-transform active:scale-95 shadow-md shrink-0 ${
+                      selectedSphereIds.length >= numTargets
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/30 animate-pulse'
+                        : selectedSphereIds.length > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} /> Comprobar
+                  </button>
+                </div>
+              ) : (
+                /* 4. PORTRAIT DOCK: Tall screen standard layout */
+                <div className="bg-zinc-950/95 border border-zinc-700/80 p-2 sm:p-2.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-300 font-bold uppercase tracking-wider px-1">
+                    <span className="flex items-center gap-1.5 text-white">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Toca las esferas en 3D o en el teclado:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-mono font-bold">
+                        {selectedSphereIds.length}/{numTargets} Sel
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDockMinimized(true)}
+                        className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
+                        title="Ocultar teclado para ver todas las bolas"
+                      >
+                        <EyeOff size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1 to 8 keypad */}
+                  <div className="grid grid-cols-8 gap-1 sm:gap-1.5">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
+                      const isSel = selectedSphereIds.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => toggleSphereById(id)}
+                          className={`py-2 rounded-xl font-mono font-black text-sm sm:text-base transition-transform active:scale-90 border ${
+                            isSel
+                              ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.7)] scale-105'
+                              : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {id}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Instant Confirm / Comprobar Button */}
+                  <button
+                    onClick={handleConfirmSelection}
+                    disabled={selectedSphereIds.length === 0}
+                    className={`w-full py-2.5 sm:py-3 font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-xl ${
+                      selectedSphereIds.length >= numTargets
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] animate-pulse'
+                        : selectedSphereIds.length > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    }`}
+                  >
+                    <CheckCircle2 size={18} /> Comprobar Selección ({selectedSphereIds.length}/{numTargets})
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
