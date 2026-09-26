@@ -82,17 +82,33 @@ export const NeuroHubScreen = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="flex items-center gap-4 mb-8 pt-4">
-        <button 
-          onClick={() => navigate(-1)}
-          className="p-3 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
-        >
-          <ArrowLeft size={24} />
-        </button>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Centro <span className="text-[#D4AF37]">Neurocognitivo</span></h1>
-          <p className="text-zinc-500 text-sm font-medium">Entrenamiento cerebral, reactividad y agilidad motora</p>
+    <div className="min-h-screen bg-black text-white p-4 sm:p-6 pb-24">
+      <div className="flex items-center justify-between mb-6 pt-2">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2.5 sm:p-3 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/owl_vision_logo.jpg" 
+              alt="Owl Vision Pro" 
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-[#D4AF37]/50 object-cover shadow-[0_0_20px_rgba(212,175,55,0.35)] shrink-0 bg-black"
+              referrerPolicy="no-referrer"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20">
+                  OWL VISION PRO
+                </span>
+                <span className="text-[10px] text-zinc-400 font-mono">WLSPORTS</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Centro <span className="text-[#D4AF37]">Neurocognitivo</span></h1>
+              <p className="text-zinc-400 text-xs sm:text-sm font-medium">Entrenamiento cerebral, agudeza visual y toma de decisiones</p>
+            </div>
+          </div>
         </div>
       </div>
 

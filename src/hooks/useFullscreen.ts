@@ -36,8 +36,9 @@ export function useFullscreen(containerRef?: RefObject<HTMLElement | null>) {
 
       if (!activeElement) {
         const target = containerRef?.current || document.documentElement;
+        const options: FullscreenOptions = { navigationUI: 'hide' };
         if (target.requestFullscreen) {
-          await target.requestFullscreen();
+          await target.requestFullscreen(options);
         } else if ((target as any).webkitRequestFullscreen) {
           await (target as any).webkitRequestFullscreen();
         } else if ((target as any).mozRequestFullScreen) {

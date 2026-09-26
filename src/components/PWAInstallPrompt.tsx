@@ -137,14 +137,17 @@ export const PWAInstallPrompt: React.FC = () => {
             <div className="absolute -right-8 -top-8 w-28 h-28 bg-[#D4AF37]/20 rounded-full blur-2xl pointer-events-none" />
             
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-zinc-900 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                <Smartphone className="w-5 h-5 text-[#D4AF37]" />
-              </div>
+              <img 
+                src="/owl_vision_logo.jpg" 
+                alt="Owl Vision Pro WLSPORTS" 
+                className="w-10 h-10 rounded-xl object-cover border border-[#D4AF37]/50 shadow-md shrink-0 group-hover:scale-105 transition-transform"
+                referrerPolicy="no-referrer"
+              />
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">Instalar WLSPORTS</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">Instalar OWL VISION PRO</span>
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30">
-                    App Nativa
+                    WLSPORTS
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-400 truncate">

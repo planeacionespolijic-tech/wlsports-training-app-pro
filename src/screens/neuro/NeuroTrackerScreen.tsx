@@ -45,6 +45,53 @@ export const NeuroTrackerScreen: React.FC = () => {
   type SphereSizeType = 'JUMBO' | 'LARGE' | 'STANDARD' | 'COMPACT';
   const [sphereSize, setSphereSize] = useState<SphereSizeType>('JUMBO'); // Jumbo default for optimal mobile and desktop visibility
 
+  // === Orientation & Full-Screen Mobile Adaptation ===
+  const [isLandscape, setIsLandscape] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= window.innerHeight;
+    }
+    return true;
+  });
+  const [showOrientationHint, setShowOrientationHint] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleOrientation = () => {
+      if (typeof window !== 'undefined') {
+        setIsLandscape(window.innerWidth >= window.innerHeight);
+      }
+    };
+    handleOrientation();
+    window.addEventListener('resize', handleOrientation);
+    window.addEventListener('orientationchange', handleOrientation);
+    return () => {
+      window.removeEventListener('resize', handleOrientation);
+      window.removeEventListener('orientationchange', handleOrientation);
+    };
+  }, []);
+
+  const toggleOrientationMode = async () => {
+    try {
+      const orientation = screen.orientation as any;
+      if (orientation && orientation.lock) {
+        if (isLandscape) {
+          await orientation.lock('portrait');
+        } else {
+          await orientation.lock('landscape');
+        }
+      } else {
+        setShowOrientationHint(true);
+        setTimeout(() => setShowOrientationHint(false), 4000);
+      }
+    } catch {
+      setShowOrientationHint(true);
+      setTimeout(() => setShowOrientationHint(false), 4000);
+    }
+  };
+
+  // Dynamic Canvas Resolution: 1100x640 in landscape, 800x960 in portrait
+  const canvasWidth = isLandscape ? 1100 : 800;
+  const canvasHeight = isLandscape ? 640 : 960;
+
   // === Session State ===
   const [phase, setPhase] = useState<Phase>('CONFIG');
   const [currentTrial, setCurrentTrial] = useState<number>(1);
@@ -186,9 +233,13 @@ export const NeuroTrackerScreen: React.FC = () => {
     // Enhanced speed calculation: base 3.2 x multiplier
     const speed = 3.2 * speedMult;
 
+    const isPortrait = typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false;
+    const spawnX = isPortrait ? 460 : 640;
+    const spawnY = isPortrait ? 540 : 320;
+
     for (let i = 0; i < totalSpheres; i++) {
-      const x = (Math.random() - 0.5) * 620;
-      const y = (Math.random() - 0.5) * 320;
+      const x = (Math.random() - 0.5) * spawnX;
+      const y = (Math.random() - 0.5) * spawnY;
       const z = 360 + Math.random() * 320;
 
       const angleXY = Math.random() * Math.PI * 2;
@@ -240,9 +291,10 @@ export const NeuroTrackerScreen: React.FC = () => {
     ctx.fillStyle = '#060709';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw 3D Wireframe Boundary Box - Wide, expansive athletic arena
-    const boxHalfW = 420;
-    const boxHalfH = 220;
+    // Dynamic 3D Wireframe Boundary Box - Matches landscape or portrait aspect ratio
+    const isPortrait = height > width * 1.05;
+    const boxHalfW = isPortrait ? 310 : 430;
+    const boxHalfH = isPortrait ? 360 : 225;
     const boxCorners = [
       { x: -boxHalfW, y: -boxHalfH, z: 320 },
       { x: boxHalfW, y: -boxHalfH, z: 320 },
@@ -300,8 +352,8 @@ export const NeuroTrackerScreen: React.FC = () => {
 
     // Physics step during TRACKING phase
     if (currentP === 'TRACKING') {
-      const boundX = 385;
-      const boundY = 190;
+      const boundX = boxHalfW - 35;
+      const boundY = boxHalfH - 30;
       const minZ = 330;
       const maxZ = 710;
 
@@ -660,6 +712,219 @@ export const NeuroTrackerScreen: React.FC = () => {
     ? Math.max(...trialResults.map(r => r.speed)) 
     : initialSpeed;
 
+  const handleExitDrill = () => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+    setPhase('CONFIG');
+    phaseRef.current = 'CONFIG';
+  };
+
+  // =========================================================================
+  // VIEW: IMMERSIVE ACTIVE DRILL (100% Full-Screen, Zero-Shift on Freeze, Full Horizontal/Vertical Support)
+  // =========================================================================
+  if (phase === 'MEMORIZE' || phase === 'TRACKING' || phase === 'SELECT' || phase === 'FEEDBACK') {
+    return (
+      <div 
+        ref={containerRef}
+        className="fixed inset-0 z-50 w-screen h-screen h-[100dvh] bg-black text-white flex flex-col overflow-hidden select-none"
+      >
+        {/* SLIM ATHLETIC TOP HUD (Height 42-46px, preserves maximum screen space for 3D field) */}
+        <header className="px-2.5 sm:px-4 py-2 bg-zinc-950/95 border-b border-zinc-900 flex items-center justify-between shrink-0 z-40 gap-2 backdrop-blur-md">
+          {/* Left: Pause / Exit button & Phase Status */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <button
+              onClick={handleExitDrill}
+              className="p-1.5 sm:p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold border border-zinc-800"
+              title="Pausar y volver a configuración"
+            >
+              <ArrowLeft size={16} />
+              <span className="hidden sm:inline">Pausar</span>
+            </button>
+
+            {/* Brand Logo Emblem */}
+            <img 
+              src="/owl_vision_logo.jpg" 
+              alt="Owl Vision Pro" 
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-[#D4AF37]/50 object-cover shadow-sm bg-black shrink-0"
+              referrerPolicy="no-referrer"
+            />
+
+            {/* Phase Badge */}
+            <span className={`text-[10px] sm:text-xs font-black uppercase tracking-wider px-2 sm:px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
+              phase === 'MEMORIZE' ? 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40' :
+              phase === 'TRACKING' ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/40' :
+              phase === 'SELECT' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' :
+              'bg-purple-500/15 text-purple-300 border-purple-500/40'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                phase === 'MEMORIZE' ? 'bg-[#D4AF37] animate-pulse' :
+                phase === 'TRACKING' ? 'bg-cyan-400 animate-ping' :
+                phase === 'SELECT' ? 'bg-emerald-400 animate-bounce' : 'bg-purple-400'
+              }`} />
+              {phase === 'MEMORIZE' && `Fase 1 · Memoriza (${numTargets})`}
+              {phase === 'TRACKING' && `Fase 2 · Rastreo`}
+              {phase === 'SELECT' && `Fase 3 · Identifica`}
+              {phase === 'FEEDBACK' && `Fase 4 · Evaluación`}
+            </span>
+
+            {/* Countdown / Counter Badge */}
+            {(phase === 'MEMORIZE' || phase === 'TRACKING') && (
+              <span className={`px-2 py-0.5 rounded-lg border font-mono font-black text-xs sm:text-sm flex items-center gap-1 ${
+                phase === 'MEMORIZE' ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]' : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'
+              }`}>
+                <Clock size={12} />
+                {phaseCountdown}s
+              </span>
+            )}
+            {phase === 'SELECT' && (
+              <span className="px-2 py-0.5 rounded-lg border bg-emerald-500/20 border-emerald-500/40 text-emerald-400 font-mono font-black text-xs sm:text-sm">
+                {selectedSphereIds.length}/{numTargets}
+              </span>
+            )}
+          </div>
+
+          {/* Right: Controls & Metrics */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Orientation Toggle / Status */}
+            <button
+              onClick={toggleOrientationMode}
+              className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-[11px] font-bold border border-zinc-800 flex items-center gap-1 transition-colors"
+              title={`Modo de visualización: ${isLandscape ? 'Horizontal' : 'Vertical'} (Haz clic para alternar)`}
+            >
+              <RotateCw size={13} className="text-[#D4AF37]" />
+              <span className="text-[10px] hidden sm:inline">{isLandscape ? 'Horizontal' : 'Vertical'}</span>
+            </button>
+
+            {/* Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              className={`p-1.5 sm:p-2 rounded-xl border transition-all ${
+                isFullscreen
+                  ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-md shadow-[#D4AF37]/20'
+                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
+              }`}
+              title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa Celular'}
+            >
+              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+
+            {/* Sound Toggle */}
+            <button
+              onClick={() => setSoundEnabled(prev => !prev)}
+              className="p-1.5 sm:p-2 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
+              title="Audio"
+            >
+              {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            </button>
+
+            {/* Speed Badge */}
+            <div className="hidden xs:flex items-center gap-1 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded-xl text-xs font-mono font-bold text-white">
+              <Activity size={12} className="text-[#D4AF37]" />
+              <span>{currentSpeedMultiplier}x</span>
+            </div>
+
+            {/* Round Badge */}
+            <div className="bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-xl text-xs font-mono font-bold text-[#D4AF37]">
+              {currentTrial}/{totalTrials}
+            </div>
+          </div>
+        </header>
+
+        {/* ORIENTATION GUIDANCE TOAST */}
+        {showOrientationHint && (
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black font-black px-4 py-2.5 rounded-2xl shadow-2xl z-50 text-xs flex items-center gap-2 border border-black/20 animate-bounce">
+            <RotateCw size={15} className="animate-spin" />
+            <span>Para cambiar a {isLandscape ? 'Vertical' : 'Horizontal'}, gira tu dispositivo físicamente</span>
+          </div>
+        )}
+
+        {/* 3D ARENA VIEWPORT (EXPANDS TO 100% REMAINING SCREEN - ZERO JUMP OR RESIZE ON SELECT) */}
+        <div className="flex-1 w-full h-full relative overflow-hidden bg-[#060709] flex items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            width={canvasWidth}
+            height={canvasHeight}
+            onClick={e => handleCanvasInteraction(e.clientX, e.clientY)}
+            onTouchStart={e => {
+              if (e.touches && e.touches.length > 0) {
+                handleCanvasInteraction(e.touches[0].clientX, e.touches[0].clientY);
+              }
+            }}
+            className={`w-full h-full object-contain touch-none select-none ${phase === 'SELECT' ? 'cursor-pointer' : 'cursor-default'}`}
+          />
+
+          {/* FLOATING SELECTION DOCK IN SELECT PHASE (DOES NOT DISPLACE OR SHRINK CANVAS) */}
+          {phase === 'SELECT' && (
+            <div 
+              className="absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-lg z-30 pointer-events-auto"
+              onClick={e => e.stopPropagation()}
+              onTouchStart={e => e.stopPropagation()}
+            >
+              <div className="bg-zinc-950/95 border border-zinc-700/80 p-2 sm:p-2.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl flex flex-col gap-2">
+                <div className="flex items-center justify-between text-[11px] text-zinc-300 font-bold uppercase tracking-wider px-1">
+                  <span className="flex items-center gap-1.5 text-white">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Toca las esferas en 3D o en el teclado:
+                  </span>
+                  <span className="text-emerald-400 font-mono font-bold">
+                    {selectedSphereIds.length} de {numTargets} Seleccionadas
+                  </span>
+                </div>
+
+                {/* 1 to 8 keypad */}
+                <div className="grid grid-cols-8 gap-1 sm:gap-1.5">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
+                    const isSel = selectedSphereIds.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => toggleSphereById(id)}
+                        className={`py-2 rounded-xl font-mono font-black text-sm sm:text-base transition-transform active:scale-90 border ${
+                          isSel
+                            ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.7)] scale-105'
+                            : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                        }`}
+                      >
+                        {id}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Instant Confirm / Comprobar Button */}
+                <button
+                  onClick={handleConfirmSelection}
+                  disabled={selectedSphereIds.length === 0}
+                  className={`w-full py-2.5 sm:py-3 font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-xl ${
+                    selectedSphereIds.length >= numTargets
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] animate-pulse'
+                      : selectedSphereIds.length > 0
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
+                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                  }`}
+                >
+                  <CheckCircle2 size={18} /> Comprobar Selección ({selectedSphereIds.length}/{numTargets})
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* FLOATING FEEDBACK STATUS BADGE */}
+          {phase === 'FEEDBACK' && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-950/90 border border-zinc-800 px-4 py-2 rounded-xl text-xs font-mono font-bold text-[#D4AF37] shadow-xl z-30 flex items-center gap-2 backdrop-blur-md">
+              <Activity size={14} className="text-emerald-400 animate-spin" />
+              <span>Evaluando repetición... Siguiente en 1s</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW: CONFIGURATION & SUMMARY (Regular Dashboard View)
+  // =========================================================================
   return (
     <div 
       ref={containerRef}
@@ -681,17 +946,24 @@ export const NeuroTrackerScreen: React.FC = () => {
                 navigate('/neuro');
               }
             }}
-            className="p-2 sm:p-2.5 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
+            className="p-2 sm:p-2.5 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors shrink-0"
           >
             <ArrowLeft size={18} />
           </button>
+          <img 
+            src="/owl_vision_logo.jpg" 
+            alt="Owl Vision Pro" 
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-[#D4AF37]/50 object-cover shadow-[0_0_15px_rgba(212,175,55,0.3)] bg-black shrink-0"
+            referrerPolicy="no-referrer"
+          />
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20 flex items-center gap-1">
-                <Brain size={12} /> NeuroTracker 3D-MOT
+                OWL VISION PRO
               </span>
+              <span className="text-[10px] text-zinc-400 font-mono">WLSPORTS</span>
             </div>
-            <h1 className="text-sm sm:text-lg font-black text-white leading-tight">Seguimiento 3D de Múltiples Objetos</h1>
+            <h1 className="text-sm sm:text-lg font-black text-white leading-tight">NeuroTracker 3D-MOT</h1>
           </div>
         </div>
 
@@ -1130,241 +1402,6 @@ export const NeuroTrackerScreen: React.FC = () => {
               <Play size={18} fill="currentColor" /> Iniciar Sesión ({initialSpeed}x inicial)
             </button>
           </motion.div>
-        )}
-
-        {/* VIEW 2: 3D INTERACTIVE ARENA */}
-        {(phase === 'MEMORIZE' || phase === 'TRACKING' || phase === 'SELECT' || phase === 'FEEDBACK') && (
-          <div className="w-full max-w-7xl flex flex-col items-center flex-1 justify-between min-h-0 relative">
-            {/* UNIFIED PHASE HUD - POSITIONED CLEARLY OUTSIDE THE 3D ARENA (NEVER OBSCURING SPHERES) */}
-            <div className="w-full bg-zinc-950/90 border border-zinc-800/90 rounded-2xl p-2.5 sm:p-3 mb-2 shrink-0 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                {/* Phase Status & Visual Guidance */}
-                <div className="flex items-center gap-3">
-                  <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${
-                    phase === 'MEMORIZE' ? 'bg-[#D4AF37] ring-4 ring-[#D4AF37]/30 animate-pulse' :
-                    phase === 'TRACKING' ? 'bg-cyan-400 ring-4 ring-cyan-400/30 animate-ping' :
-                    phase === 'SELECT' ? 'bg-emerald-400 ring-4 ring-emerald-400/30 animate-bounce' :
-                    'bg-purple-400 ring-4 ring-purple-400/30'
-                  }`} />
-                  
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[11px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                        phase === 'MEMORIZE' ? 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40' :
-                        phase === 'TRACKING' ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/40' :
-                        phase === 'SELECT' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' :
-                        'bg-purple-500/15 text-purple-300 border-purple-500/40'
-                      }`}>
-                        {phase === 'MEMORIZE' && `Fase 1 · Memorización`}
-                        {phase === 'TRACKING' && `Fase 2 · Rastreo Activo`}
-                        {phase === 'SELECT' && `Fase 3 · Identificación`}
-                        {phase === 'FEEDBACK' && `Fase 4 · Evaluación`}
-                      </span>
-
-                      {phase === 'MEMORIZE' && (
-                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
-                          Memoriza las <strong className="text-[#D4AF37]">{numTargets} esferas doradas</strong>
-                        </span>
-                      )}
-                      {phase === 'TRACKING' && (
-                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
-                          ¡Sigue las esferas en movimiento!
-                        </span>
-                      )}
-                      {phase === 'SELECT' && (
-                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
-                          Toca las <strong className="text-emerald-400">{numTargets} esferas</strong> memorizadas
-                        </span>
-                      )}
-                      {phase === 'FEEDBACK' && (
-                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
-                          Resultado de la repetición
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 h-4 sm:h-5 truncate">
-                      {phase === 'MEMORIZE' && 'Las esferas están estáticas para fijar tu memoria visual. El movimiento comenzará al terminar la cuenta atrás.'}
-                      {phase === 'TRACKING' && 'Mantén la mirada en los objetivos mientras rebotan libremente en el espacio 3D.'}
-                      {phase === 'SELECT' && `Toca las esferas directamente en el visor 3D o pulsa los números en el teclado abajo.`}
-                      {phase === 'FEEDBACK' && 'Verde: Acierto | Dorado: Objetivo sin marcar | Rojo: Esfera incorrecta.'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right metrics: Live countdown timer, counter & trial progress */}
-                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                  {/* Live Countdown */}
-                  {(phase === 'MEMORIZE' || phase === 'TRACKING') && (
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-mono font-black text-xs sm:text-sm ${
-                      phase === 'MEMORIZE' 
-                        ? 'bg-[#D4AF37]/15 border-[#D4AF37]/40 text-[#D4AF37]' 
-                        : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400'
-                    }`}>
-                      <Clock size={14} />
-                      <span>{phaseCountdown}s</span>
-                    </div>
-                  )}
-
-                  {/* Select counter */}
-                  {phase === 'SELECT' && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-mono font-black text-xs sm:text-sm">
-                      <span>{selectedSphereIds.length}/{numTargets}</span>
-                    </div>
-                  )}
-
-                  {/* Speed badge */}
-                  <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 rounded-xl">
-                    <Activity size={13} className="text-[#D4AF37]" />
-                    <span className="text-xs font-mono font-bold text-white">{currentSpeedMultiplier}x</span>
-                  </div>
-
-                  {/* Trial progress badge */}
-                  <div className="bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 rounded-xl text-center">
-                    <span className="text-[10px] font-mono text-zinc-400">Rnd </span>
-                    <span className="text-xs font-mono font-bold text-[#D4AF37]">{currentTrial}/{totalTrials}</span>
-                  </div>
-
-                  {/* Fullscreen Button */}
-                  <button
-                    onClick={toggleFullscreen}
-                    className="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white"
-                    title="Pantalla Completa"
-                  >
-                    {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* CANVAS 3D BOX (100% CONSTANT SIZE - NEVER SHRINKS OR SHIFTS BALLS ON FREEZE) */}
-            <div className={`relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-zinc-800 shadow-2xl bg-[#060709] flex items-center justify-center ${
-              isFullscreen 
-                ? 'flex-1 min-h-[280px] w-full' 
-                : 'flex-1 min-h-[300px] sm:min-h-[440px] max-h-[72vh] w-full'
-            }`}>
-              <canvas
-                ref={canvasRef}
-                width={1100}
-                height={650}
-                onClick={e => handleCanvasInteraction(e.clientX, e.clientY)}
-                onTouchStart={e => {
-                  if (e.touches && e.touches.length > 0) {
-                    handleCanvasInteraction(e.touches[0].clientX, e.touches[0].clientY);
-                  }
-                }}
-                className={`w-full h-full object-contain touch-none select-none ${phase === 'SELECT' ? 'cursor-pointer' : 'cursor-default'}`}
-              />
-            </div>
-
-            {/* CONSTANT-HEIGHT BOTTOM PANEL (RESERVES IDENTICAL SPACE ACROSS ALL PHASES TO PREVENT CANVAS RESIZING) */}
-            <div className="w-full max-w-xl shrink-0 mt-2 sm:mt-2.5 h-[116px] sm:h-[126px] flex flex-col justify-center z-30">
-              {/* 1. SELECT PHASE: Keypad + Confirm Button */}
-              {phase === 'SELECT' && (
-                <div className="flex flex-col items-center gap-2 w-full h-full justify-between">
-                  {/* Numeric quick-tap keypad for easy selection on mobile */}
-                  <div className="w-full bg-zinc-950/95 border border-zinc-800 p-2 rounded-2xl shadow-xl backdrop-blur-md">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 font-bold uppercase tracking-wider px-2 mb-1">
-                      <span>Teclado Rápido (1 al 8):</span>
-                      <span className="text-emerald-400 font-mono font-bold">
-                        {selectedSphereIds.length} de {numTargets} Seleccionadas
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-8 gap-1.5 sm:gap-2">
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
-                        const isSel = selectedSphereIds.includes(id);
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => toggleSphereById(id)}
-                            className={`py-2 rounded-xl font-mono font-black text-sm sm:text-base transition-transform active:scale-90 border ${
-                              isSel
-                                ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.7)] scale-105'
-                                : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
-                            }`}
-                          >
-                            {id}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Instant Confirm / Comprobar Button */}
-                  <button
-                    onClick={handleConfirmSelection}
-                    disabled={selectedSphereIds.length === 0}
-                    className={`w-full py-3 sm:py-3.5 font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-xl ${
-                      selectedSphereIds.length >= numTargets
-                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] animate-pulse'
-                        : selectedSphereIds.length > 0
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
-                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                    }`}
-                  >
-                    <CheckCircle2 size={18} /> Comprobar / Confirmar Selección ({selectedSphereIds.length}/{numTargets})
-                  </button>
-                </div>
-              )}
-
-              {/* 2. MEMORIZE PHASE: Focus telemetry panel (same height) */}
-              {phase === 'MEMORIZE' && (
-                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl border border-[#D4AF37]/30 shrink-0">
-                      <Sparkles size={20} className="animate-spin" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-black text-white">Fase 1: Fijación Atencional</p>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">Memoriza los <strong className="text-[#D4AF37]">{numTargets} objetivos dorados</strong> antes de iniciar el movimiento.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37] rounded-xl font-mono font-black text-sm shrink-0">
-                    <Clock size={15} />
-                    <span>{phaseCountdown}s</span>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. TRACKING PHASE: Active tracking telemetry panel (same height) */}
-              {phase === 'TRACKING' && (
-                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/30 shrink-0">
-                      <FastForward size={20} className="animate-pulse" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-black text-white">Fase 2: Rastreo Activo en Curso</p>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">Velocidad: <strong className="text-cyan-400">{currentSpeedMultiplier}x</strong> · Sigue las esferas con tu visión periférica.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded-xl font-mono font-black text-sm shrink-0">
-                    <Activity size={15} />
-                    <span>{phaseCountdown}s</span>
-                  </div>
-                </div>
-              )}
-
-              {/* 4. FEEDBACK PHASE: Evaluation panel (same height) */}
-              {phase === 'FEEDBACK' && (
-                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
-                      <CheckCircle2 size={20} />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-black text-white">Fase 4: Análisis de Repetición</p>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">Verde: Acierto | Dorado: Objetivo sin marcar | Rojo: Incorrecta.</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-3 py-1.5 rounded-xl border border-[#D4AF37]/30 shrink-0">
-                    Siguiente en 1s...
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
         )}
 
         {/* VIEW 3: SUMMARY & FIRESTORE SAVE */}

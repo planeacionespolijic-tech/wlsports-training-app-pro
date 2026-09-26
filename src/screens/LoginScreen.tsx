@@ -75,16 +75,22 @@ export const LoginScreen = ({ externalError }: { externalError?: string | null }
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center mb-6"
+          className="text-center mb-6 flex flex-col items-center"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl mb-4 shadow-2xl">
-            <Activity size={40} className="text-[#D4AF37]" />
+          <div className="relative mb-3 group">
+            <div className="absolute inset-0 rounded-full bg-[#D4AF37]/20 blur-xl group-hover:bg-[#D4AF37]/35 transition-all animate-pulse" />
+            <img 
+              src="/owl_vision_logo.jpg" 
+              alt="Owl Vision Pro WLSPORTS" 
+              className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover border-2 border-[#D4AF37]/60 shadow-[0_0_35px_rgba(212,175,55,0.45)] bg-black"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-2">
-            WL<span className="text-[#D4AF37]">SPORTS</span>
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight mb-1 text-white">
+            OWL VISION <span className="text-[#D4AF37]">PRO</span>
           </h1>
-          <p className="text-zinc-400 text-xs sm:text-sm uppercase tracking-[0.3em] font-bold">
-            Elite Performance Tracking
+          <p className="text-[#D4AF37] text-xs sm:text-sm font-black uppercase tracking-[0.25em]">
+            WLSPORTS · Elite Performance
           </p>
         </motion.div>
 

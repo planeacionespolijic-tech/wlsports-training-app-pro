@@ -46,9 +46,21 @@ const InitialEvaluationScreen = lazy(() => import('./screens/evaluation/InitialE
 
 // Global Loading Component
 const PageLoader = () => (
-  <div className="min-h-screen min-h-[100dvh] bg-black flex flex-col items-center justify-center">
-    <Loader2 className="text-[#D4AF37] animate-spin mb-4" size={48} />
-    <p className="text-zinc-500 font-medium animate-pulse uppercase tracking-[0.2em] text-[10px]">WLSPORTS</p>
+  <div className="min-h-screen min-h-[100dvh] bg-black flex flex-col items-center justify-center p-4">
+    <div className="relative mb-4">
+      <div className="absolute inset-0 rounded-full bg-[#D4AF37]/25 blur-xl animate-pulse" />
+      <img 
+        src="/owl_vision_logo.jpg" 
+        alt="Owl Vision Pro WLSPORTS" 
+        className="relative w-20 h-20 rounded-full object-cover border-2 border-[#D4AF37]/50 shadow-[0_0_25px_rgba(212,175,55,0.4)]"
+        referrerPolicy="no-referrer"
+      />
+      <div className="absolute -bottom-1 -right-1 bg-black rounded-full p-1 border border-[#D4AF37]/40 shadow-lg">
+        <Loader2 className="text-[#D4AF37] animate-spin" size={16} />
+      </div>
+    </div>
+    <h2 className="text-white font-black text-sm tracking-widest uppercase">OWL VISION PRO</h2>
+    <p className="text-[#D4AF37] font-bold tracking-[0.25em] text-[10px] uppercase mt-0.5 animate-pulse">WLSPORTS</p>
   </div>
 );
 

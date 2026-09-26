@@ -190,13 +190,16 @@ export const PWAInstallButton: React.FC<{ className?: string; variant?: 'floatin
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
-                  <Smartphone className="w-5 h-5" />
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img 
+                  src="/owl_vision_logo.jpg" 
+                  alt="Owl Vision Pro WLSPORTS" 
+                  className="w-10 h-10 rounded-xl object-cover border-2 border-[#D4AF37]/50 shadow-md shrink-0 bg-black"
+                  referrerPolicy="no-referrer"
+                />
                 <div>
-                  <h3 className="font-bold text-sm text-white">Instalación Nativa</h3>
-                  <p className="text-[11px] text-zinc-400">WLSPORTS WebAPK Oficial</p>
+                  <h3 className="font-bold text-sm text-white">OWL VISION PRO</h3>
+                  <p className="text-[11px] text-[#D4AF37] font-semibold">WLSPORTS WebAPK Oficial</p>
                 </div>
               </div>
               <button 

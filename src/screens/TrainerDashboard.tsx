@@ -483,7 +483,19 @@ export const TrainerDashboard = ({ onNavigate }: any) => {
       <header className="p-4 sm:p-6 pt-safe border-b border-zinc-900 bg-black/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
+            <img 
+              src="/owl_vision_logo.jpg" 
+              alt="Owl Vision Pro WLSPORTS" 
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-[#D4AF37]/50 object-cover shadow-[0_0_20px_rgba(212,175,55,0.35)] bg-black shrink-0"
+              referrerPolicy="no-referrer"
+            />
             <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20">
+                  WLSPORTS
+                </span>
+                <span className="text-[10px] text-zinc-400 font-mono">OWL VISION PRO</span>
+              </div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight">Panel <span className="text-[#D4AF37]">Entrenador</span></h1>
               <p className="text-zinc-400 text-xs uppercase tracking-wider font-bold mt-0.5">Gestión de Alto Rendimiento</p>
             </div>
