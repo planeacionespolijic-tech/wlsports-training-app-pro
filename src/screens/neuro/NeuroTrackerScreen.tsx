@@ -36,11 +36,14 @@ export const NeuroTrackerScreen: React.FC = () => {
   // === Configuration Parameters ===
   const [numTargets, setNumTargets] = useState<number>(3); // 1 to 4 targets
   const [initialSpeed, setInitialSpeed] = useState<number>(1.5); // 0.8x, 1.2x, 1.5x, 2.0x, 2.5x
-  const [trackingDurationSec, setTrackingDurationSec] = useState<number>(6); // 4, 6, 8, 10, 12, 15s
+  const [memorizeDurationSec, setMemorizeDurationSec] = useState<number>(4); // Visualización/Memorización Fase 1 (2 a 15s)
+  const [trackingDurationSec, setTrackingDurationSec] = useState<number>(6); // Rastreo Fase 2 (2 a 60s)
   const [totalTrials, setTotalTrials] = useState<number>(10);
   const [dualTask, setDualTask] = useState<string>('VISUAL_ONLY');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [sphereSize, setSphereSize] = useState<'STANDARD' | 'LARGE' | 'COMPACT'>('LARGE'); // Larger for mobile
+  const [autoFullscreenOnStart, setAutoFullscreenOnStart] = useState<boolean>(true);
+  type SphereSizeType = 'JUMBO' | 'LARGE' | 'STANDARD' | 'COMPACT';
+  const [sphereSize, setSphereSize] = useState<SphereSizeType>('JUMBO'); // Jumbo default for optimal mobile and desktop visibility
 
   // === Session State ===
   const [phase, setPhase] = useState<Phase>('CONFIG');
@@ -168,15 +171,25 @@ export const NeuroTrackerScreen: React.FC = () => {
       targetIndices.add(Math.floor(Math.random() * totalSpheres));
     }
 
-    // Adapt sphere radius for mobile visibility
-    const baseRadius = sphereSize === 'LARGE' ? 32 : sphereSize === 'STANDARD' ? 26 : 22;
+    // Adaptive sphere radius for mobile visibility and crisp perception on all screens
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const mobileBoost = isMobile ? 1.25 : 1.0;
+
+    let baseRadius = 40;
+    if (sphereSize === 'JUMBO') baseRadius = 50;
+    else if (sphereSize === 'LARGE') baseRadius = 40;
+    else if (sphereSize === 'STANDARD') baseRadius = 32;
+    else if (sphereSize === 'COMPACT') baseRadius = 25;
+
+    baseRadius = Math.round(baseRadius * mobileBoost);
+
     // Enhanced speed calculation: base 3.2 x multiplier
     const speed = 3.2 * speedMult;
 
     for (let i = 0; i < totalSpheres; i++) {
-      const x = (Math.random() - 0.5) * 440;
-      const y = (Math.random() - 0.5) * 280;
-      const z = 380 + Math.random() * 320;
+      const x = (Math.random() - 0.5) * 620;
+      const y = (Math.random() - 0.5) * 320;
+      const z = 360 + Math.random() * 320;
 
       const angleXY = Math.random() * Math.PI * 2;
       const angleZ = (Math.random() - 0.5) * Math.PI;
@@ -221,22 +234,24 @@ export const NeuroTrackerScreen: React.FC = () => {
     const height = canvas.height;
     const centerX = width / 2;
     const centerY = height / 2;
-    const focalLength = 480;
+    const focalLength = 520;
 
     // Clear background
     ctx.fillStyle = '#060709';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw 3D Wireframe Boundary Box
+    // Draw 3D Wireframe Boundary Box - Wide, expansive athletic arena
+    const boxHalfW = 420;
+    const boxHalfH = 220;
     const boxCorners = [
-      { x: -290, y: -190, z: 320 },
-      { x: 290, y: -190, z: 320 },
-      { x: 290, y: 190, z: 320 },
-      { x: -290, y: 190, z: 320 },
-      { x: -290, y: -190, z: 720 },
-      { x: 290, y: -190, z: 720 },
-      { x: 290, y: 190, z: 720 },
-      { x: -290, y: 190, z: 720 }
+      { x: -boxHalfW, y: -boxHalfH, z: 320 },
+      { x: boxHalfW, y: -boxHalfH, z: 320 },
+      { x: boxHalfW, y: boxHalfH, z: 320 },
+      { x: -boxHalfW, y: boxHalfH, z: 320 },
+      { x: -boxHalfW, y: -boxHalfH, z: 740 },
+      { x: boxHalfW, y: -boxHalfH, z: 740 },
+      { x: boxHalfW, y: boxHalfH, z: 740 },
+      { x: -boxHalfW, y: boxHalfH, z: 740 }
     ];
 
     const project = (pt: { x: number; y: number; z: number }) => {
@@ -285,10 +300,10 @@ export const NeuroTrackerScreen: React.FC = () => {
 
     // Physics step during TRACKING phase
     if (currentP === 'TRACKING') {
-      const boundX = 270;
-      const boundY = 170;
-      const minZ = 340;
-      const maxZ = 690;
+      const boundX = 385;
+      const boundY = 190;
+      const minZ = 330;
+      const maxZ = 710;
 
       spheres.forEach(s => {
         s.x += s.vx;
@@ -309,10 +324,14 @@ export const NeuroTrackerScreen: React.FC = () => {
     // Sort by Z descending
     const sortedSpheres = [...spheres].sort((a, b) => b.z - a.z);
 
+    const isMobile = width < 640 || (typeof window !== 'undefined' && window.innerWidth < 640);
+    const minRadiusFloor = isMobile ? 22 : 16;
+
     sortedSpheres.forEach(s => {
       const proj = project(s);
-      const r = s.radius * proj.scale;
-      const depthRatio = Math.max(0.3, Math.min(1.0, (750 - s.z) / 420));
+      // Guarantee spheres never look like tiny specks, even at the deepest distance
+      const r = Math.max(minRadiusFloor, s.radius * proj.scale);
+      const depthRatio = Math.max(0.35, Math.min(1.0, (750 - s.z) / 400));
 
       ctx.save();
 
@@ -322,27 +341,27 @@ export const NeuroTrackerScreen: React.FC = () => {
       if (currentP === 'MEMORIZE') {
         if (s.isTarget) {
           mainColor = '#D4AF37';
-          haloColor = 'rgba(212, 175, 55, 0.7)';
+          haloColor = 'rgba(212, 175, 55, 0.75)';
         }
       } else if (currentP === 'TRACKING') {
         mainColor = '#94a3b8';
       } else if (currentP === 'SELECT') {
         if (s.selected) {
           mainColor = '#06B6D4';
-          haloColor = 'rgba(6, 182, 212, 0.7)';
+          haloColor = 'rgba(6, 182, 212, 0.75)';
         } else {
           mainColor = '#cbd5e1';
         }
       } else if (currentP === 'FEEDBACK') {
         if (s.isTarget && s.selected) {
           mainColor = '#10B981';
-          haloColor = 'rgba(16, 185, 129, 0.8)';
+          haloColor = 'rgba(16, 185, 129, 0.85)';
         } else if (s.isTarget && !s.selected) {
           mainColor = '#D4AF37';
-          haloColor = 'rgba(212, 175, 55, 0.8)';
+          haloColor = 'rgba(212, 175, 55, 0.85)';
         } else if (!s.isTarget && s.selected) {
           mainColor = '#EF4444';
-          haloColor = 'rgba(239, 68, 68, 0.8)';
+          haloColor = 'rgba(239, 68, 68, 0.85)';
         } else {
           mainColor = '#475569';
         }
@@ -351,7 +370,7 @@ export const NeuroTrackerScreen: React.FC = () => {
       // Glow halo
       if (haloColor) {
         ctx.beginPath();
-        ctx.arc(proj.x, proj.y, r * 1.5, 0, Math.PI * 2);
+        ctx.arc(proj.x, proj.y, r * 1.45, 0, Math.PI * 2);
         ctx.fillStyle = haloColor;
         ctx.fill();
       }
@@ -370,25 +389,28 @@ export const NeuroTrackerScreen: React.FC = () => {
       );
 
       if (mainColor === '#D4AF37') {
-        grad.addColorStop(0, '#FFF5C0');
-        grad.addColorStop(0.3, '#E6C158');
-        grad.addColorStop(0.8, '#9E7D1A');
-        grad.addColorStop(1, '#4A3B0A');
+        grad.addColorStop(0, '#FFFBEB');
+        grad.addColorStop(0.3, '#F59E0B');
+        grad.addColorStop(0.8, '#B45309');
+        grad.addColorStop(1, '#451A03');
       } else if (mainColor === '#10B981') {
-        grad.addColorStop(0, '#A7F3D0');
-        grad.addColorStop(0.4, '#10B981');
+        grad.addColorStop(0, '#D1FAE5');
+        grad.addColorStop(0.3, '#10B981');
+        grad.addColorStop(0.8, '#047857');
         grad.addColorStop(1, '#064E3B');
       } else if (mainColor === '#EF4444') {
-        grad.addColorStop(0, '#FECACA');
-        grad.addColorStop(0.4, '#EF4444');
+        grad.addColorStop(0, '#FEE2E2');
+        grad.addColorStop(0.3, '#EF4444');
+        grad.addColorStop(0.8, '#B91C1C');
         grad.addColorStop(1, '#7F1D1D');
       } else if (mainColor === '#06B6D4') {
-        grad.addColorStop(0, '#CFFAFE');
-        grad.addColorStop(0.4, '#06B6D4');
+        grad.addColorStop(0, '#ECFEFF');
+        grad.addColorStop(0.3, '#06B6D4');
+        grad.addColorStop(0.8, '#0E7490');
         grad.addColorStop(1, '#164E63');
       } else {
-        const lightValue = Math.round(200 * depthRatio);
-        const shadowValue = Math.round(50 * depthRatio);
+        const lightValue = Math.round(210 * depthRatio);
+        const shadowValue = Math.round(55 * depthRatio);
         grad.addColorStop(0, `rgb(${lightValue + 40}, ${lightValue + 40}, ${lightValue + 40})`);
         grad.addColorStop(0.5, `rgb(${lightValue}, ${lightValue}, ${lightValue})`);
         grad.addColorStop(1, `rgb(${shadowValue}, ${shadowValue}, ${shadowValue})`);
@@ -396,14 +418,14 @@ export const NeuroTrackerScreen: React.FC = () => {
 
       ctx.fillStyle = grad;
       ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 * depthRatio})`;
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 * depthRatio})`;
       ctx.stroke();
 
-      // Number badge in SELECT or FEEDBACK
+      // Number badge in SELECT or FEEDBACK (Bold and highly legible)
       if (currentP === 'SELECT' || currentP === 'FEEDBACK') {
         ctx.fillStyle = s.selected ? '#000000' : '#FFFFFF';
-        ctx.font = `bold ${Math.round(r * 0.95)}px monospace`;
+        ctx.font = `900 ${Math.max(14, Math.round(r * 1.05))}px system-ui, -apple-system, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(s.id.toString(), proj.x, proj.y);
@@ -439,20 +461,23 @@ export const NeuroTrackerScreen: React.FC = () => {
     const clickX = (clientX - rect.left) * (canvas.width / rect.width);
     const clickY = (clientY - rect.top) * (canvas.height / rect.height);
 
-    const focalLength = 480;
+    const focalLength = 520;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
+    const isMobile = canvas.width < 640 || (typeof window !== 'undefined' && window.innerWidth < 640);
+    const minRadiusFloor = isMobile ? 22 : 16;
 
     const sorted = [...spheresRef.current].sort((a, b) => a.z - b.z);
     for (const sphere of sorted) {
       const scale = focalLength / sphere.z;
       const projX = centerX + sphere.x * scale;
       const projY = centerY + sphere.y * scale;
-      const r = sphere.radius * scale;
+      const r = Math.max(minRadiusFloor, sphere.radius * scale);
 
-      // Touch target on mobile (generous 1.8x radius for effortless tapping)
+      // Touch target on mobile (generous tolerance for effortless fingertip selection)
+      const hitTolerance = Math.max(r * 1.8, r + 24);
       const dist = Math.hypot(clickX - projX, clickY - projY);
-      if (dist <= r * 1.8) {
+      if (dist <= hitTolerance) {
         toggleSphereById(sphere.id);
         break;
       }
@@ -467,11 +492,11 @@ export const NeuroTrackerScreen: React.FC = () => {
     initializeSpheres(numTargets, speedVal);
     setPhase('MEMORIZE');
     phaseRef.current = 'MEMORIZE';
-    setPhaseCountdown(2);
+    setPhaseCountdown(memorizeDurationSec);
     playChime('target_highlight');
 
-    // Countdown during memorize (2s -> 1s -> 0s)
-    let memorizeRemaining = 2;
+    // Countdown during memorize (e.g. 4s -> 3s -> 2s -> 1s -> 0s)
+    let memorizeRemaining = memorizeDurationSec;
     countdownIntervalRef.current = setInterval(() => {
       memorizeRemaining -= 1;
       setPhaseCountdown(memorizeRemaining);
@@ -480,7 +505,7 @@ export const NeuroTrackerScreen: React.FC = () => {
       }
     }, 1000);
 
-    // 2s Memorize Targets -> Tracking
+    // Memorize Targets -> Tracking
     phaseTimerRef.current = setTimeout(() => {
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       setPhase('TRACKING');
@@ -502,8 +527,8 @@ export const NeuroTrackerScreen: React.FC = () => {
         setPhase('SELECT');
         phaseRef.current = 'SELECT';
       }, trackingDurationSec * 1000);
-    }, 2000);
-  }, [initializeSpheres, numTargets, trackingDurationSec, playChime]);
+    }, memorizeDurationSec * 1000);
+  }, [initializeSpheres, numTargets, memorizeDurationSec, trackingDurationSec, playChime]);
 
   // Confirm selection in SELECT phase
   const handleConfirmSelection = () => {
@@ -559,6 +584,10 @@ export const NeuroTrackerScreen: React.FC = () => {
 
   // Launch Session
   const handleStartSession = () => {
+    // Automatically span full screen when starting activity
+    if (autoFullscreenOnStart && !isFullscreen) {
+      toggleFullscreen().catch(() => {});
+    }
     setCurrentTrial(1);
     setCurrentSpeedMultiplier(initialSpeed);
     setTrialResults([]);
@@ -699,7 +728,7 @@ export const NeuroTrackerScreen: React.FC = () => {
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-start sm:justify-center p-2 sm:p-4 md:p-6 relative overflow-y-auto w-full">
         {/* VIEW 1: CONFIGURATION */}
         {phase === 'CONFIG' && (
           <motion.div 
@@ -808,45 +837,52 @@ export const NeuroTrackerScreen: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
-                    Tamaño de Esferas (Optimización Móvil)
+                    Tamaño de Esferas (Optimización de Visibilidad Móvil y PC)
                   </label>
                   <span className="text-xs font-mono font-bold text-[#D4AF37]">
-                    {sphereSize === 'LARGE' ? 'Grande (Móvil Recomendado)' : sphereSize === 'STANDARD' ? 'Estándar' : 'Compacto'}
+                    {sphereSize === 'JUMBO' ? 'Gigante (Recomendado Celular)' :
+                     sphereSize === 'LARGE' ? 'Grande (Muy Visible)' :
+                     sphereSize === 'STANDARD' ? 'Medio (Pantallas Grandes)' : 'Compacto'}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { key: 'STANDARD', label: 'Estándar' },
-                    { key: 'LARGE', label: 'Grande (Móvil)' },
-                    { key: 'COMPACT', label: 'Compacto' }
+                    { key: 'JUMBO', label: 'Gigante (Móvil)', desc: 'Máxima visibilidad' },
+                    { key: 'LARGE', label: 'Grande', desc: 'Recomendado' },
+                    { key: 'STANDARD', label: 'Medio', desc: 'Pantalla PC' },
+                    { key: 'COMPACT', label: 'Compacto', desc: 'Reto fino' }
                   ].map(s => (
                     <button
                       key={s.key}
                       type="button"
                       onClick={() => setSphereSize(s.key as any)}
-                      className={`py-2 rounded-xl font-bold text-xs transition-all border ${
+                      className={`p-2.5 rounded-xl font-bold text-xs transition-all border flex flex-col items-center gap-0.5 ${
                         sphereSize === s.key
-                          ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                          ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-lg shadow-[#D4AF37]/20 font-black'
                           : 'bg-zinc-800/80 text-zinc-300 border-zinc-700/60 hover:bg-zinc-800'
                       }`}
                     >
-                      {s.label}
+                      <span>{s.label}</span>
+                      <span className={`text-[10px] ${sphereSize === s.key ? 'text-black/80 font-medium' : 'text-zinc-500'}`}>{s.desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Tracking duration & Rounds Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. CUSTOM TRACKING DURATION */}
+              {/* Durations, Rounds & Fullscreen Configuration */}
+              <div className="space-y-4">
+                {/* 1. VISUALIZATION / MEMORIZATION DURATION (FASE 1) */}
                 <div className="bg-black/50 border border-zinc-800/80 p-3.5 rounded-2xl space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <Clock size={14} className="text-[#D4AF37]" />
-                      Duración Rastreando
-                    </label>
-                    <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-0.5 rounded-lg border border-[#D4AF37]/30">
-                      {trackingDurationSec} Segundos
+                    <div>
+                      <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Clock size={14} className="text-[#D4AF37]" />
+                        Tiempo para Visualizar / Memorizar (Fase 1)
+                      </label>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">Segundos con las esferas doradas inmóviles para fijarlas en la memoria.</p>
+                    </div>
+                    <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-0.5 rounded-lg border border-[#D4AF37]/30 shrink-0">
+                      {memorizeDurationSec} Segundos
                     </span>
                   </div>
 
@@ -854,7 +890,7 @@ export const NeuroTrackerScreen: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setTrackingDurationSec(prev => Math.max(2, prev - 1))}
+                      onClick={() => setMemorizeDurationSec(prev => Math.max(2, prev - 1))}
                       className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
                       title="Restar 1 segundo"
                     >
@@ -864,16 +900,16 @@ export const NeuroTrackerScreen: React.FC = () => {
                     <input
                       type="range"
                       min={2}
-                      max={60}
+                      max={15}
                       step={1}
-                      value={trackingDurationSec}
-                      onChange={e => setTrackingDurationSec(Number(e.target.value))}
+                      value={memorizeDurationSec}
+                      onChange={e => setMemorizeDurationSec(Number(e.target.value))}
                       className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
                     />
 
                     <button
                       type="button"
-                      onClick={() => setTrackingDurationSec(prev => Math.min(60, prev + 1))}
+                      onClick={() => setMemorizeDurationSec(prev => Math.min(15, prev + 1))}
                       className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
                       title="Sumar 1 segundo"
                     >
@@ -886,90 +922,184 @@ export const NeuroTrackerScreen: React.FC = () => {
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1.5">
                       Atajos rápidos:
                     </span>
-                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
-                      {[3, 5, 8, 10, 15, 20, 30, 45].map(sec => (
+                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
+                      {[2, 3, 4, 5, 6, 8, 10].map(sec => (
                         <button
                           key={sec}
                           type="button"
-                          onClick={() => setTrackingDurationSec(sec)}
+                          onClick={() => setMemorizeDurationSec(sec)}
                           className={`py-1.5 rounded-lg font-bold text-xs transition-all border text-center ${
-                            trackingDurationSec === sec
+                            memorizeDurationSec === sec
                               ? 'bg-[#D4AF37] text-black border-[#D4AF37] font-black shadow-sm'
                               : 'bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
                           }`}
                         >
-                          {sec}s
+                          {sec}s {sec === 4 ? '★' : ''}
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                {/* 2. CUSTOM ROUNDS / TRIALS */}
-                <div className="bg-black/50 border border-zinc-800/80 p-3.5 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <RotateCw size={14} className="text-[#D4AF37]" />
-                      Cantidad de Rounds
-                    </label>
-                    <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-0.5 rounded-lg border border-[#D4AF37]/30">
-                      {totalTrials} Rounds
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 2. TRACKING DURATION (FASE 2) */}
+                  <div className="bg-black/50 border border-zinc-800/80 p-3.5 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <FastForward size={14} className="text-cyan-400" />
+                          Duración de Rastreo (Fase 2)
+                        </label>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">Segundos en movimiento.</p>
+                      </div>
+                      <span className="text-xs font-mono font-black text-cyan-400 bg-cyan-400/10 px-2.5 py-0.5 rounded-lg border border-cyan-400/30 shrink-0">
+                        {trackingDurationSec}s
+                      </span>
+                    </div>
 
-                  {/* Stepper + Direct Slider */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTotalTrials(prev => Math.max(1, prev - 1))}
-                      className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
-                      title="Restar 1 round"
-                    >
-                      <Minus size={16} />
-                    </button>
+                    {/* Stepper + Direct Slider */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTrackingDurationSec(prev => Math.max(2, prev - 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
+                        title="Restar 1 segundo"
+                      >
+                        <Minus size={16} />
+                      </button>
 
-                    <input
-                      type="range"
-                      min={1}
-                      max={30}
-                      step={1}
-                      value={totalTrials}
-                      onChange={e => setTotalTrials(Number(e.target.value))}
-                      className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
-                    />
+                      <input
+                        type="range"
+                        min={2}
+                        max={60}
+                        step={1}
+                        value={trackingDurationSec}
+                        onChange={e => setTrackingDurationSec(Number(e.target.value))}
+                        className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                      />
 
-                    <button
-                      type="button"
-                      onClick={() => setTotalTrials(prev => Math.min(30, prev + 1))}
-                      className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
-                      title="Sumar 1 round"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setTrackingDurationSec(prev => Math.min(60, prev + 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
+                        title="Sumar 1 segundo"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
 
-                  {/* Quick Preset Pills */}
-                  <div>
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1.5">
-                      Atajos rápidos:
-                    </span>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
-                      {[3, 5, 8, 10, 15, 20].map(reps => (
-                        <button
-                          key={reps}
-                          type="button"
-                          onClick={() => setTotalTrials(reps)}
-                          className={`py-1.5 rounded-lg font-bold text-xs transition-all border text-center ${
-                            totalTrials === reps
-                              ? 'bg-[#D4AF37] text-black border-[#D4AF37] font-black shadow-sm'
-                              : 'bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
-                          }`}
-                        >
-                          {reps} Rds
-                        </button>
-                      ))}
+                    {/* Quick Preset Pills */}
+                    <div>
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1.5">
+                        Atajos rápidos:
+                      </span>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
+                        {[4, 6, 8, 10, 15, 20, 30, 45].map(sec => (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => setTrackingDurationSec(sec)}
+                            className={`py-1.5 rounded-lg font-bold text-xs transition-all border text-center ${
+                              trackingDurationSec === sec
+                                ? 'bg-cyan-500 text-black border-cyan-400 font-black shadow-sm'
+                                : 'bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
+                            }`}
+                          >
+                            {sec}s
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+
+                  {/* 3. CUSTOM ROUNDS / TRIALS */}
+                  <div className="bg-black/50 border border-zinc-800/80 p-3.5 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <RotateCw size={14} className="text-[#D4AF37]" />
+                        Cantidad de Rounds
+                      </label>
+                      <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-0.5 rounded-lg border border-[#D4AF37]/30">
+                        {totalTrials} Rounds
+                      </span>
+                    </div>
+
+                    {/* Stepper + Direct Slider */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTotalTrials(prev => Math.max(1, prev - 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
+                        title="Restar 1 round"
+                      >
+                        <Minus size={16} />
+                      </button>
+
+                      <input
+                        type="range"
+                        min={1}
+                        max={30}
+                        step={1}
+                        value={totalTrials}
+                        onChange={e => setTotalTrials(Number(e.target.value))}
+                        className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setTotalTrials(prev => Math.min(30, prev + 1))}
+                        className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 shrink-0"
+                        title="Sumar 1 round"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+
+                    {/* Quick Preset Pills */}
+                    <div>
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1.5">
+                        Atajos rápidos:
+                      </span>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                        {[3, 5, 8, 10, 15, 20].map(reps => (
+                          <button
+                            key={reps}
+                            type="button"
+                            onClick={() => setTotalTrials(reps)}
+                            className={`py-1.5 rounded-lg font-bold text-xs transition-all border text-center ${
+                              totalTrials === reps
+                                ? 'bg-[#D4AF37] text-black border-[#D4AF37] font-black shadow-sm'
+                                : 'bg-zinc-900/90 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
+                            }`}
+                          >
+                            {reps} Rds
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auto Fullscreen Option */}
+                <div 
+                  onClick={() => setAutoFullscreenOnStart(prev => !prev)}
+                  className="bg-black/50 border border-zinc-800/80 p-3.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-zinc-700 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl border border-[#D4AF37]/20">
+                      <Maximize2 size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Abarcar toda la pantalla al iniciar (Campo 3D Inmersivo)</p>
+                      <p className="text-[10px] text-zinc-400">Expande el campo visual tridimensional a pantalla completa sin distracciones.</p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoFullscreenOnStart}
+                    onChange={e => setAutoFullscreenOnStart(e.target.checked)}
+                    className="w-5 h-5 rounded accent-[#D4AF37] cursor-pointer"
+                  />
                 </div>
               </div>
 
@@ -1004,49 +1134,119 @@ export const NeuroTrackerScreen: React.FC = () => {
 
         {/* VIEW 2: 3D INTERACTIVE ARENA */}
         {(phase === 'MEMORIZE' || phase === 'TRACKING' || phase === 'SELECT' || phase === 'FEEDBACK') && (
-          <div className="w-full max-w-4xl flex flex-col items-center flex-1 justify-center">
-            {/* Status Header HUD */}
-            <div className="w-full flex items-center justify-between mb-2.5 px-2">
-              <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${
-                  phase === 'MEMORIZE' ? 'bg-[#D4AF37] animate-ping' :
-                  phase === 'TRACKING' ? 'bg-cyan-400 animate-pulse' :
-                  phase === 'SELECT' ? 'bg-emerald-400 animate-bounce' : 'bg-purple-400'
-                }`} />
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-200">
-                  {phase === 'MEMORIZE' && `Fase 1: Memoriza los ${numTargets} dorados (${phaseCountdown}s)`}
-                  {phase === 'TRACKING' && `Fase 2: Rastreando en movimiento (${phaseCountdown}s)`}
-                  {phase === 'SELECT' && `Fase 3: Toca los ${numTargets} objetivos memorizados`}
-                  {phase === 'FEEDBACK' && `Fase 4: Análisis de acierto`}
-                </span>
-              </div>
+          <div className="w-full max-w-7xl flex flex-col items-center flex-1 justify-between min-h-0 relative">
+            {/* UNIFIED PHASE HUD - POSITIONED CLEARLY OUTSIDE THE 3D ARENA (NEVER OBSCURING SPHERES) */}
+            <div className="w-full bg-zinc-950/90 border border-zinc-800/90 rounded-2xl p-2.5 sm:p-3 mb-2 shrink-0 shadow-xl backdrop-blur-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                {/* Phase Status & Visual Guidance */}
+                <div className="flex items-center gap-3">
+                  <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+                    phase === 'MEMORIZE' ? 'bg-[#D4AF37] ring-4 ring-[#D4AF37]/30 animate-pulse' :
+                    phase === 'TRACKING' ? 'bg-cyan-400 ring-4 ring-cyan-400/30 animate-ping' :
+                    phase === 'SELECT' ? 'bg-emerald-400 ring-4 ring-emerald-400/30 animate-bounce' :
+                    'bg-purple-400 ring-4 ring-purple-400/30'
+                  }`} />
+                  
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[11px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                        phase === 'MEMORIZE' ? 'bg-[#D4AF37]/15 text-[#D4AF37] border-[#D4AF37]/40' :
+                        phase === 'TRACKING' ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/40' :
+                        phase === 'SELECT' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' :
+                        'bg-purple-500/15 text-purple-300 border-purple-500/40'
+                      }`}>
+                        {phase === 'MEMORIZE' && `Fase 1 · Memorización`}
+                        {phase === 'TRACKING' && `Fase 2 · Rastreo Activo`}
+                        {phase === 'SELECT' && `Fase 3 · Identificación`}
+                        {phase === 'FEEDBACK' && `Fase 4 · Evaluación`}
+                      </span>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl">
-                  <Activity size={14} className="text-[#D4AF37]" />
-                  <span className="text-xs font-mono font-bold text-white">{currentSpeedMultiplier}x</span>
+                      {phase === 'MEMORIZE' && (
+                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                          Memoriza las <strong className="text-[#D4AF37]">{numTargets} esferas doradas</strong>
+                        </span>
+                      )}
+                      {phase === 'TRACKING' && (
+                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                          ¡Sigue las esferas en movimiento!
+                        </span>
+                      )}
+                      {phase === 'SELECT' && (
+                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                          Toca las <strong className="text-emerald-400">{numTargets} esferas</strong> memorizadas
+                        </span>
+                      )}
+                      {phase === 'FEEDBACK' && (
+                        <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                          Resultado de la repetición
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 h-4 sm:h-5 truncate">
+                      {phase === 'MEMORIZE' && 'Las esferas están estáticas para fijar tu memoria visual. El movimiento comenzará al terminar la cuenta atrás.'}
+                      {phase === 'TRACKING' && 'Mantén la mirada en los objetivos mientras rebotan libremente en el espacio 3D.'}
+                      {phase === 'SELECT' && `Toca las esferas directamente en el visor 3D o pulsa los números en el teclado abajo.`}
+                      {phase === 'FEEDBACK' && 'Verde: Acierto | Dorado: Objetivo sin marcar | Rojo: Esfera incorrecta.'}
+                    </p>
+                  </div>
                 </div>
 
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white"
-                  title="Pantalla Completa"
-                >
-                  {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                </button>
+                {/* Right metrics: Live countdown timer, counter & trial progress */}
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  {/* Live Countdown */}
+                  {(phase === 'MEMORIZE' || phase === 'TRACKING') && (
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-mono font-black text-xs sm:text-sm ${
+                      phase === 'MEMORIZE' 
+                        ? 'bg-[#D4AF37]/15 border-[#D4AF37]/40 text-[#D4AF37]' 
+                        : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400'
+                    }`}>
+                      <Clock size={14} />
+                      <span>{phaseCountdown}s</span>
+                    </div>
+                  )}
+
+                  {/* Select counter */}
+                  {phase === 'SELECT' && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-mono font-black text-xs sm:text-sm">
+                      <span>{selectedSphereIds.length}/{numTargets}</span>
+                    </div>
+                  )}
+
+                  {/* Speed badge */}
+                  <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 rounded-xl">
+                    <Activity size={13} className="text-[#D4AF37]" />
+                    <span className="text-xs font-mono font-bold text-white">{currentSpeedMultiplier}x</span>
+                  </div>
+
+                  {/* Trial progress badge */}
+                  <div className="bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 rounded-xl text-center">
+                    <span className="text-[10px] font-mono text-zinc-400">Rnd </span>
+                    <span className="text-xs font-mono font-bold text-[#D4AF37]">{currentTrial}/{totalTrials}</span>
+                  </div>
+
+                  {/* Fullscreen Button */}
+                  <button
+                    onClick={toggleFullscreen}
+                    className="p-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+                    title="Pantalla Completa"
+                  >
+                    {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* CANVAS 3D BOX */}
-            <div className={`relative w-full rounded-3xl overflow-hidden border-2 border-zinc-800 shadow-2xl bg-[#060709] flex items-center justify-center ${
+            {/* CANVAS 3D BOX (100% CONSTANT SIZE - NEVER SHRINKS OR SHIFTS BALLS ON FREEZE) */}
+            <div className={`relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-zinc-800 shadow-2xl bg-[#060709] flex items-center justify-center ${
               isFullscreen 
-                ? 'h-[74vh] max-h-[78vh]' 
-                : 'aspect-[16/10] sm:aspect-[16/9] max-h-[68vh]'
+                ? 'flex-1 min-h-[280px] w-full' 
+                : 'flex-1 min-h-[300px] sm:min-h-[440px] max-h-[72vh] w-full'
             }`}>
               <canvas
                 ref={canvasRef}
-                width={800}
-                height={500}
+                width={1100}
+                height={650}
                 onClick={e => handleCanvasInteraction(e.clientX, e.clientY)}
                 onTouchStart={e => {
                   if (e.touches && e.touches.length > 0) {
@@ -1055,85 +1255,115 @@ export const NeuroTrackerScreen: React.FC = () => {
                 }}
                 className={`w-full h-full object-contain touch-none select-none ${phase === 'SELECT' ? 'cursor-pointer' : 'cursor-default'}`}
               />
+            </div>
 
-              {/* Banner: Memorize Phase (Explains why balls are still) */}
-              {phase === 'MEMORIZE' && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-[#D4AF37] px-5 py-2.5 rounded-2xl flex items-center gap-2.5 shadow-2xl pointer-events-none">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] animate-ping" />
-                  <span className="text-[#D4AF37] font-black text-xs uppercase tracking-wider">
-                    👀 MEMORIZA LAS {numTargets} DORADAS ({phaseCountdown}s)... ¡EN SEGUIDA SE MOVERÁN!
-                  </span>
-                </div>
-              )}
-
-              {/* Banner: Tracking Phase */}
-              {phase === 'TRACKING' && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-cyan-500/60 px-5 py-2 rounded-2xl flex items-center gap-2.5 shadow-2xl pointer-events-none">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="text-cyan-400 font-bold text-xs uppercase tracking-wider">
-                    ⚡ ¡SIGUE LAS ESFERAS CON LA MIRADA! ({phaseCountdown}s)
-                  </span>
-                </div>
-              )}
-
-              {/* Banner: Instructions Overlay in Select Phase */}
+            {/* CONSTANT-HEIGHT BOTTOM PANEL (RESERVES IDENTICAL SPACE ACROSS ALL PHASES TO PREVENT CANVAS RESIZING) */}
+            <div className="w-full max-w-xl shrink-0 mt-2 sm:mt-2.5 h-[116px] sm:h-[126px] flex flex-col justify-center z-30">
+              {/* 1. SELECT PHASE: Keypad + Confirm Button */}
               {phase === 'SELECT' && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-emerald-500/60 px-5 py-2.5 rounded-2xl flex items-center gap-2 shadow-2xl pointer-events-none">
-                  <span className="text-emerald-400 font-black text-xs uppercase tracking-wider animate-pulse">
-                    👉 Toca en pantalla o usa el teclado inferior ({selectedSphereIds.length}/{numTargets})
+                <div className="flex flex-col items-center gap-2 w-full h-full justify-between">
+                  {/* Numeric quick-tap keypad for easy selection on mobile */}
+                  <div className="w-full bg-zinc-950/95 border border-zinc-800 p-2 rounded-2xl shadow-xl backdrop-blur-md">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400 font-bold uppercase tracking-wider px-2 mb-1">
+                      <span>Teclado Rápido (1 al 8):</span>
+                      <span className="text-emerald-400 font-mono font-bold">
+                        {selectedSphereIds.length} de {numTargets} Seleccionadas
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-8 gap-1.5 sm:gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
+                        const isSel = selectedSphereIds.includes(id);
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleSphereById(id)}
+                            className={`py-2 rounded-xl font-mono font-black text-sm sm:text-base transition-transform active:scale-90 border ${
+                              isSel
+                                ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.7)] scale-105'
+                                : 'bg-zinc-900 text-zinc-200 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'
+                            }`}
+                          >
+                            {id}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Instant Confirm / Comprobar Button */}
+                  <button
+                    onClick={handleConfirmSelection}
+                    disabled={selectedSphereIds.length === 0}
+                    className={`w-full py-3 sm:py-3.5 font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-xl ${
+                      selectedSphereIds.length >= numTargets
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] animate-pulse'
+                        : selectedSphereIds.length > 0
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    }`}
+                  >
+                    <CheckCircle2 size={18} /> Comprobar / Confirmar Selección ({selectedSphereIds.length}/{numTargets})
+                  </button>
+                </div>
+              )}
+
+              {/* 2. MEMORIZE PHASE: Focus telemetry panel (same height) */}
+              {phase === 'MEMORIZE' && (
+                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl border border-[#D4AF37]/30 shrink-0">
+                      <Sparkles size={20} className="animate-spin" />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-black text-white">Fase 1: Fijación Atencional</p>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">Memoriza los <strong className="text-[#D4AF37]">{numTargets} objetivos dorados</strong> antes de iniciar el movimiento.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37] rounded-xl font-mono font-black text-sm shrink-0">
+                    <Clock size={15} />
+                    <span>{phaseCountdown}s</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. TRACKING PHASE: Active tracking telemetry panel (same height) */}
+              {phase === 'TRACKING' && (
+                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/30 shrink-0">
+                      <FastForward size={20} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-black text-white">Fase 2: Rastreo Activo en Curso</p>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">Velocidad: <strong className="text-cyan-400">{currentSpeedMultiplier}x</strong> · Sigue las esferas con tu visión periférica.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded-xl font-mono font-black text-sm shrink-0">
+                    <Activity size={15} />
+                    <span>{phaseCountdown}s</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. FEEDBACK PHASE: Evaluation panel (same height) */}
+              {phase === 'FEEDBACK' && (
+                <div className="w-full h-full bg-zinc-950/90 border border-zinc-800 p-3 rounded-2xl flex items-center justify-between shadow-xl backdrop-blur-md">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 shrink-0">
+                      <CheckCircle2 size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-black text-white">Fase 4: Análisis de Repetición</p>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">Verde: Acierto | Dorado: Objetivo sin marcar | Rojo: Incorrecta.</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-black text-[#D4AF37] bg-[#D4AF37]/10 px-3 py-1.5 rounded-xl border border-[#D4AF37]/30 shrink-0">
+                    Siguiente en 1s...
                   </span>
                 </div>
               )}
             </div>
-
-            {/* BOTTOM CONTROLS FOR SELECTION */}
-            {phase === 'SELECT' && (
-              <div className="mt-3 sm:mt-4 flex flex-col items-center gap-2.5 w-full max-w-md">
-                {/* Numeric quick-tap keypad for easy selection on mobile */}
-                <div className="w-full bg-zinc-950/80 border border-zinc-800 p-2 rounded-2xl">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-bold uppercase tracking-wider px-2 mb-1.5">
-                    <span>Teclado de Números (1 al 8):</span>
-                    <span className="text-emerald-400 font-mono">
-                      {selectedSphereIds.length} de {numTargets} Seleccionadas
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-8 gap-1 sm:gap-1.5">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(id => {
-                      const isSel = selectedSphereIds.includes(id);
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => toggleSphereById(id)}
-                          className={`py-2 sm:py-2.5 rounded-xl font-mono font-black text-xs sm:text-sm transition-all border active:scale-90 ${
-                            isSel
-                              ? 'bg-cyan-500 text-black border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.6)]'
-                              : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700'
-                          }`}
-                        >
-                          {id}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Instant Confirm Button */}
-                <button
-                  onClick={handleConfirmSelection}
-                  disabled={selectedSphereIds.length === 0}
-                  className={`w-full py-3.5 font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
-                    selectedSphereIds.length >= numTargets
-                      ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.45)] animate-pulse'
-                      : selectedSphereIds.length > 0
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-black shadow-lg shadow-emerald-600/30'
-                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
-                  }`}
-                >
-                  <CheckCircle2 size={18} /> Confirmar Selección ({selectedSphereIds.length}/{numTargets})
-                </button>
-              </div>
-            )}
           </div>
         )}
 
